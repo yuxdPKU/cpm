@@ -45,6 +45,8 @@ by voxel, and writes the first local line-line PoCA pair QA tree.
 
 `macro/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
 accumulates pair-level PoCA deltas into voxel-level correction QA rows.
+The B1/B2 delta convention is `voxel center - crossing point`, matching the
+distortion values subtracted by `TpcDistortionCorrection`.
 
 Example B0/B1 preflight:
 

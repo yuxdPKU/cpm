@@ -3,8 +3,8 @@
  *
  * This macro reads B1 local line-line PoCA pair outputs, groups accepted pairs
  * by 3D voxel, and writes one correction-summary row per voxel. The output is a
- * QA/intermediate product; final distortion-map sign conventions are deferred
- * to the later container-writing step.
+ * QA/intermediate product. The input B1 delta convention is the same as the
+ * TpcDistortionCorrection distortion convention: voxel center - crossing point.
  */
 
 #include <TChain.h>

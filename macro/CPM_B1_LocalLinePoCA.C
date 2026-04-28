@@ -333,16 +333,16 @@ void CPM_B1_LocalLinePoCA(
         voxel_center_x = a.voxel_center.x;
         voxel_center_y = a.voxel_center.y;
         voxel_center_z = a.voxel_center.z;
-        delta_x = midpoint_x - voxel_center_x;
-        delta_y = midpoint_y - voxel_center_y;
-        delta_z = midpoint_z - voxel_center_z;
+        delta_x = voxel_center_x - midpoint_x;
+        delta_y = voxel_center_y - midpoint_y;
+        delta_z = voxel_center_z - midpoint_z;
 
         const double voxel_r = std::hypot(voxel_center_x, voxel_center_y);
         const double midpoint_r = std::hypot(midpoint_x, midpoint_y);
         const double voxel_phi = std::atan2(voxel_center_y, voxel_center_x);
         const double midpoint_phi = std::atan2(midpoint_y, midpoint_x);
-        delta_r = midpoint_r - voxel_r;
-        delta_phi = CPMB1::wrap_delta_phi(midpoint_phi - voxel_phi);
+        delta_r = voxel_r - midpoint_r;
+        delta_phi = CPMB1::wrap_delta_phi(voxel_phi - midpoint_phi);
         delta_rphi = voxel_r * delta_phi;
 
         pairs.Fill();
