@@ -43,6 +43,9 @@ mini-DST rehydration is attempted.
 `macro/CPM_B1_LocalLinePoCA.C` reads one or more Job A outputs, groups records
 by voxel, and writes the first local line-line PoCA pair QA tree.
 
+`macro/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
+accumulates pair-level PoCA deltas into voxel-level correction QA rows.
+
 Example B0/B1 preflight:
 
 ```sh
@@ -50,6 +53,7 @@ root -l -b -q 'macro/CPM_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root","CPM
 root -l -b -q 'macro/CPM_B0_BuildEventIndex.C("cpm_filelist.txt","CPM_B0_event_index.root",true)'
 root -l -b -q 'macro/CPM_B0_CheckEventIndex.C("CPM_B0_event_index.root")'
 root -l -b -q 'macro/CPM_B1_LocalLinePoCA.C("jobA_CPMVoxelContainer.root","CPM_B1_local_line_poca.root")'
+root -l -b -q 'macro/CPM_B2_AccumulateVoxelCorrections.C("CPM_B1_local_line_poca.root","CPM_B2_voxel_corrections.root")'
 ```
 
 For Condor production, run Job A once per DST/segment and write one
