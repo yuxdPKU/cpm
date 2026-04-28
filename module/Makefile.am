@@ -60,8 +60,10 @@ testexternals_cpm_LDADD = \
   libcpm.la
 
 test_local_line_poca_SOURCES = \
-  CPMLocalLinePoCA.cc \
   test_local_line_poca.cc
+
+test_local_line_poca_LDADD = \
+  libcpm.la
 
 testexternals.cc:
 	echo "//*** this is a generated file. Do not commit, do not edit" > $@
