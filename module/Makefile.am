@@ -47,10 +47,30 @@ libcpm_la_SOURCES = \
   PHCPMTpcCalibration.cc
 
 noinst_PROGRAMS = \
+  testexternals_cpm \
   test_local_line_poca
+
+BUILT_SOURCES = \
+  testexternals.cc
+
+testexternals_cpm_SOURCES = \
+  testexternals.cc
+
+testexternals_cpm_LDADD = \
+  libcpm.la
 
 test_local_line_poca_SOURCES = \
   CPMLocalLinePoCA.cc \
   test_local_line_poca.cc
+
+testexternals.cc:
+	echo "//*** this is a generated file. Do not commit, do not edit" > $@
+	echo "int main()" >> $@
+	echo "{" >> $@
+	echo "  return 0;" >> $@
+	echo "}" >> $@
+
+clean-local:
+	rm -f $(BUILT_SOURCES)
 
 ##############################################
