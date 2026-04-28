@@ -671,8 +671,11 @@ namespace cpm
     out.boundary = geometryId.boundary();
 
     const auto& geoContext = m_tGeometry->geometry().getGeoContext();
-    const auto center = surface->center(geoContext) / Acts::UnitConstants::cm;
-    out.center = {center.x(), center.y(), center.z()};
+    const Acts::Vector3 center = surface->center(geoContext);
+    out.center = {
+        center.x() / Acts::UnitConstants::cm,
+        center.y() / Acts::UnitConstants::cm,
+        center.z() / Acts::UnitConstants::cm};
 
     return out;
   }
