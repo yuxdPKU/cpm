@@ -14,20 +14,25 @@ AM_LDFLAGS = \
   -L$(libdir) \
   -L$(ROOTSYS)/lib \
   -L$(OFFLINE_MAIN)/lib \
-  -L$(OFFLINE_MAIN)/lib64
+  -L$(OFFLINE_MAIN)/lib64 \
+  -L$(OPT_SPHENIX)/lib
 
 lib_LTLIBRARIES = \
   libcpm.la
 
 libcpm_la_LIBADD = \
+  -lActsCore \
   -lCore \
   -lffaobjects \
   -lphool \
   -lRIO \
   -lSubsysReco \
   -lTree \
+  -ltpc \
   -ltrack_io \
+  -ltrack \
   -ltrackbase_historic_io \
+  -ltrackbase_historic \
   -ltpc_io
 
 pkginclude_HEADERS = \
@@ -45,9 +50,7 @@ noinst_PROGRAMS = \
   test_local_line_poca
 
 test_local_line_poca_SOURCES = \
+  CPMLocalLinePoCA.cc \
   test_local_line_poca.cc
-
-test_local_line_poca_LDADD = \
-  libcpm.la
 
 ##############################################
