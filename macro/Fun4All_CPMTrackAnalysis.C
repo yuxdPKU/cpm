@@ -44,6 +44,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdio.h>
 #include <string>
 #include <utility>
@@ -70,7 +71,8 @@ void Fun4All_CPMTrackAnalysis(
     const int index = 0,
     const int stepsize = 10,
     const bool convertSeeds = false,
-    const bool writeMiniDst = true)
+    const bool writeMiniDst = true,
+    const bool writePrunedSeedsToMiniDst = false)
 {
   std::string inputclusterFile = clusterfilename;
 
@@ -397,7 +399,7 @@ void Fun4All_CPMTrackAnalysis(
 
     cpmreco->setOutputfile(cpmstring);
     cpmreco->setClusterSource(inputclusterFile);
-    cpmreco->setTrackSource(writeMiniDst ? cpmmindstfinalstring : inputclusterFile);
+    cpmreco->setTrackSource(writeMiniDst ? cpmmindstfinalstring : "");
     cpmreco->setRunSegment(runnumber, segment);
     cpmreco->setTrackMapName("SvtxSiliconMMTrackMap");
     cpmreco->setMinPt(0.5);
@@ -408,14 +410,23 @@ void Fun4All_CPMTrackAnalysis(
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
 
+    if (!writeMiniDst)
+    {
+      std::cout << "Fun4All_CPMTrackAnalysis - writeMiniDst is false. "
+                << "CPM snapshots remain usable, but SvtxTrack object rehydration is disabled."
+                << std::endl;
+    }
+
     if (writeMiniDst)
     {
       auto out = new Fun4AllDstOutputManager("CPMMiniDstOutput", cpmmindststring);
       out->AddNode("Sync");
       out->AddNode("EventHeader");
-      //out->AddNode("TRKR_CLUSTER");
       out->AddNode("SvtxSiliconMMTrackMap");
-      out->AddNode("PrunedSvtxTrackSeedContainer");
+      if (writePrunedSeedsToMiniDst)
+      {
+        out->AddNode("PrunedSvtxTrackSeedContainer");
+      }
       se->registerOutputManager(out);
     }
   }

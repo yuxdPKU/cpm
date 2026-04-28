@@ -25,6 +25,12 @@ Job A writes a flat ROOT file with:
 - `cpm_records`: one ACTS-ready TPC state/voxel record per row;
 - `cpm_metadata`: grid and counter metadata for the Job A segment.
 
+For the cluster-DST production mode, Job A stores `cluster_source` as the input
+cluster DST and `track_source` as the optional CPM mini-DST containing
+`SvtxSiliconMMTrackMap`. The mini-DST intentionally does not store
+`TRKR_CLUSTER`; clusters are recovered from `cluster_source` if a later
+rehydration pass needs them.
+
 `macro/CPM_B0_BuildEventIndex.C` reads one or more Job A output files and
 builds:
 
@@ -34,12 +40,16 @@ builds:
 `macro/CPM_B0_CheckEventIndex.C` performs a light QA pass on that index before
 mini-DST rehydration is attempted.
 
-Example B0 preflight:
+`macro/CPM_B1_LocalLinePoCA.C` reads one or more Job A outputs, groups records
+by voxel, and writes the first local line-line PoCA pair QA tree.
+
+Example B0/B1 preflight:
 
 ```sh
 root -l -b -q 'macro/CPM_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root","CPM_B0_event_index.root")'
 root -l -b -q 'macro/CPM_B0_BuildEventIndex.C("cpm_filelist.txt","CPM_B0_event_index.root",true)'
 root -l -b -q 'macro/CPM_B0_CheckEventIndex.C("CPM_B0_event_index.root")'
+root -l -b -q 'macro/CPM_B1_LocalLinePoCA.C("jobA_CPMVoxelContainer.root","CPM_B1_local_line_poca.root")'
 ```
 
 For Condor production, run Job A once per DST/segment and write one

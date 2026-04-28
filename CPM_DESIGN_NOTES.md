@@ -250,7 +250,7 @@ The reference fields should include at least:
 - state cluster key, expected to match `SvtxTrackState::get_cluskey()`;
 - cluster key in `TRKR_CLUSTER`.
 
-`SvtxSiliconMMTrackMap` can be persisted in a CPM mini-DST. The current workflow already contains a commented output block that writes `SvtxSiliconMMTrackMap`; CPM should make this an explicit optional output. A useful mini-DST for rehydration would include `Sync`, `EventHeader`, `TRKR_CLUSTER`, `SvtxSiliconMMTrackMap`, and `PrunedSvtxTrackSeedContainer`. Seed containers can be added later if full ACTS refit from source links becomes a requirement.
+`SvtxSiliconMMTrackMap` can be persisted in a CPM mini-DST. The current workflow already contains a commented output block that writes `SvtxSiliconMMTrackMap`; CPM should make this an explicit optional output. In the cluster-DST production mode, the mini-DST should stay small and store `Sync`, `EventHeader`, and `SvtxSiliconMMTrackMap`. `TRKR_CLUSTER` is intentionally not stored in the mini-DST because it is large and can be recovered from the original input cluster DST recorded as `cluster_source`. Seed containers are not required for the local line-line PoCA solver and should remain optional; they are only needed if a later workflow wants to redo a full ACTS refit from source links rather than using the stored track states/snapshots.
 
 For performance, Job B should not randomly read the DST for every voxel entry or every track pair. If DST rehydration is needed, use a separate Job B0 stage:
 
@@ -258,7 +258,7 @@ For performance, Job B should not randomly read the DST for every voxel entry or
 2. Group and deduplicate requests by `(filename, run, segment, event id)`.
 3. Sort requests in file/event order.
 4. Sequentially read each source mini-DST once.
-5. For each requested event, pull all requested tracks/states/clusters from `SvtxSiliconMMTrackMap` and `TRKR_CLUSTER`.
+5. For each requested event, pull requested tracks/states from `track_source`/`SvtxSiliconMMTrackMap` and requested clusters from `cluster_source`/`TRKR_CLUSTER`.
 6. Write an enriched or validation container, then run the actual crossing-point correction in Job B1.
 
 This keeps the normal CPM path fast and reproducible from the snapshot fields, while still preserving a route back to full Fun4All objects. The important rule is that DST rehydration should be event-ordered and deduplicated; the unit of DST readback is an event, not a pair or a single track.
@@ -327,11 +327,12 @@ Decision: CPM v1 will use local line-line PoCA from `SvtxTrackState` as the firs
 - Repository layout now follows the intended CPM package split: `module/` contains source/header/build files, including an autotools skeleton modeled after coresoftware packages, while `macro/` is reserved for Fun4All running macros.
 - Drafted the first CPM Job A `SubsysReco` interface around the new record/container model.
 - Promoted the CPM Job A macro from a helper skeleton to a complete workflow macro based on `currentworkflow/Fun4All_TrackAnalysis.C`, with `PHTpcResiduals` replaced by `PHCPMTpcCalibration`.
-- Added optional CPM mini-DST output to the Job A macro, including `Sync`, `EventHeader`, `TRKR_CLUSTER`, `SvtxSiliconMMTrackMap`, and `PrunedSvtxTrackSeedContainer`.
+- Added optional CPM mini-DST output to the Job A macro. The current default mini-DST stores `Sync`, `EventHeader`, and `SvtxSiliconMMTrackMap`; `TRKR_CLUSTER` is recovered from the input cluster DST, and pruned seeds are optional because the v1 PoCA solver does not need seed objects.
 - Added first Job A flat ROOT persistence: `cpm_records` stores one ACTS-ready state/voxel record per row, and `cpm_metadata` stores grid/counter metadata.
 - Drafted the first CPM Job B0 event-index skeleton. It scans `cpm_records`, sorts/deduplicates event references, and writes `cpm_event_requests` plus `cpm_object_requests` for a later sequential mini-DST rehydration pass.
 - Added file-list input support for B0 so large Condor productions can pass hundreds or thousands of Job A ROOT outputs without constructing a huge ROOT command line.
 - Added a first B0 event-index QA macro that checks object/event consistency before the mini-DST rehydration pass.
+- Added the first B1 local line-line PoCA macro. It reads Job A snapshots directly, groups records by 3D voxel, forms different-track pairs, and writes pair-level crossing QA without requiring seeds or `TRKR_CLUSTER` in the mini-DST.
 - Draft the second CPM Job B0 rehydration/validation skeleton that reads `cpm_event_requests`, sequentially scans the mini-DST once, and writes an enriched validation output. This should be finalized against the server-side Fun4All input setup so the source-file identity and event synchronization policy are not guessed locally.
 - Draft a CPM Job B1 macro skeleton that reads CPM segment or enriched outputs and writes 3D `TpcDistortionCorrectionContainerAverage`-compatible histograms, with explicit TPOT phi/theta range overrides.
 - Define whether CPM should include an extrapolation step analogous to `TpcSpaceChargeMatrixInversion::extrapolate_distortion_corrections`, or only produce corrections in the acceptance where crossing-point statistics exist.
