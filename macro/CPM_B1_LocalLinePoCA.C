@@ -2,9 +2,9 @@
  * CPM Job B1 local line-line PoCA prototype.
  *
  * This macro reads Job A cpm_records, groups ACTS-ready state snapshots by
- * voxel, forms track-state pairs inside each voxel, and computes the first CPM
- * local line-line point of closest approach. It does not require seed objects
- * or TRKR_CLUSTER in the CPM mini-DST.
+ * voxel, forms same-charge track-state pairs inside each voxel, and computes
+ * the first CPM local line-line point of closest approach. It does not require
+ * seed objects or TRKR_CLUSTER in the CPM mini-DST.
  */
 
 #include <CPMLocalLinePoCA.h>
@@ -64,6 +64,8 @@ namespace CPMB1
     Long64_t entry = -1;
     EventTrackKey event_track;
     unsigned long long cluskey = 0;
+    int charge = 0;
+    double pt = std::numeric_limits<double>::quiet_NaN();
     VoxelKey voxel;
     cpm::Vector3 voxel_center;
     cpm::Vector3 offset;
@@ -83,6 +85,16 @@ namespace CPMB1
       value += 2.0 * pi;
     }
     return value;
+  }
+
+  bool has_good_curvature_proxy(const Record& record)
+  {
+    return record.charge != 0 && std::isfinite(record.pt) && record.pt > 0.0;
+  }
+
+  double pair_weight_from_curvature_proxy(const Record& a, const Record& b)
+  {
+    return 1.0 / (a.pt * b.pt);
   }
 
   std::vector<std::string> read_file_list(const std::string& input_list)
@@ -107,7 +119,8 @@ void CPM_B1_LocalLinePoCA(
     const std::string& output_file = "CPM_B1_local_line_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
-    const unsigned int max_records_per_voxel = 500)
+    const unsigned int max_records_per_voxel = 500,
+    const unsigned int min_records_per_charge = 2)
 {
   TChain chain("cpm_records");
   for (const auto& file : input_files)
@@ -124,6 +137,8 @@ void CPM_B1_LocalLinePoCA(
   unsigned long long stream_event_ordinal = 0;
   unsigned int track_id = 0;
   unsigned long long cluskey = 0;
+  int charge = 0;
+  float pt = std::numeric_limits<float>::quiet_NaN();
   int iphi = -1;
   int ir = -1;
   int iz = -1;
@@ -149,6 +164,8 @@ void CPM_B1_LocalLinePoCA(
   chain.SetBranchAddress("stream_event_ordinal", &stream_event_ordinal);
   chain.SetBranchAddress("track_id", &track_id);
   chain.SetBranchAddress("cluskey", &cluskey);
+  chain.SetBranchAddress("charge", &charge);
+  chain.SetBranchAddress("pt", &pt);
   chain.SetBranchAddress("iphi", &iphi);
   chain.SetBranchAddress("ir", &ir);
   chain.SetBranchAddress("iz", &iz);
@@ -183,6 +200,8 @@ void CPM_B1_LocalLinePoCA(
     record.event_track.stream_event_ordinal = stream_event_ordinal;
     record.event_track.track_id = track_id;
     record.cluskey = cluskey;
+    record.charge = charge;
+    record.pt = pt;
     record.voxel = {iphi, ir, iz};
     record.voxel_center = {voxel_x, voxel_y, voxel_z};
     record.offset = {offset_x, offset_y, offset_z};
@@ -209,6 +228,11 @@ void CPM_B1_LocalLinePoCA(
   unsigned int track_id_b = 0;
   unsigned long long cluskey_a = 0;
   unsigned long long cluskey_b = 0;
+  int charge_a = 0;
+  int charge_b = 0;
+  double pt_a = std::numeric_limits<double>::quiet_NaN();
+  double pt_b = std::numeric_limits<double>::quiet_NaN();
+  double pair_weight = std::numeric_limits<double>::quiet_NaN();
   double dca = std::numeric_limits<double>::quiet_NaN();
   double s = std::numeric_limits<double>::quiet_NaN();
   double t = std::numeric_limits<double>::quiet_NaN();
@@ -240,6 +264,11 @@ void CPM_B1_LocalLinePoCA(
   pairs.Branch("track_id_b", &track_id_b);
   pairs.Branch("cluskey_a", &cluskey_a);
   pairs.Branch("cluskey_b", &cluskey_b);
+  pairs.Branch("charge_a", &charge_a);
+  pairs.Branch("charge_b", &charge_b);
+  pairs.Branch("pt_a", &pt_a);
+  pairs.Branch("pt_b", &pt_b);
+  pairs.Branch("pair_weight", &pair_weight);
   pairs.Branch("dca", &dca);
   pairs.Branch("s", &s);
   pairs.Branch("t", &t);
@@ -268,6 +297,7 @@ void CPM_B1_LocalLinePoCA(
   unsigned long long candidate_pairs = 0;
   unsigned long long accepted_pairs = 0;
   unsigned int processed_voxels = 0;
+  unsigned int skipped_low_charge_voxels = 0;
   unsigned int skipped_large_voxels = 0;
 
   for (const auto& [voxel, records] : records_by_voxel)
@@ -282,6 +312,31 @@ void CPM_B1_LocalLinePoCA(
       continue;
     }
 
+    unsigned int positive_records = 0;
+    unsigned int negative_records = 0;
+    for (const auto& record : records)
+    {
+      if (!CPMB1::has_good_curvature_proxy(record))
+      {
+        continue;
+      }
+      if (record.charge > 0)
+      {
+        ++positive_records;
+      }
+      else if (record.charge < 0)
+      {
+        ++negative_records;
+      }
+    }
+
+    if (positive_records < min_records_per_charge &&
+        negative_records < min_records_per_charge)
+    {
+      ++skipped_low_charge_voxels;
+      continue;
+    }
+
     ++processed_voxels;
     for (std::size_t ia = 0; ia < records.size(); ++ia)
     {
@@ -293,8 +348,25 @@ void CPM_B1_LocalLinePoCA(
         {
           continue;
         }
+        if (!CPMB1::has_good_curvature_proxy(a) ||
+            !CPMB1::has_good_curvature_proxy(b) ||
+            a.charge != b.charge)
+        {
+          continue;
+        }
+        if ((a.charge > 0 && positive_records < min_records_per_charge) ||
+            (a.charge < 0 && negative_records < min_records_per_charge))
+        {
+          continue;
+        }
 
         ++candidate_pairs;
+        pair_weight = CPMB1::pair_weight_from_curvature_proxy(a, b);
+        if (!std::isfinite(pair_weight) || pair_weight <= 0.0)
+        {
+          continue;
+        }
+
         const cpm::Vector3 point_a = a.state_position - a.offset;
         const cpm::Vector3 point_b = b.state_position - b.offset;
         const auto result = cpm::computeLocalLinePoCA(
@@ -318,6 +390,10 @@ void CPM_B1_LocalLinePoCA(
         track_id_b = b.event_track.track_id;
         cluskey_a = a.cluskey;
         cluskey_b = b.cluskey;
+        charge_a = a.charge;
+        charge_b = b.charge;
+        pt_a = a.pt;
+        pt_b = b.pt;
         dca = result.dca;
         s = result.s;
         t = result.t;
@@ -358,17 +434,20 @@ void CPM_B1_LocalLinePoCA(
   double summary_max_pair_dca = max_pair_dca;
   double summary_min_sin_angle = min_sin_angle;
   unsigned int summary_max_records_per_voxel = max_records_per_voxel;
+  unsigned int summary_min_records_per_charge = min_records_per_charge;
 
   summary.Branch("input_records", &input_records);
   summary.Branch("input_files", &input_files_count);
   summary.Branch("voxel_count", &voxel_count);
   summary.Branch("processed_voxels", &processed_voxels);
   summary.Branch("skipped_large_voxels", &skipped_large_voxels);
+  summary.Branch("skipped_low_charge_voxels", &skipped_low_charge_voxels);
   summary.Branch("candidate_pairs", &candidate_pairs);
   summary.Branch("accepted_pairs", &accepted_pairs);
   summary.Branch("max_pair_dca", &summary_max_pair_dca);
   summary.Branch("min_sin_angle", &summary_min_sin_angle);
   summary.Branch("max_records_per_voxel", &summary_max_records_per_voxel);
+  summary.Branch("min_records_per_charge", &summary_min_records_per_charge);
   summary.Fill();
 
   pairs.Write();
@@ -379,6 +458,7 @@ void CPM_B1_LocalLinePoCA(
   std::cout << "CPM_B1_LocalLinePoCA - voxels: " << voxel_count << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - processed voxels: " << processed_voxels << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - skipped large voxels: " << skipped_large_voxels << std::endl;
+  std::cout << "CPM_B1_LocalLinePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - candidate pairs: " << candidate_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - accepted pairs: " << accepted_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - output: " << output_file << std::endl;
@@ -389,14 +469,16 @@ void CPM_B1_LocalLinePoCA(
     const std::string& output_file = "CPM_B1_local_line_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
-    const unsigned int max_records_per_voxel = 500)
+    const unsigned int max_records_per_voxel = 500,
+    const unsigned int min_records_per_charge = 2)
 {
   CPM_B1_LocalLinePoCA(
       std::vector<std::string>{input_file},
       output_file,
       max_pair_dca,
       min_sin_angle,
-      max_records_per_voxel);
+      max_records_per_voxel,
+      min_records_per_charge);
 }
 
 void CPM_B1_LocalLinePoCA(
@@ -405,7 +487,8 @@ void CPM_B1_LocalLinePoCA(
     const bool input_is_list,
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
-    const unsigned int max_records_per_voxel = 500)
+    const unsigned int max_records_per_voxel = 500,
+    const unsigned int min_records_per_charge = 2)
 {
   const auto input_files = input_is_list ?
       CPMB1::read_file_list(input_file_or_list) :
@@ -416,5 +499,6 @@ void CPM_B1_LocalLinePoCA(
       output_file,
       max_pair_dca,
       min_sin_angle,
-      max_records_per_voxel);
+      max_records_per_voxel,
+      min_records_per_charge);
 }

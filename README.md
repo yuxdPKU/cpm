@@ -41,10 +41,14 @@ builds:
 mini-DST rehydration is attempted.
 
 `macro/CPM_B1_LocalLinePoCA.C` reads one or more Job A outputs, groups records
-by voxel, and writes the first local line-line PoCA pair QA tree.
+by voxel, applies the intra-voxel offset shift, forms same-charge local
+line-line PoCA pairs, and writes the pair QA tree. It stores a pair weight
+`1/(pt_a*pt_b)`, which is proportional to the method weight
+`(1/R_a)*(1/R_b)` for a fixed magnetic field.
 
 `macro/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
-accumulates pair-level PoCA deltas into voxel-level correction QA rows.
+accumulates pair-level PoCA deltas into voxel-level correction QA rows using
+that curvature-proxy weighted average.
 The B1/B2 delta convention is `voxel center - crossing point`, matching the
 distortion values subtracted by `TpcDistortionCorrection`.
 
@@ -72,6 +76,22 @@ root -l -b -q 'macro/CPM_B3_CheckAverageCorrectionHistograms.C("CPM_B3_average_c
 For Condor production, run Job A once per DST/segment and write one
 `*_CPMVoxelContainer.root` per job. Put those output filenames in
 `cpm_filelist.txt`, one file per line, then build the B0 index from the list.
+
+The full Job B chain can also be run with:
+
+```sh
+scripts/run_cpm_b_chain.sh \
+  --input jobA_CPMVoxelContainer.root \
+  --out-dir cpm_jobB \
+  --prefix test
+
+scripts/run_cpm_b_chain.sh \
+  --input cpm_filelist.txt \
+  --input-is-list \
+  --out-dir cpm_jobB \
+  --prefix merged \
+  --b1-min-records-per-charge 10
+```
 
 ## Build and Test
 

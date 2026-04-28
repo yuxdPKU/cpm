@@ -2,9 +2,12 @@
  * CPM Job B2 voxel-level accumulator.
  *
  * This macro reads B1 local line-line PoCA pair outputs, groups accepted pairs
- * by 3D voxel, and writes one correction-summary row per voxel. The output is a
- * QA/intermediate product. The input B1 delta convention is the same as the
- * TpcDistortionCorrection distortion convention: voxel center - crossing point.
+ * by 3D voxel, and writes one correction-summary row per voxel. Pairwise
+ * crossing estimates are averaged with the B1 curvature proxy weight
+ * 1/(pt_i pt_j), proportional to (1/R_i)(1/R_j) in a fixed magnetic field.
+ * The output is a QA/intermediate product. The input B1 delta convention is the
+ * same as the TpcDistortionCorrection distortion convention:
+ * voxel center - crossing point.
  */
 
 #include <TChain.h>
@@ -38,14 +41,16 @@ namespace CPMB2
   struct Accumulator
   {
     unsigned long long entries = 0;
-    double sum_delta_r = 0.0;
-    double sum_delta_r2 = 0.0;
-    double sum_delta_rphi = 0.0;
-    double sum_delta_rphi2 = 0.0;
-    double sum_delta_phi = 0.0;
-    double sum_delta_phi2 = 0.0;
-    double sum_delta_z = 0.0;
-    double sum_delta_z2 = 0.0;
+    double sum_weight = 0.0;
+    double sum_weight2 = 0.0;
+    double sum_weighted_delta_r = 0.0;
+    double sum_weighted_delta_r2 = 0.0;
+    double sum_weighted_delta_rphi = 0.0;
+    double sum_weighted_delta_rphi2 = 0.0;
+    double sum_weighted_delta_phi = 0.0;
+    double sum_weighted_delta_phi2 = 0.0;
+    double sum_weighted_delta_z = 0.0;
+    double sum_weighted_delta_z2 = 0.0;
     double sum_dca = 0.0;
     double sum_dca2 = 0.0;
     double sum_voxel_x = 0.0;
@@ -58,19 +63,22 @@ namespace CPMB2
         const double delta_phi,
         const double delta_z,
         const double dca,
+        const double weight,
         const double voxel_x,
         const double voxel_y,
         const double voxel_z)
     {
       ++entries;
-      sum_delta_r += delta_r;
-      sum_delta_r2 += delta_r * delta_r;
-      sum_delta_rphi += delta_rphi;
-      sum_delta_rphi2 += delta_rphi * delta_rphi;
-      sum_delta_phi += delta_phi;
-      sum_delta_phi2 += delta_phi * delta_phi;
-      sum_delta_z += delta_z;
-      sum_delta_z2 += delta_z * delta_z;
+      sum_weight += weight;
+      sum_weight2 += weight * weight;
+      sum_weighted_delta_r += weight * delta_r;
+      sum_weighted_delta_r2 += weight * delta_r * delta_r;
+      sum_weighted_delta_rphi += weight * delta_rphi;
+      sum_weighted_delta_rphi2 += weight * delta_rphi * delta_rphi;
+      sum_weighted_delta_phi += weight * delta_phi;
+      sum_weighted_delta_phi2 += weight * delta_phi * delta_phi;
+      sum_weighted_delta_z += weight * delta_z;
+      sum_weighted_delta_z2 += weight * delta_z * delta_z;
       sum_dca += dca;
       sum_dca2 += dca * dca;
       sum_voxel_x += voxel_x;
@@ -82,6 +90,22 @@ namespace CPMB2
   double mean(const double sum, const unsigned long long entries)
   {
     return entries > 0 ? sum / static_cast<double>(entries) : std::numeric_limits<double>::quiet_NaN();
+  }
+
+  double weighted_mean(const double sum_weighted, const double sum_weight)
+  {
+    return sum_weight > 0.0 ? sum_weighted / sum_weight : std::numeric_limits<double>::quiet_NaN();
+  }
+
+  double weighted_rms(const double sum_weighted, const double sum_weighted2, const double sum_weight)
+  {
+    if (sum_weight <= 0.0)
+    {
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double average = weighted_mean(sum_weighted, sum_weight);
+    const double variance = sum_weighted2 / sum_weight - average * average;
+    return std::sqrt(std::max(0.0, variance));
   }
 
   double rms(const double sum, const double sum2, const unsigned long long entries)
@@ -131,6 +155,7 @@ void CPM_B2_AccumulateVoxelCorrections(
   double voxel_center_x = std::numeric_limits<double>::quiet_NaN();
   double voxel_center_y = std::numeric_limits<double>::quiet_NaN();
   double voxel_center_z = std::numeric_limits<double>::quiet_NaN();
+  double pair_weight = 1.0;
   double delta_r = std::numeric_limits<double>::quiet_NaN();
   double delta_rphi = std::numeric_limits<double>::quiet_NaN();
   double delta_phi = std::numeric_limits<double>::quiet_NaN();
@@ -143,6 +168,11 @@ void CPM_B2_AccumulateVoxelCorrections(
   chain.SetBranchAddress("voxel_center_x", &voxel_center_x);
   chain.SetBranchAddress("voxel_center_y", &voxel_center_y);
   chain.SetBranchAddress("voxel_center_z", &voxel_center_z);
+  const bool has_pair_weight = chain.GetBranch("pair_weight") != nullptr;
+  if (has_pair_weight)
+  {
+    chain.SetBranchAddress("pair_weight", &pair_weight);
+  }
   chain.SetBranchAddress("delta_r", &delta_r);
   chain.SetBranchAddress("delta_rphi", &delta_rphi);
   chain.SetBranchAddress("delta_phi", &delta_phi);
@@ -156,11 +186,16 @@ void CPM_B2_AccumulateVoxelCorrections(
   for (Long64_t entry = 0; entry < input_pairs; ++entry)
   {
     chain.GetEntry(entry);
+    if (!has_pair_weight)
+    {
+      pair_weight = 1.0;
+    }
 
     if (iphi < 0 || ir < 0 || iz < 0 ||
         !std::isfinite(delta_r) || !std::isfinite(delta_rphi) ||
         !std::isfinite(delta_phi) || !std::isfinite(delta_z) ||
-        !std::isfinite(dca))
+        !std::isfinite(dca) ||
+        !std::isfinite(pair_weight) || pair_weight <= 0.0)
     {
       ++rejected_pairs;
       continue;
@@ -177,6 +212,7 @@ void CPM_B2_AccumulateVoxelCorrections(
         delta_phi,
         delta_z,
         dca,
+        pair_weight,
         voxel_center_x,
         voxel_center_y,
         voxel_center_z);
@@ -193,6 +229,9 @@ void CPM_B2_AccumulateVoxelCorrections(
   double voxel_x = std::numeric_limits<double>::quiet_NaN();
   double voxel_y = std::numeric_limits<double>::quiet_NaN();
   double voxel_z = std::numeric_limits<double>::quiet_NaN();
+  double sum_pair_weight = std::numeric_limits<double>::quiet_NaN();
+  double mean_pair_weight = std::numeric_limits<double>::quiet_NaN();
+  double effective_pair_entries = std::numeric_limits<double>::quiet_NaN();
   double mean_delta_r = std::numeric_limits<double>::quiet_NaN();
   double rms_delta_r = std::numeric_limits<double>::quiet_NaN();
   double mean_delta_rphi = std::numeric_limits<double>::quiet_NaN();
@@ -211,6 +250,9 @@ void CPM_B2_AccumulateVoxelCorrections(
   voxels.Branch("voxel_x", &voxel_x);
   voxels.Branch("voxel_y", &voxel_y);
   voxels.Branch("voxel_z", &voxel_z);
+  voxels.Branch("sum_pair_weight", &sum_pair_weight);
+  voxels.Branch("mean_pair_weight", &mean_pair_weight);
+  voxels.Branch("effective_pair_entries", &effective_pair_entries);
   voxels.Branch("mean_delta_r", &mean_delta_r);
   voxels.Branch("rms_delta_r", &rms_delta_r);
   voxels.Branch("mean_delta_rphi", &mean_delta_rphi);
@@ -239,14 +281,19 @@ void CPM_B2_AccumulateVoxelCorrections(
     voxel_x = CPMB2::mean(accumulator.sum_voxel_x, entries);
     voxel_y = CPMB2::mean(accumulator.sum_voxel_y, entries);
     voxel_z = CPMB2::mean(accumulator.sum_voxel_z, entries);
-    mean_delta_r = CPMB2::mean(accumulator.sum_delta_r, entries);
-    rms_delta_r = CPMB2::rms(accumulator.sum_delta_r, accumulator.sum_delta_r2, entries);
-    mean_delta_rphi = CPMB2::mean(accumulator.sum_delta_rphi, entries);
-    rms_delta_rphi = CPMB2::rms(accumulator.sum_delta_rphi, accumulator.sum_delta_rphi2, entries);
-    mean_delta_phi = CPMB2::mean(accumulator.sum_delta_phi, entries);
-    rms_delta_phi = CPMB2::rms(accumulator.sum_delta_phi, accumulator.sum_delta_phi2, entries);
-    mean_delta_z = CPMB2::mean(accumulator.sum_delta_z, entries);
-    rms_delta_z = CPMB2::rms(accumulator.sum_delta_z, accumulator.sum_delta_z2, entries);
+    sum_pair_weight = accumulator.sum_weight;
+    mean_pair_weight = CPMB2::mean(accumulator.sum_weight, entries);
+    effective_pair_entries = accumulator.sum_weight2 > 0.0 ?
+        accumulator.sum_weight * accumulator.sum_weight / accumulator.sum_weight2 :
+        std::numeric_limits<double>::quiet_NaN();
+    mean_delta_r = CPMB2::weighted_mean(accumulator.sum_weighted_delta_r, accumulator.sum_weight);
+    rms_delta_r = CPMB2::weighted_rms(accumulator.sum_weighted_delta_r, accumulator.sum_weighted_delta_r2, accumulator.sum_weight);
+    mean_delta_rphi = CPMB2::weighted_mean(accumulator.sum_weighted_delta_rphi, accumulator.sum_weight);
+    rms_delta_rphi = CPMB2::weighted_rms(accumulator.sum_weighted_delta_rphi, accumulator.sum_weighted_delta_rphi2, accumulator.sum_weight);
+    mean_delta_phi = CPMB2::weighted_mean(accumulator.sum_weighted_delta_phi, accumulator.sum_weight);
+    rms_delta_phi = CPMB2::weighted_rms(accumulator.sum_weighted_delta_phi, accumulator.sum_weighted_delta_phi2, accumulator.sum_weight);
+    mean_delta_z = CPMB2::weighted_mean(accumulator.sum_weighted_delta_z, accumulator.sum_weight);
+    rms_delta_z = CPMB2::weighted_rms(accumulator.sum_weighted_delta_z, accumulator.sum_weighted_delta_z2, accumulator.sum_weight);
     mean_dca = CPMB2::mean(accumulator.sum_dca, entries);
     rms_dca = CPMB2::rms(accumulator.sum_dca, accumulator.sum_dca2, entries);
 
@@ -259,6 +306,7 @@ void CPM_B2_AccumulateVoxelCorrections(
   unsigned int accumulator_voxels = accumulators.size();
   unsigned int summary_min_entries_per_voxel = min_entries_per_voxel;
   double summary_max_pair_dca = max_pair_dca;
+  bool summary_has_pair_weight = has_pair_weight;
 
   summary.Branch("input_files", &input_files_count);
   summary.Branch("input_pairs", &input_pairs);
@@ -269,6 +317,7 @@ void CPM_B2_AccumulateVoxelCorrections(
   summary.Branch("skipped_low_entry_voxels", &skipped_low_entry_voxels);
   summary.Branch("min_entries_per_voxel", &summary_min_entries_per_voxel);
   summary.Branch("max_pair_dca", &summary_max_pair_dca);
+  summary.Branch("has_pair_weight", &summary_has_pair_weight);
   summary.Fill();
 
   voxels.Write();
