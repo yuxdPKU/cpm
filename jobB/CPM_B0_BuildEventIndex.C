@@ -9,7 +9,7 @@
  *
  * Example:
  *
- *   root -l -b -q 'macro/CPM_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root",
+ *   root -l -b -q 'jobB/CPM_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root",
  *                                                  "CPM_B0_event_index.root")'
  */
 
