@@ -90,8 +90,17 @@ scripts/run_cpm_b_chain.sh \
   --input-is-list \
   --out-dir cpm_jobB \
   --prefix merged \
-  --b1-min-records-per-charge 10
+  --b1-min-records-per-charge 10 \
+  --run-b0-qa \
+  --no-keep-intermediates
 ```
+
+By default the driver skips B0 QA, keeps the B1/B2 intermediate ROOT files,
+and also writes a combined file named `OUT_DIR/PREFIX_B.root` containing the
+B1, B2, and B3 outputs. Use `--run-b0-qa` to include the B0 index/check step
+and include its output in the combined file. Use `--no-combined-output` to
+disable the merged file, or `--no-keep-intermediates` to remove B1/B2 after the
+combined file and B3 correction map are written.
 
 ## Build and Test
 

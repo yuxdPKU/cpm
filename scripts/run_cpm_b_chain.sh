@@ -8,12 +8,12 @@ Usage:
   scripts/run_cpm_b_chain.sh --input cpm_filelist.txt --input-is-list [options]
 
 Runs the CPM Job B macro chain:
-  B0 build event index
-  B0 check event index
+  optional B0 build/check event index QA
   B1 local line-line PoCA
   B2 weighted voxel accumulator
   B3 average-correction histogram writer
   B3 histogram check
+  combined Job B ROOT file
 
 Options:
   --input PATH                  Job A CPMVoxelContainer ROOT file, or file list.
@@ -23,6 +23,12 @@ Options:
   --metadata PATH               Job A file used for B3 cpm_metadata. Default:
                                 --input for single-file mode, first list entry
                                 for --input-is-list mode.
+  --run-b0-qa                   Run B0 event-index QA. Default: disabled.
+  --combined-output PATH        Combined B1/B2/B3 ROOT output. Default:
+                                OUT_DIR/PREFIX_B.root
+  --no-combined-output          Do not write the combined Job B ROOT file.
+  --keep-intermediates          Keep B1/B2 intermediate ROOT files. Default.
+  --no-keep-intermediates       Remove B1/B2 after successful B3/combined output.
   --b1-max-pair-dca VALUE       B1 max pair DCA. Default: 2.0
   --b1-min-sin-angle VALUE      B1 minimum sin(opening angle). Default: 1.0e-4
   --b1-max-records VALUE        B1 max records per voxel. Default: 500
@@ -40,7 +46,8 @@ Example:
 
   scripts/run_cpm_b_chain.sh \
     --input cpm_filelist.txt --input-is-list \
-    --out-dir merged --prefix run79516
+    --out-dir merged --prefix run79516 \
+    --run-b0-qa --no-keep-intermediates
 EOF
 }
 
@@ -86,6 +93,10 @@ B1_MAX_RECORDS="500"
 B1_MIN_RECORDS_PER_CHARGE="2"
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
+RUN_B0_QA=0
+WRITE_COMBINED=1
+COMBINED_OUTPUT=""
+KEEP_INTERMEDIATES=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -108,6 +119,27 @@ while [[ $# -gt 0 ]]; do
     --metadata)
       METADATA=${2:-}
       shift 2
+      ;;
+    --run-b0-qa|--enable-b0-qa)
+      RUN_B0_QA=1
+      shift
+      ;;
+    --combined-output)
+      COMBINED_OUTPUT=${2:-}
+      WRITE_COMBINED=1
+      shift 2
+      ;;
+    --no-combined-output)
+      WRITE_COMBINED=0
+      shift
+      ;;
+    --keep-intermediates)
+      KEEP_INTERMEDIATES=1
+      shift
+      ;;
+    --no-keep-intermediates)
+      KEEP_INTERMEDIATES=0
+      shift
       ;;
     --b1-max-pair-dca)
       B1_MAX_PAIR_DCA=${2:-}
@@ -183,6 +215,12 @@ B0_EVENT_INDEX="${OUT_DIR}/${PREFIX}_B0_event_index.root"
 B1_POCA="${OUT_DIR}/${PREFIX}_B1_local_line_poca.root"
 B2_CORRECTIONS="${OUT_DIR}/${PREFIX}_B2_voxel_corrections.root"
 B3_HISTOGRAMS="${OUT_DIR}/${PREFIX}_B3_average_correction_histograms.root"
+if [[ -z "$COMBINED_OUTPUT" ]]; then
+  COMBINED_OUTPUT="${OUT_DIR}/${PREFIX}_B.root"
+fi
+if [[ "$WRITE_COMBINED" -eq 1 ]]; then
+  mkdir -p "$(dirname "$COMBINED_OUTPUT")"
+fi
 
 INPUT_Q=$(root_string "$INPUT")
 B0_Q=$(root_string "$B0_EVENT_INDEX")
@@ -196,14 +234,19 @@ echo "[run_cpm_b_chain] input_is_list: $INPUT_IS_LIST"
 echo "[run_cpm_b_chain] metadata: $METADATA"
 echo "[run_cpm_b_chain] output directory: $OUT_DIR"
 echo "[run_cpm_b_chain] prefix: $PREFIX"
+echo "[run_cpm_b_chain] run_b0_qa: $RUN_B0_QA"
+echo "[run_cpm_b_chain] write_combined: $WRITE_COMBINED"
+echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
 
-if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-  run_root "${MACRO_DIR}/CPM_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q},true)"
-else
-  run_root "${MACRO_DIR}/CPM_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q})"
+if [[ "$RUN_B0_QA" -eq 1 ]]; then
+  if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
+    run_root "${MACRO_DIR}/CPM_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q},true)"
+  else
+    run_root "${MACRO_DIR}/CPM_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q})"
+  fi
+
+  run_root "${MACRO_DIR}/CPM_B0_CheckEventIndex.C(${B0_Q})"
 fi
-
-run_root "${MACRO_DIR}/CPM_B0_CheckEventIndex.C(${B0_Q})"
 
 if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
   run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE})"
@@ -215,9 +258,41 @@ run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_
 run_root "${MACRO_DIR}/CPM_B3_WriteAverageCorrectionHistograms.C(${B2_Q},${B3_Q},${METADATA_Q})"
 run_root "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C(${B3_Q})"
 
+if [[ "$WRITE_COMBINED" -eq 1 ]]; then
+  if ! command -v hadd >/dev/null 2>&1; then
+    echo "hadd is required for --combined-output, but it was not found in PATH" >&2
+    exit 1
+  fi
+
+  combined_inputs=()
+  if [[ "$RUN_B0_QA" -eq 1 ]]; then
+    combined_inputs+=("$B0_EVENT_INDEX")
+  fi
+  combined_inputs+=("$B1_POCA" "$B2_CORRECTIONS" "$B3_HISTOGRAMS")
+
+  echo
+  echo "[run_cpm_b_chain] hadd -f ${COMBINED_OUTPUT} ${combined_inputs[*]}"
+  hadd -f "$COMBINED_OUTPUT" "${combined_inputs[@]}"
+fi
+
+if [[ "$KEEP_INTERMEDIATES" -eq 0 ]]; then
+  echo
+  echo "[run_cpm_b_chain] removing intermediate B1/B2 files"
+  rm -f "$B1_POCA" "$B2_CORRECTIONS"
+fi
+
 echo
 echo "[run_cpm_b_chain] done"
-echo "[run_cpm_b_chain] B0: $B0_EVENT_INDEX"
-echo "[run_cpm_b_chain] B1: $B1_POCA"
-echo "[run_cpm_b_chain] B2: $B2_CORRECTIONS"
+if [[ "$RUN_B0_QA" -eq 1 ]]; then
+  echo "[run_cpm_b_chain] B0: $B0_EVENT_INDEX"
+fi
+if [[ "$KEEP_INTERMEDIATES" -eq 1 ]]; then
+  echo "[run_cpm_b_chain] B1: $B1_POCA"
+  echo "[run_cpm_b_chain] B2: $B2_CORRECTIONS"
+else
+  echo "[run_cpm_b_chain] B1/B2 intermediates: removed"
+fi
 echo "[run_cpm_b_chain] B3: $B3_HISTOGRAMS"
+if [[ "$WRITE_COMBINED" -eq 1 ]]; then
+  echo "[run_cpm_b_chain] combined: $COMBINED_OUTPUT"
+fi
