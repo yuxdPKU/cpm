@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 usage() {
@@ -28,7 +33,8 @@ Options:
                                 OUT_DIR/PREFIX_B.root
   --no-combined-output          Do not write the combined Job B ROOT file.
   --keep-intermediates          Keep B1/B2 intermediate ROOT files. Default.
-  --no-keep-intermediates       Remove B1/B2 after successful B3/combined output.
+  --no-keep-intermediates       Remove B1/B2 after successful B3 and optional
+                                combined output.
   --b1-max-pair-dca VALUE       B1 max pair DCA. Default: 2.0
   --b1-min-sin-angle VALUE      B1 minimum sin(opening angle). Default: 1.0e-4
   --b1-max-records VALUE        B1 max records per voxel. Default: 500
@@ -279,6 +285,9 @@ if [[ "$KEEP_INTERMEDIATES" -eq 0 ]]; then
   echo
   echo "[run_cpm_b_chain] removing intermediate B1/B2 files"
   rm -f "$B1_POCA" "$B2_CORRECTIONS"
+  if [[ -e "$B1_POCA" || -e "$B2_CORRECTIONS" ]]; then
+    echo "[run_cpm_b_chain] warning: failed to remove one or more intermediate files" >&2
+  fi
 fi
 
 echo
