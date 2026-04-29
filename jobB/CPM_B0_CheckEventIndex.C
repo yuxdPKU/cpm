@@ -6,7 +6,7 @@
  *
  * Example:
  *
- *   root -l -b -q 'macro/CPM_B0_CheckEventIndex.C("CPM_B0_event_index.root")'
+ *   root -l -b -q 'jobB/CPM_B0_CheckEventIndex.C("CPM_B0_event_index.root")'
  */
 
 #include <TFile.h>

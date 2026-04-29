@@ -18,6 +18,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <set>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -73,6 +74,49 @@ namespace CPMB1
     cpm::Vector3 state_momentum;
   };
 
+  struct GridMetadata
+  {
+    int phi_bins = -1;
+    int r_bins = -1;
+    int z_bins = -1;
+    bool valid = false;
+  };
+
+  struct VoxelSummary
+  {
+    unsigned long long unique_tracks = 0;
+    unsigned long long unique_track_pairs = 0;
+    unsigned long long raw_pairs = 0;
+    unsigned long long same_charge_pairs = 0;
+    unsigned long long candidate_pairs = 0;
+    unsigned long long accepted_pairs = 0;
+  };
+
+  using UniqueTrackId = std::tuple<std::string, std::string, int, int, int, int, unsigned long long, unsigned int>;
+
+  unsigned long long pair_count(const std::size_t entries)
+  {
+    return entries < 2 ? 0 : static_cast<unsigned long long>(entries) * (entries - 1) / 2;
+  }
+
+  unsigned long long count_unique_tracks(const std::vector<Record>& records)
+  {
+    std::set<UniqueTrackId> unique_tracks;
+    for (const auto& record : records)
+    {
+      unique_tracks.insert(std::make_tuple(
+          record.event_track.cluster_source,
+          record.event_track.track_source,
+          record.event_track.run,
+          record.event_track.segment,
+          record.event_track.sync_event,
+          record.event_track.event_sequence,
+          record.event_track.stream_event_ordinal,
+          record.event_track.track_id));
+    }
+    return unique_tracks.size();
+  }
+
   double wrap_delta_phi(double value)
   {
     constexpr double pi = 3.141592653589793238462643383279502884;
@@ -95,6 +139,67 @@ namespace CPMB1
   double pair_weight_from_curvature_proxy(const Record& a, const Record& b)
   {
     return 1.0 / (a.pt * b.pt);
+  }
+
+  GridMetadata load_grid_metadata(const std::vector<std::string>& input_files)
+  {
+    GridMetadata metadata;
+    if (input_files.empty())
+    {
+      return metadata;
+    }
+
+    TFile input(input_files.front().c_str(), "READ");
+    if (input.IsZombie())
+    {
+      return metadata;
+    }
+
+    auto* tree = dynamic_cast<TTree*>(input.Get("cpm_metadata"));
+    if (!tree || tree->GetEntries() <= 0)
+    {
+      return metadata;
+    }
+
+    tree->SetBranchAddress("phi_bins", &metadata.phi_bins);
+    tree->SetBranchAddress("r_bins", &metadata.r_bins);
+    tree->SetBranchAddress("z_bins", &metadata.z_bins);
+    tree->GetEntry(0);
+    metadata.valid = metadata.phi_bins > 0 && metadata.r_bins > 0 && metadata.z_bins > 0;
+    return metadata;
+  }
+
+  void print_voxel_summary(
+      const VoxelKey& voxel,
+      const GridMetadata& metadata,
+      const std::size_t records,
+      const unsigned int positive_records,
+      const unsigned int negative_records,
+      const VoxelSummary& summary,
+      const std::string& status)
+  {
+    std::cout << "CPM_B1_LocalLinePoCA - voxel (iphi,ir,iz)=("
+              << voxel.iphi << "," << voxel.ir << "," << voxel.iz << ")";
+    if (metadata.valid)
+    {
+      std::cout << " / bins=(" << metadata.phi_bins << ","
+                << metadata.r_bins << "," << metadata.z_bins << ")";
+    }
+    else
+    {
+      std::cout << " / bins=(unknown)";
+    }
+    std::cout << " records=" << records
+              << " unique_tracks=" << summary.unique_tracks
+              << " unique_track_pairs=" << summary.unique_track_pairs
+              << " good_charge_records(+,-)=("
+              << positive_records << "," << negative_records << ")"
+              << " raw_record_pairs=" << summary.raw_pairs
+              << " same_charge_pairs=" << summary.same_charge_pairs
+              << " candidate_pairs=" << summary.candidate_pairs
+              << " accepted_pairs=" << summary.accepted_pairs
+              << " status=" << status
+              << std::endl;
   }
 
   std::vector<std::string> read_file_list(const std::string& input_list)
@@ -120,13 +225,15 @@ void CPM_B1_LocalLinePoCA(
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 500,
-    const unsigned int min_records_per_charge = 2)
+    const unsigned int min_records_per_charge = 2,
+    const bool print_voxel_summaries = true)
 {
   TChain chain("cpm_records");
   for (const auto& file : input_files)
   {
     chain.Add(file.c_str());
   }
+  const auto grid_metadata = CPMB1::load_grid_metadata(input_files);
 
   std::string* cluster_source = nullptr;
   std::string* track_source = nullptr;
@@ -302,16 +409,7 @@ void CPM_B1_LocalLinePoCA(
 
   for (const auto& [voxel, records] : records_by_voxel)
   {
-    if (records.size() < 2)
-    {
-      continue;
-    }
-    if (max_records_per_voxel > 0 && records.size() > max_records_per_voxel)
-    {
-      ++skipped_large_voxels;
-      continue;
-    }
-
+    CPMB1::VoxelSummary voxel_summary;
     unsigned int positive_records = 0;
     unsigned int negative_records = 0;
     for (const auto& record : records)
@@ -329,11 +427,60 @@ void CPM_B1_LocalLinePoCA(
         ++negative_records;
       }
     }
+    voxel_summary.unique_tracks = CPMB1::count_unique_tracks(records);
+    voxel_summary.unique_track_pairs =
+        CPMB1::pair_count(static_cast<std::size_t>(voxel_summary.unique_tracks));
+    voxel_summary.raw_pairs = CPMB1::pair_count(records.size());
+    voxel_summary.same_charge_pairs =
+        CPMB1::pair_count(positive_records) + CPMB1::pair_count(negative_records);
+
+    if (records.size() < 2)
+    {
+      if (print_voxel_summaries)
+      {
+        CPMB1::print_voxel_summary(
+            voxel,
+            grid_metadata,
+            records.size(),
+            positive_records,
+            negative_records,
+            voxel_summary,
+            "skipped_fewer_than_two_records");
+      }
+      continue;
+    }
+    if (max_records_per_voxel > 0 && records.size() > max_records_per_voxel)
+    {
+      ++skipped_large_voxels;
+      if (print_voxel_summaries)
+      {
+        CPMB1::print_voxel_summary(
+            voxel,
+            grid_metadata,
+            records.size(),
+            positive_records,
+            negative_records,
+            voxel_summary,
+            "skipped_too_many_records");
+      }
+      continue;
+    }
 
     if (positive_records < min_records_per_charge &&
         negative_records < min_records_per_charge)
     {
       ++skipped_low_charge_voxels;
+      if (print_voxel_summaries)
+      {
+        CPMB1::print_voxel_summary(
+            voxel,
+            grid_metadata,
+            records.size(),
+            positive_records,
+            negative_records,
+            voxel_summary,
+            "skipped_low_charge_records");
+      }
       continue;
     }
 
@@ -361,6 +508,7 @@ void CPM_B1_LocalLinePoCA(
         }
 
         ++candidate_pairs;
+        ++voxel_summary.candidate_pairs;
         pair_weight = CPMB1::pair_weight_from_curvature_proxy(a, b);
         if (!std::isfinite(pair_weight) || pair_weight <= 0.0)
         {
@@ -423,7 +571,20 @@ void CPM_B1_LocalLinePoCA(
 
         pairs.Fill();
         ++accepted_pairs;
+        ++voxel_summary.accepted_pairs;
       }
+    }
+
+    if (print_voxel_summaries)
+    {
+      CPMB1::print_voxel_summary(
+          voxel,
+          grid_metadata,
+          records.size(),
+          positive_records,
+          negative_records,
+          voxel_summary,
+          "processed");
     }
   }
 
@@ -435,6 +596,11 @@ void CPM_B1_LocalLinePoCA(
   double summary_min_sin_angle = min_sin_angle;
   unsigned int summary_max_records_per_voxel = max_records_per_voxel;
   unsigned int summary_min_records_per_charge = min_records_per_charge;
+  bool summary_print_voxel_summaries = print_voxel_summaries;
+  int summary_phi_bins = grid_metadata.phi_bins;
+  int summary_r_bins = grid_metadata.r_bins;
+  int summary_z_bins = grid_metadata.z_bins;
+  bool summary_grid_metadata_valid = grid_metadata.valid;
 
   summary.Branch("input_records", &input_records);
   summary.Branch("input_files", &input_files_count);
@@ -448,6 +614,11 @@ void CPM_B1_LocalLinePoCA(
   summary.Branch("min_sin_angle", &summary_min_sin_angle);
   summary.Branch("max_records_per_voxel", &summary_max_records_per_voxel);
   summary.Branch("min_records_per_charge", &summary_min_records_per_charge);
+  summary.Branch("print_voxel_summaries", &summary_print_voxel_summaries);
+  summary.Branch("phi_bins", &summary_phi_bins);
+  summary.Branch("r_bins", &summary_r_bins);
+  summary.Branch("z_bins", &summary_z_bins);
+  summary.Branch("grid_metadata_valid", &summary_grid_metadata_valid);
   summary.Fill();
 
   pairs.Write();
@@ -461,6 +632,13 @@ void CPM_B1_LocalLinePoCA(
   std::cout << "CPM_B1_LocalLinePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - candidate pairs: " << candidate_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - accepted pairs: " << accepted_pairs << std::endl;
+  if (grid_metadata.valid)
+  {
+    std::cout << "CPM_B1_LocalLinePoCA - grid bins: ("
+              << grid_metadata.phi_bins << ", "
+              << grid_metadata.r_bins << ", "
+              << grid_metadata.z_bins << ")" << std::endl;
+  }
   std::cout << "CPM_B1_LocalLinePoCA - output: " << output_file << std::endl;
 }
 
@@ -470,7 +648,8 @@ void CPM_B1_LocalLinePoCA(
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 500,
-    const unsigned int min_records_per_charge = 2)
+    const unsigned int min_records_per_charge = 2,
+    const bool print_voxel_summaries = true)
 {
   CPM_B1_LocalLinePoCA(
       std::vector<std::string>{input_file},
@@ -478,7 +657,8 @@ void CPM_B1_LocalLinePoCA(
       max_pair_dca,
       min_sin_angle,
       max_records_per_voxel,
-      min_records_per_charge);
+      min_records_per_charge,
+      print_voxel_summaries);
 }
 
 void CPM_B1_LocalLinePoCA(
@@ -488,7 +668,8 @@ void CPM_B1_LocalLinePoCA(
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 500,
-    const unsigned int min_records_per_charge = 2)
+    const unsigned int min_records_per_charge = 2,
+    const bool print_voxel_summaries = true)
 {
   const auto input_files = input_is_list ?
       CPMB1::read_file_list(input_file_or_list) :
@@ -500,5 +681,6 @@ void CPM_B1_LocalLinePoCA(
       max_pair_dca,
       min_sin_angle,
       max_records_per_voxel,
-      min_records_per_charge);
+      min_records_per_charge,
+      print_voxel_summaries);
 }

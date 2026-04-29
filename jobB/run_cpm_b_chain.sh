@@ -9,8 +9,8 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/run_cpm_b_chain.sh --input JOB_A.root [options]
-  scripts/run_cpm_b_chain.sh --input cpm_filelist.txt --input-is-list [options]
+  jobB/run_cpm_b_chain.sh --input JOB_A.root [options]
+  jobB/run_cpm_b_chain.sh --input cpm_filelist.txt --input-is-list [options]
 
 Runs the CPM Job B macro chain:
   optional B0 build/check event index QA
@@ -40,17 +40,19 @@ Options:
   --b1-max-records VALUE        B1 max records per voxel. Default: 500
   --b1-min-records-per-charge VALUE
                                 B1 minimum same-charge records. Default: 2
+  --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
+  --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
   --b2-min-entries VALUE        B2 minimum accepted pairs per voxel. Default: 1
   --b2-max-pair-dca VALUE       Optional B2 max pair DCA. Default: -1.0
   --help                        Show this message.
 
 Example:
-  scripts/run_cpm_b_chain.sh \
+  jobB/run_cpm_b_chain.sh \
     --input root/Reconstructed/79516/clusters_seeds_79516-0.root_CPMVoxelContainer.root \
     --out-dir root/Reconstructed/79516 \
     --prefix run79516_seg0
 
-  scripts/run_cpm_b_chain.sh \
+  jobB/run_cpm_b_chain.sh \
     --input cpm_filelist.txt --input-is-list \
     --out-dir merged --prefix run79516 \
     --run-b0-qa --no-keep-intermediates
@@ -96,7 +98,7 @@ run_root_bool_check() {
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
-MACRO_DIR="${REPO_DIR}/macro"
+MACRO_DIR="${REPO_DIR}/jobB"
 
 INPUT=""
 INPUT_IS_LIST=0
@@ -107,6 +109,7 @@ B1_MAX_PAIR_DCA="2.0"
 B1_MIN_SIN_ANGLE="1.0e-4"
 B1_MAX_RECORDS="500"
 B1_MIN_RECORDS_PER_CHARGE="2"
+B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
 RUN_B0_QA=0
@@ -172,6 +175,14 @@ while [[ $# -gt 0 ]]; do
     --b1-min-records-per-charge)
       B1_MIN_RECORDS_PER_CHARGE=${2:-}
       shift 2
+      ;;
+    --b1-print-voxel-summary)
+      B1_PRINT_VOXEL_SUMMARY=1
+      shift
+      ;;
+    --no-b1-print-voxel-summary)
+      B1_PRINT_VOXEL_SUMMARY=0
+      shift
       ;;
     --b2-min-entries)
       B2_MIN_ENTRIES=${2:-}
@@ -253,6 +264,7 @@ echo "[run_cpm_b_chain] prefix: $PREFIX"
 echo "[run_cpm_b_chain] run_b0_qa: $RUN_B0_QA"
 echo "[run_cpm_b_chain] write_combined: $WRITE_COMBINED"
 echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
+echo "[run_cpm_b_chain] b1_print_voxel_summary: $B1_PRINT_VOXEL_SUMMARY"
 
 if [[ "$RUN_B0_QA" -eq 1 ]]; then
   if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
@@ -265,9 +277,9 @@ if [[ "$RUN_B0_QA" -eq 1 ]]; then
 fi
 
 if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY})"
 else
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY})"
 fi
 
 run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA})"
