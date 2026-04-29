@@ -92,6 +92,7 @@ namespace CPMB1
     unsigned long long selected_unique_tracks = 0;
     unsigned long long selected_record_pairs = 0;
     unsigned long long pt_rejected_records = 0;
+    unsigned long long duplicate_dropped_records = 0;
     unsigned long long cap_dropped_records = 0;
     unsigned long long raw_pairs = 0;
     unsigned long long same_charge_pairs = 0;
@@ -214,6 +215,33 @@ namespace CPMB1
     return 1.0 / (a.pt * b.pt);
   }
 
+  double offset_magnitude2(const Record& record)
+  {
+    return record.offset.x * record.offset.x +
+           record.offset.y * record.offset.y +
+           record.offset.z * record.offset.z;
+  }
+
+  bool is_closer_to_voxel_center(const Record& candidate, const Record& current_best)
+  {
+    const double candidate_distance2 = offset_magnitude2(candidate);
+    const double current_distance2 = offset_magnitude2(current_best);
+    if (std::isfinite(candidate_distance2) && std::isfinite(current_distance2) &&
+        candidate_distance2 != current_distance2)
+    {
+      return candidate_distance2 < current_distance2;
+    }
+    if (std::isfinite(candidate_distance2) != std::isfinite(current_distance2))
+    {
+      return std::isfinite(candidate_distance2);
+    }
+    if (candidate.cluskey != current_best.cluskey)
+    {
+      return candidate.cluskey < current_best.cluskey;
+    }
+    return candidate.entry < current_best.entry;
+  }
+
   GridMetadata load_grid_metadata(const std::vector<std::string>& input_files)
   {
     GridMetadata metadata;
@@ -270,6 +298,7 @@ namespace CPMB1
               << " selected_charge_records(+,-)=("
               << positive_records << "," << negative_records << ")"
               << " pt_rejected_records=" << summary.pt_rejected_records
+              << " duplicate_dropped_records=" << summary.duplicate_dropped_records
               << " cap_dropped_records=" << summary.cap_dropped_records
               << " raw_record_pairs=" << summary.raw_pairs
               << " selected_record_pairs=" << summary.selected_record_pairs
@@ -488,6 +517,7 @@ void CPM_B1_LocalLinePoCA(
   unsigned long long summary_selected_records = 0;
   unsigned long long summary_selected_unique_tracks = 0;
   unsigned long long summary_pt_rejected_records = 0;
+  unsigned long long summary_duplicate_dropped_records = 0;
   unsigned long long summary_cap_dropped_records = 0;
   unsigned long long summary_raw_record_pairs = 0;
   unsigned long long summary_selected_record_pairs = 0;
@@ -507,6 +537,7 @@ void CPM_B1_LocalLinePoCA(
   voxel_summaries.Branch("selected_records", &summary_selected_records);
   voxel_summaries.Branch("selected_unique_tracks", &summary_selected_unique_tracks);
   voxel_summaries.Branch("pt_rejected_records", &summary_pt_rejected_records);
+  voxel_summaries.Branch("duplicate_dropped_records", &summary_duplicate_dropped_records);
   voxel_summaries.Branch("cap_dropped_records", &summary_cap_dropped_records);
   voxel_summaries.Branch("raw_record_pairs", &summary_raw_record_pairs);
   voxel_summaries.Branch("selected_record_pairs", &summary_selected_record_pairs);
@@ -534,6 +565,7 @@ void CPM_B1_LocalLinePoCA(
     summary_selected_records = voxel_summary.selected_records;
     summary_selected_unique_tracks = voxel_summary.selected_unique_tracks;
     summary_pt_rejected_records = voxel_summary.pt_rejected_records;
+    summary_duplicate_dropped_records = voxel_summary.duplicate_dropped_records;
     summary_cap_dropped_records = voxel_summary.cap_dropped_records;
     summary_raw_record_pairs = voxel_summary.raw_pairs;
     summary_selected_record_pairs = voxel_summary.selected_record_pairs;
@@ -558,8 +590,8 @@ void CPM_B1_LocalLinePoCA(
   for (const auto& [voxel, records] : records_by_voxel)
   {
     CPMB1::VoxelSummary voxel_summary;
-    std::vector<const CPMB1::Record*> selected_records;
-    selected_records.reserve(records.size());
+    std::map<CPMB1::UniqueTrackId, const CPMB1::Record*> closest_record_by_track;
+    unsigned long long good_records = 0;
 
     for (const auto& record : records)
     {
@@ -568,7 +600,23 @@ void CPM_B1_LocalLinePoCA(
         ++voxel_summary.pt_rejected_records;
         continue;
       }
-      selected_records.push_back(&record);
+      ++good_records;
+      const auto track_id = CPMB1::make_unique_track_id(record);
+      auto [iter, inserted] = closest_record_by_track.emplace(track_id, &record);
+      if (!inserted && CPMB1::is_closer_to_voxel_center(record, *iter->second))
+      {
+        iter->second = &record;
+      }
+    }
+
+    voxel_summary.duplicate_dropped_records =
+        good_records - static_cast<unsigned long long>(closest_record_by_track.size());
+
+    std::vector<const CPMB1::Record*> selected_records;
+    selected_records.reserve(closest_record_by_track.size());
+    for (const auto& entry : closest_record_by_track)
+    {
+      selected_records.push_back(entry.second);
     }
 
     std::stable_sort(
