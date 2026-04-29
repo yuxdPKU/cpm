@@ -43,7 +43,8 @@ Options:
   --b1-min-pair-pt VALUE        B1 minimum pT for records entering pair loops.
                                 Default: 0.0
   --b1-max-pair-records VALUE   B1 max selected records per voxel entering pair
-                                loops after pT sorting. 0 means unlimited.
+                                loops after deterministic hash sampling.
+                                0 means unlimited.
                                 Default: 0
   --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.

@@ -50,8 +50,9 @@ diagnostic line per voxel with `(iphi, ir, iz)`, total `(phi, r, z)` bins,
 record count, unique track count, unique track-pair count, same-charge counts,
 candidate pairs, accepted pairs, and the processing status. It also writes
 `cpm_b1_voxel_summary`, a persistent per-voxel QA tree. Optional pair-input
-controls can require `pt >= --b1-min-pair-pt` and keep only the highest-pT
-`--b1-max-pair-records` records per voxel before forming pairs.
+controls can require `pt >= --b1-min-pair-pt` and keep a deterministic hash
+sample of at most `--b1-max-pair-records` records per voxel before forming
+pairs, avoiding a high-pT selection bias.
 
 `jobB/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
 accumulates pair-level PoCA deltas into voxel-level correction QA rows using

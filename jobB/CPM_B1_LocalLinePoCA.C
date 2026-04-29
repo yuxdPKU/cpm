@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -113,6 +114,31 @@ namespace CPMB1
     return entries < 2 ? 0 : static_cast<unsigned long long>(entries) * (entries - 1) / 2;
   }
 
+  void hash_mix_byte(std::uint64_t& hash, const unsigned char value)
+  {
+    constexpr std::uint64_t fnv_prime = 1099511628211ULL;
+    hash ^= value;
+    hash *= fnv_prime;
+  }
+
+  void hash_mix_uint64(std::uint64_t& hash, std::uint64_t value)
+  {
+    for (int i = 0; i < 8; ++i)
+    {
+      hash_mix_byte(hash, static_cast<unsigned char>(value & 0xffU));
+      value >>= 8U;
+    }
+  }
+
+  void hash_mix_string(std::uint64_t& hash, const std::string& value)
+  {
+    for (const auto character : value)
+    {
+      hash_mix_byte(hash, static_cast<unsigned char>(character));
+    }
+    hash_mix_byte(hash, 0xffU);
+  }
+
   UniqueTrackId make_unique_track_id(const Record& record)
   {
     return std::make_tuple(
@@ -144,6 +170,21 @@ namespace CPMB1
       unique_tracks.insert(make_unique_track_id(*record));
     }
     return unique_tracks.size();
+  }
+
+  std::uint64_t record_selection_hash(const Record& record)
+  {
+    std::uint64_t hash = 14695981039346656037ULL;
+    hash_mix_string(hash, record.event_track.cluster_source);
+    hash_mix_string(hash, record.event_track.track_source);
+    hash_mix_uint64(hash, static_cast<std::uint64_t>(record.event_track.run));
+    hash_mix_uint64(hash, static_cast<std::uint64_t>(record.event_track.segment));
+    hash_mix_uint64(hash, static_cast<std::uint64_t>(record.event_track.sync_event));
+    hash_mix_uint64(hash, static_cast<std::uint64_t>(record.event_track.event_sequence));
+    hash_mix_uint64(hash, record.event_track.stream_event_ordinal);
+    hash_mix_uint64(hash, record.event_track.track_id);
+    hash_mix_uint64(hash, record.cluskey);
+    return hash;
   }
 
   double wrap_delta_phi(double value)
@@ -535,9 +576,11 @@ void CPM_B1_LocalLinePoCA(
         selected_records.end(),
         [](const CPMB1::Record* lhs, const CPMB1::Record* rhs)
         {
-          if (lhs->pt != rhs->pt)
+          const auto lhs_hash = CPMB1::record_selection_hash(*lhs);
+          const auto rhs_hash = CPMB1::record_selection_hash(*rhs);
+          if (lhs_hash != rhs_hash)
           {
-            return lhs->pt > rhs->pt;
+            return lhs_hash < rhs_hash;
           }
           if (lhs->event_track.track_id != rhs->event_track.track_id)
           {
