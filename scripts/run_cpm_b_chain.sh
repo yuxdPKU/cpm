@@ -84,6 +84,16 @@ run_root() {
   root -l -b -q "$macro_call"
 }
 
+run_root_bool_check() {
+  local macro_file=$1
+  local function_call=$2
+  local macro_file_q
+  macro_file_q=$(root_string "$macro_file")
+  echo
+  echo "[run_cpm_b_chain] root bool check ${function_call}"
+  root -l -b -q -e "gROOT->LoadMacro(${macro_file_q}); bool ok = ${function_call}; gSystem->Exit(ok ? 0 : 1);"
+}
+
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
 MACRO_DIR="${REPO_DIR}/macro"
@@ -251,7 +261,7 @@ if [[ "$RUN_B0_QA" -eq 1 ]]; then
     run_root "${MACRO_DIR}/CPM_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q})"
   fi
 
-  run_root "${MACRO_DIR}/CPM_B0_CheckEventIndex.C(${B0_Q})"
+  run_root_bool_check "${MACRO_DIR}/CPM_B0_CheckEventIndex.C" "CPM_B0_CheckEventIndex(${B0_Q})"
 fi
 
 if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
@@ -262,7 +272,7 @@ fi
 
 run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA})"
 run_root "${MACRO_DIR}/CPM_B3_WriteAverageCorrectionHistograms.C(${B2_Q},${B3_Q},${METADATA_Q})"
-run_root "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C(${B3_Q})"
+run_root_bool_check "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C" "CPM_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 
 if [[ "$WRITE_COMBINED" -eq 1 ]]; then
   if ! command -v hadd >/dev/null 2>&1; then
