@@ -40,6 +40,11 @@ Options:
   --b1-max-records VALUE        B1 max records per voxel. Default: 500
   --b1-min-records-per-charge VALUE
                                 B1 minimum same-charge records. Default: 2
+  --b1-min-pair-pt VALUE        B1 minimum pT for records entering pair loops.
+                                Default: 0.0
+  --b1-max-pair-records VALUE   B1 max selected records per voxel entering pair
+                                loops after pT sorting. 0 means unlimited.
+                                Default: 0
   --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
   --b2-min-entries VALUE        B2 minimum accepted pairs per voxel. Default: 1
@@ -109,6 +114,8 @@ B1_MAX_PAIR_DCA="2.0"
 B1_MIN_SIN_ANGLE="1.0e-4"
 B1_MAX_RECORDS="500"
 B1_MIN_RECORDS_PER_CHARGE="2"
+B1_MIN_PAIR_PT="0.0"
+B1_MAX_PAIR_RECORDS="0"
 B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
@@ -174,6 +181,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --b1-min-records-per-charge)
       B1_MIN_RECORDS_PER_CHARGE=${2:-}
+      shift 2
+      ;;
+    --b1-min-pair-pt)
+      B1_MIN_PAIR_PT=${2:-}
+      shift 2
+      ;;
+    --b1-max-pair-records)
+      B1_MAX_PAIR_RECORDS=${2:-}
       shift 2
       ;;
     --b1-print-voxel-summary)
@@ -265,6 +280,8 @@ echo "[run_cpm_b_chain] run_b0_qa: $RUN_B0_QA"
 echo "[run_cpm_b_chain] write_combined: $WRITE_COMBINED"
 echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
 echo "[run_cpm_b_chain] b1_print_voxel_summary: $B1_PRINT_VOXEL_SUMMARY"
+echo "[run_cpm_b_chain] b1_min_pair_pt: $B1_MIN_PAIR_PT"
+echo "[run_cpm_b_chain] b1_max_pair_records: $B1_MAX_PAIR_RECORDS"
 
 if [[ "$RUN_B0_QA" -eq 1 ]]; then
   if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
@@ -277,9 +294,9 @@ if [[ "$RUN_B0_QA" -eq 1 ]]; then
 fi
 
 if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS})"
 else
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS})"
 fi
 
 run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA})"
