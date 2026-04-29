@@ -80,15 +80,18 @@ For Condor production, run Job A once per DST/segment and write one
 The full Job B chain can also be run with:
 
 ```sh
+cd ~/workarea/cpm
+
 scripts/run_cpm_b_chain.sh \
-  --input jobA_CPMVoxelContainer.root \
-  --out-dir cpm_jobB \
-  --prefix test
+  --input macro/root/Reconstructed/79516/clusters_seeds_79516-0.root_CPMVoxelContainer.root \
+  --out-dir output/jobB/run79516 \
+  --prefix seg0 \
+  --no-keep-intermediates
 
 scripts/run_cpm_b_chain.sh \
   --input cpm_filelist.txt \
   --input-is-list \
-  --out-dir cpm_jobB \
+  --out-dir output/jobB/run79516 \
   --prefix merged \
   --b1-min-records-per-charge 10 \
   --run-b0-qa \
@@ -101,6 +104,11 @@ B1, B2, and B3 outputs. Use `--run-b0-qa` to include the B0 index/check step
 and include its output in the combined file. Use `--no-combined-output` to
 disable the merged file, or `--no-keep-intermediates` to remove B1/B2 after the
 combined file and B3 correction map are written.
+
+The recommended convention is to launch the script from the repository root
+instead of from `macro/`, and to write ROOT outputs into a dedicated output
+directory such as `output/jobB/run79516/`. This keeps `macro/` reserved for
+source macros and avoids mixing `.C` files with generated `.root` files.
 
 ## Build and Test
 
