@@ -40,5 +40,5 @@ getinputfiles.pl --filelist $InDstList
 # print the environment - needed for debugging
 printenv
 
-root.exe -q -b Fun4All_TrackAnalysis.C\($nEvents,\"${InClusterDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize\)
+root.exe -q -b Fun4All_CPMTrackAnalysis.C\($nEvents,\"${InClusterDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize\)
 echo Script done

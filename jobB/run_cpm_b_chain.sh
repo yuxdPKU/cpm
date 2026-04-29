@@ -96,7 +96,7 @@ run_root_bool_check() {
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
-MACRO_DIR="${REPO_DIR}/macro"
+MACRO_DIR="${REPO_DIR}/jobB"
 
 INPUT=""
 INPUT_IS_LIST=0
