@@ -89,8 +89,9 @@ Target crossing solver:
   `TrackFitUtils` provides helix-to-point/surface helpers, while
   `KshortReconstruction` and `PHSimpleVertexFinder` provide line-line two-track
   PCA/DCA.
-- CPM should therefore add a CPM-local helix PoCA module first, with a narrow
-  interface designed for later upstreaming.
+- CPM now has an initial CPM-local numerical helix PoCA helper,
+  `CPMHelixPoCA`, with a narrow interface designed for later upstreaming. It is
+  not yet the default B1 solver.
 
 ## Job B2: Voxel Accumulation
 

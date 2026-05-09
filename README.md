@@ -9,6 +9,7 @@ This repository currently contains the framework-independent CPM core:
 - ACTS-ready CPM record/data structures under `module`;
 - a voxel container keyed by `(iphi, ir, iz)`;
 - a first local line-line PoCA solver for CPM v1 validation;
+- an initial CPM-local ideal-helix PoCA helper for review and validation;
 - a small CMake test source for the PoCA and voxel-container basics.
 
 Directory layout:

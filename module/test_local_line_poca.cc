@@ -1,3 +1,4 @@
+#include "CPMHelixPoCA.h"
 #include "CPMLocalLinePoCA.h"
 #include "CPMVoxelContainer.h"
 
@@ -67,6 +68,50 @@ int main()
     assert(near(result.midpoint.x, 0.0));
     assert(near(result.midpoint.y, 0.0));
     assert(near(result.midpoint.z, 0.0));
+  }
+
+  {
+    cpm::HelixPoCAOptions options;
+    options.magnetic_field_z = 0.0;
+    const auto result = cpm::computeHelixPoCA(
+        {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 1},
+        {{0.0, -1.0, 0.0}, {0.0, 1.0, 0.0}, -1},
+        options);
+
+    assert(result.valid);
+    assert(result.converged);
+    assert(near(result.midpoint.x, 0.0));
+    assert(near(result.midpoint.y, 0.0));
+    assert(near(result.midpoint.z, 0.0));
+    assert(near(result.dca, 0.0));
+  }
+
+  {
+    const auto result = cpm::computeHelixPoCA(
+        {{0.0, 0.0, 0.0}, {1.0, 0.2, 0.1}, 1},
+        {{0.0, 0.0, 0.0}, {-0.2, 1.0, 0.1}, -1});
+
+    assert(result.valid);
+    assert(result.converged);
+    assert(near(result.midpoint.x, 0.0, 1.0e-8));
+    assert(near(result.midpoint.y, 0.0, 1.0e-8));
+    assert(near(result.midpoint.z, 0.0, 1.0e-8));
+    assert(near(result.dca, 0.0, 1.0e-8));
+  }
+
+  {
+    cpm::HelixPoCAOptions options;
+    options.magnetic_field_z = 0.0;
+    const cpm::HelixState state{{1.0, 2.0, 3.0}, {0.0, 3.0, 4.0}, 1};
+    const auto eval = cpm::evaluateHelix(state, 5.0, options);
+
+    assert(eval.valid);
+    assert(near(eval.position.x, 1.0));
+    assert(near(eval.position.y, 5.0));
+    assert(near(eval.position.z, 7.0));
+    assert(near(eval.tangent.x, 0.0));
+    assert(near(eval.tangent.y, 0.6));
+    assert(near(eval.tangent.z, 0.8));
   }
 
   return 0;

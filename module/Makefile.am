@@ -36,6 +36,7 @@ libcpm_la_LIBADD = \
   -ltpc_io
 
 pkginclude_HEADERS = \
+  CPMHelixPoCA.h \
   CPMLocalLinePoCA.h \
   CPMRecord.h \
   CPMTypes.h \
@@ -43,6 +44,7 @@ pkginclude_HEADERS = \
   PHCPMTpcCalibration.h
 
 libcpm_la_SOURCES = \
+  CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
   PHCPMTpcCalibration.cc
 
