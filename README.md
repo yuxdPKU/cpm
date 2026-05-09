@@ -48,12 +48,14 @@ line-line PoCA pairs, and writes the pair QA tree. It stores a pair weight
 `(1/R_a)*(1/R_b)` for a fixed magnetic field. By default it prints one
 diagnostic line per voxel with `(iphi, ir, iz)`, total `(phi, r, z)` bins,
 record count, unique track count, unique track-pair count, charge-pair counts,
-candidate pairs, accepted pairs, and the processing status. It also writes
+batch counts, batched pair counts, candidate pairs, accepted pairs, and the
+processing status. It also writes
 `cpm_b1_voxel_summary`, a persistent per-voxel QA tree. Optional pair-input
 controls can require `pt >= --b1-min-pair-pt`, keep only the record closest to
-the voxel center for each unique track, and then keep a deterministic hash
-sample of at most `--b1-max-pair-records` records per voxel before forming
-pairs.
+the voxel center for each unique track, and then process the selected records in
+deterministic hash-ordered opposite-charge batches. `--b1-max-pair-records`
+sets the maximum selected records per charge sign in each batch; `0` keeps one
+unlimited full-voxel batch.
 
 `jobB/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
 accumulates pair-level PoCA deltas into voxel-level correction QA rows. It can

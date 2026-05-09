@@ -42,10 +42,10 @@ Options:
                                 B1 minimum records per charge sign. Default: 2
   --b1-min-pair-pt VALUE        B1 minimum pT for records entering pair loops.
                                 Default: 0.5
-  --b1-max-pair-records VALUE   B1 max selected records per voxel entering pair
-                                loops after keeping the closest record per
-                                unique track and deterministic hash sampling.
-                                0 means unlimited.
+  --b1-max-pair-records VALUE   B1 max selected records per charge sign in each
+                                opposite-charge pair batch after keeping the
+                                closest record per unique track. 0 means one
+                                unlimited full-voxel batch.
                                 Default: 0
   --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
@@ -294,7 +294,7 @@ echo "[run_cpm_b_chain] write_combined: $WRITE_COMBINED"
 echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
 echo "[run_cpm_b_chain] b1_print_voxel_summary: $B1_PRINT_VOXEL_SUMMARY"
 echo "[run_cpm_b_chain] b1_min_pair_pt: $B1_MIN_PAIR_PT"
-echo "[run_cpm_b_chain] b1_max_pair_records: $B1_MAX_PAIR_RECORDS"
+echo "[run_cpm_b_chain] b1_max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
 echo "[run_cpm_b_chain] b2_use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 
 if [[ "$RUN_B0_QA" -eq 1 ]]; then

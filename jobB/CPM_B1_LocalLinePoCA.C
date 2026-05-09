@@ -94,6 +94,11 @@ namespace CPMB1
     unsigned long long pt_rejected_records = 0;
     unsigned long long duplicate_dropped_records = 0;
     unsigned long long cap_dropped_records = 0;
+    unsigned long long batch_count = 0;
+    unsigned long long batched_positive_records = 0;
+    unsigned long long batched_negative_records = 0;
+    unsigned long long batched_record_pairs = 0;
+    unsigned long long batched_opposite_charge_pairs = 0;
     unsigned long long raw_pairs = 0;
     unsigned long long same_charge_pairs = 0;
     unsigned long long opposite_charge_pairs = 0;
@@ -301,10 +306,16 @@ namespace CPMB1
               << " pt_rejected_records=" << summary.pt_rejected_records
               << " duplicate_dropped_records=" << summary.duplicate_dropped_records
               << " cap_dropped_records=" << summary.cap_dropped_records
+              << " batches=" << summary.batch_count
+              << " batched_charge_records(+,-)=("
+              << summary.batched_positive_records << ","
+              << summary.batched_negative_records << ")"
               << " raw_record_pairs=" << summary.raw_pairs
               << " selected_record_pairs=" << summary.selected_record_pairs
+              << " batched_record_pairs=" << summary.batched_record_pairs
               << " same_charge_pairs=" << summary.same_charge_pairs
               << " opposite_charge_pairs=" << summary.opposite_charge_pairs
+              << " batched_opposite_charge_pairs=" << summary.batched_opposite_charge_pairs
               << " candidate_pairs=" << summary.candidate_pairs
               << " accepted_pairs=" << summary.accepted_pairs
               << " status=" << status
@@ -521,10 +532,15 @@ void CPM_B1_LocalLinePoCA(
   unsigned long long summary_pt_rejected_records = 0;
   unsigned long long summary_duplicate_dropped_records = 0;
   unsigned long long summary_cap_dropped_records = 0;
+  unsigned long long summary_batch_count = 0;
+  unsigned long long summary_batched_positive_records = 0;
+  unsigned long long summary_batched_negative_records = 0;
   unsigned long long summary_raw_record_pairs = 0;
   unsigned long long summary_selected_record_pairs = 0;
+  unsigned long long summary_batched_record_pairs = 0;
   unsigned long long summary_same_charge_pairs = 0;
   unsigned long long summary_opposite_charge_pairs = 0;
+  unsigned long long summary_batched_opposite_charge_pairs = 0;
   unsigned long long summary_candidate_pairs = 0;
   unsigned long long summary_accepted_pairs = 0;
   unsigned int summary_positive_records = 0;
@@ -542,10 +558,15 @@ void CPM_B1_LocalLinePoCA(
   voxel_summaries.Branch("pt_rejected_records", &summary_pt_rejected_records);
   voxel_summaries.Branch("duplicate_dropped_records", &summary_duplicate_dropped_records);
   voxel_summaries.Branch("cap_dropped_records", &summary_cap_dropped_records);
+  voxel_summaries.Branch("batches", &summary_batch_count);
+  voxel_summaries.Branch("batched_positive_records", &summary_batched_positive_records);
+  voxel_summaries.Branch("batched_negative_records", &summary_batched_negative_records);
   voxel_summaries.Branch("raw_record_pairs", &summary_raw_record_pairs);
   voxel_summaries.Branch("selected_record_pairs", &summary_selected_record_pairs);
+  voxel_summaries.Branch("batched_record_pairs", &summary_batched_record_pairs);
   voxel_summaries.Branch("same_charge_pairs", &summary_same_charge_pairs);
   voxel_summaries.Branch("opposite_charge_pairs", &summary_opposite_charge_pairs);
+  voxel_summaries.Branch("batched_opposite_charge_pairs", &summary_batched_opposite_charge_pairs);
   voxel_summaries.Branch("candidate_pairs", &summary_candidate_pairs);
   voxel_summaries.Branch("accepted_pairs", &summary_accepted_pairs);
   voxel_summaries.Branch("positive_records", &summary_positive_records);
@@ -571,10 +592,15 @@ void CPM_B1_LocalLinePoCA(
     summary_pt_rejected_records = voxel_summary.pt_rejected_records;
     summary_duplicate_dropped_records = voxel_summary.duplicate_dropped_records;
     summary_cap_dropped_records = voxel_summary.cap_dropped_records;
+    summary_batch_count = voxel_summary.batch_count;
+    summary_batched_positive_records = voxel_summary.batched_positive_records;
+    summary_batched_negative_records = voxel_summary.batched_negative_records;
     summary_raw_record_pairs = voxel_summary.raw_pairs;
     summary_selected_record_pairs = voxel_summary.selected_record_pairs;
+    summary_batched_record_pairs = voxel_summary.batched_record_pairs;
     summary_same_charge_pairs = voxel_summary.same_charge_pairs;
     summary_opposite_charge_pairs = voxel_summary.opposite_charge_pairs;
+    summary_batched_opposite_charge_pairs = voxel_summary.batched_opposite_charge_pairs;
     summary_candidate_pairs = voxel_summary.candidate_pairs;
     summary_accepted_pairs = voxel_summary.accepted_pairs;
     summary_positive_records = positive_records;
@@ -642,27 +668,26 @@ void CPM_B1_LocalLinePoCA(
           return lhs->cluskey < rhs->cluskey;
         });
 
-    if (max_pair_records_per_voxel > 0 &&
-        selected_records.size() > max_pair_records_per_voxel)
-    {
-      voxel_summary.cap_dropped_records =
-          selected_records.size() - max_pair_records_per_voxel;
-      selected_records.resize(max_pair_records_per_voxel);
-    }
-
-    unsigned int positive_records = 0;
-    unsigned int negative_records = 0;
+    std::vector<const CPMB1::Record*> positive_selected_records;
+    std::vector<const CPMB1::Record*> negative_selected_records;
+    positive_selected_records.reserve(selected_records.size());
+    negative_selected_records.reserve(selected_records.size());
     for (const auto* record : selected_records)
     {
       if (record->charge > 0)
       {
-        ++positive_records;
+        positive_selected_records.push_back(record);
       }
       else if (record->charge < 0)
       {
-        ++negative_records;
+        negative_selected_records.push_back(record);
       }
     }
+    const auto positive_records =
+        static_cast<unsigned int>(positive_selected_records.size());
+    const auto negative_records =
+        static_cast<unsigned int>(negative_selected_records.size());
+
     voxel_summary.unique_tracks = CPMB1::count_unique_tracks(records);
     voxel_summary.unique_track_pairs =
         CPMB1::pair_count(static_cast<std::size_t>(voxel_summary.unique_tracks));
@@ -746,96 +771,154 @@ void CPM_B1_LocalLinePoCA(
       continue;
     }
 
-    ++processed_voxels;
-    for (std::size_t ia = 0; ia < selected_records.size(); ++ia)
+    const std::size_t batch_charge_limit =
+        max_pair_records_per_voxel > 0 ?
+        static_cast<std::size_t>(max_pair_records_per_voxel) :
+        std::numeric_limits<std::size_t>::max();
+
+    std::size_t positive_index = 0;
+    std::size_t negative_index = 0;
+    while (positive_index < positive_selected_records.size() &&
+           negative_index < negative_selected_records.size())
     {
-      for (std::size_t ib = ia + 1; ib < selected_records.size(); ++ib)
+      const std::size_t positive_remaining =
+          positive_selected_records.size() - positive_index;
+      const std::size_t negative_remaining =
+          negative_selected_records.size() - negative_index;
+      const std::size_t positive_take =
+          std::min(batch_charge_limit, positive_remaining);
+      const std::size_t negative_take =
+          std::min(batch_charge_limit, negative_remaining);
+
+      if (positive_take < min_records_per_charge ||
+          negative_take < min_records_per_charge)
       {
-        const auto& a = *selected_records[ia];
-        const auto& b = *selected_records[ib];
-        if (a.event_track == b.event_track)
+        break;
+      }
+
+      const std::size_t positive_begin = positive_index;
+      const std::size_t negative_begin = negative_index;
+      positive_index += positive_take;
+      negative_index += negative_take;
+
+      ++voxel_summary.batch_count;
+      voxel_summary.batched_positive_records += positive_take;
+      voxel_summary.batched_negative_records += negative_take;
+      voxel_summary.batched_record_pairs +=
+          CPMB1::pair_count(positive_take + negative_take);
+      voxel_summary.batched_opposite_charge_pairs +=
+          static_cast<unsigned long long>(positive_take) * negative_take;
+
+      for (std::size_t ipos = 0; ipos < positive_take; ++ipos)
+      {
+        for (std::size_t ineg = 0; ineg < negative_take; ++ineg)
         {
-          continue;
+          const auto& a = *positive_selected_records[positive_begin + ipos];
+          const auto& b = *negative_selected_records[negative_begin + ineg];
+          if (a.event_track == b.event_track)
+          {
+            continue;
+          }
+          if (!CPMB1::has_good_curvature_proxy(a, min_pair_pt) ||
+              !CPMB1::has_good_curvature_proxy(b, min_pair_pt))
+          {
+            continue;
+          }
+
+          ++candidate_pairs;
+          ++voxel_summary.candidate_pairs;
+          pair_weight = CPMB1::pair_weight_from_curvature_proxy(a, b);
+          if (!std::isfinite(pair_weight) || pair_weight <= 0.0)
+          {
+            continue;
+          }
+
+          const cpm::Vector3 point_a = a.state_position - a.offset;
+          const cpm::Vector3 point_b = b.state_position - b.offset;
+          const auto result = cpm::computeLocalLinePoCA(
+              point_a,
+              a.state_momentum,
+              point_b,
+              b.state_momentum,
+              options);
+
+          if (!result.valid || !(result.dca <= max_pair_dca))
+          {
+            continue;
+          }
+
+          out_iphi = voxel.iphi;
+          out_ir = voxel.ir;
+          out_iz = voxel.iz;
+          entry_a = a.entry;
+          entry_b = b.entry;
+          track_id_a = a.event_track.track_id;
+          track_id_b = b.event_track.track_id;
+          cluskey_a = a.cluskey;
+          cluskey_b = b.cluskey;
+          charge_a = a.charge;
+          charge_b = b.charge;
+          pt_a = a.pt;
+          pt_b = b.pt;
+          dca = result.dca;
+          s = result.s;
+          t = result.t;
+          point_ax = result.point_a.x;
+          point_ay = result.point_a.y;
+          point_az = result.point_a.z;
+          point_bx = result.point_b.x;
+          point_by = result.point_b.y;
+          point_bz = result.point_b.z;
+          midpoint_x = result.midpoint.x;
+          midpoint_y = result.midpoint.y;
+          midpoint_z = result.midpoint.z;
+          voxel_center_x = a.voxel_center.x;
+          voxel_center_y = a.voxel_center.y;
+          voxel_center_z = a.voxel_center.z;
+          delta_x = voxel_center_x - midpoint_x;
+          delta_y = voxel_center_y - midpoint_y;
+          delta_z = voxel_center_z - midpoint_z;
+
+          const double voxel_r = std::hypot(voxel_center_x, voxel_center_y);
+          const double midpoint_r = std::hypot(midpoint_x, midpoint_y);
+          const double voxel_phi = std::atan2(voxel_center_y, voxel_center_x);
+          const double midpoint_phi = std::atan2(midpoint_y, midpoint_x);
+          delta_r = voxel_r - midpoint_r;
+          delta_phi = CPMB1::wrap_delta_phi(voxel_phi - midpoint_phi);
+          delta_rphi = voxel_r * delta_phi;
+
+          pairs.Fill();
+          ++accepted_pairs;
+          ++voxel_summary.accepted_pairs;
         }
-        if (!CPMB1::has_good_curvature_proxy(a, min_pair_pt) ||
-            !CPMB1::has_good_curvature_proxy(b, min_pair_pt) ||
-            a.charge == b.charge)
-        {
-          continue;
-        }
-        if ((a.charge > 0 && positive_records < min_records_per_charge) ||
-            (a.charge < 0 && negative_records < min_records_per_charge))
-        {
-          continue;
-        }
-
-        ++candidate_pairs;
-        ++voxel_summary.candidate_pairs;
-        pair_weight = CPMB1::pair_weight_from_curvature_proxy(a, b);
-        if (!std::isfinite(pair_weight) || pair_weight <= 0.0)
-        {
-          continue;
-        }
-
-        const cpm::Vector3 point_a = a.state_position - a.offset;
-        const cpm::Vector3 point_b = b.state_position - b.offset;
-        const auto result = cpm::computeLocalLinePoCA(
-            point_a,
-            a.state_momentum,
-            point_b,
-            b.state_momentum,
-            options);
-
-        if (!result.valid || !(result.dca <= max_pair_dca))
-        {
-          continue;
-        }
-
-        out_iphi = voxel.iphi;
-        out_ir = voxel.ir;
-        out_iz = voxel.iz;
-        entry_a = a.entry;
-        entry_b = b.entry;
-        track_id_a = a.event_track.track_id;
-        track_id_b = b.event_track.track_id;
-        cluskey_a = a.cluskey;
-        cluskey_b = b.cluskey;
-        charge_a = a.charge;
-        charge_b = b.charge;
-        pt_a = a.pt;
-        pt_b = b.pt;
-        dca = result.dca;
-        s = result.s;
-        t = result.t;
-        point_ax = result.point_a.x;
-        point_ay = result.point_a.y;
-        point_az = result.point_a.z;
-        point_bx = result.point_b.x;
-        point_by = result.point_b.y;
-        point_bz = result.point_b.z;
-        midpoint_x = result.midpoint.x;
-        midpoint_y = result.midpoint.y;
-        midpoint_z = result.midpoint.z;
-        voxel_center_x = a.voxel_center.x;
-        voxel_center_y = a.voxel_center.y;
-        voxel_center_z = a.voxel_center.z;
-        delta_x = voxel_center_x - midpoint_x;
-        delta_y = voxel_center_y - midpoint_y;
-        delta_z = voxel_center_z - midpoint_z;
-
-        const double voxel_r = std::hypot(voxel_center_x, voxel_center_y);
-        const double midpoint_r = std::hypot(midpoint_x, midpoint_y);
-        const double voxel_phi = std::atan2(voxel_center_y, voxel_center_x);
-        const double midpoint_phi = std::atan2(midpoint_y, midpoint_x);
-        delta_r = voxel_r - midpoint_r;
-        delta_phi = CPMB1::wrap_delta_phi(voxel_phi - midpoint_phi);
-        delta_rphi = voxel_r * delta_phi;
-
-        pairs.Fill();
-        ++accepted_pairs;
-        ++voxel_summary.accepted_pairs;
       }
     }
+
+    if (voxel_summary.batch_count == 0)
+    {
+      ++skipped_low_charge_voxels;
+      if (print_voxel_summaries)
+      {
+        CPMB1::print_voxel_summary(
+            voxel,
+            grid_metadata,
+            records.size(),
+            positive_records,
+            negative_records,
+            voxel_summary,
+            "skipped_low_batch_charge_records");
+      }
+      fill_voxel_summary(
+          voxel,
+          records.size(),
+          positive_records,
+          negative_records,
+          voxel_summary,
+          "skipped_low_batch_charge_records");
+      continue;
+    }
+
+    ++processed_voxels;
 
     if (print_voxel_summaries)
     {
@@ -868,6 +951,7 @@ void CPM_B1_LocalLinePoCA(
   bool summary_print_voxel_summaries = print_voxel_summaries;
   double summary_min_pair_pt = min_pair_pt;
   unsigned int summary_max_pair_records_per_voxel = max_pair_records_per_voxel;
+  unsigned int summary_max_pair_records_per_charge_batch = max_pair_records_per_voxel;
   int summary_phi_bins = grid_metadata.phi_bins;
   int summary_r_bins = grid_metadata.r_bins;
   int summary_z_bins = grid_metadata.z_bins;
@@ -888,6 +972,7 @@ void CPM_B1_LocalLinePoCA(
   summary.Branch("print_voxel_summaries", &summary_print_voxel_summaries);
   summary.Branch("min_pair_pt", &summary_min_pair_pt);
   summary.Branch("max_pair_records_per_voxel", &summary_max_pair_records_per_voxel);
+  summary.Branch("max_pair_records_per_charge_batch", &summary_max_pair_records_per_charge_batch);
   summary.Branch("phi_bins", &summary_phi_bins);
   summary.Branch("r_bins", &summary_r_bins);
   summary.Branch("z_bins", &summary_z_bins);
@@ -907,7 +992,7 @@ void CPM_B1_LocalLinePoCA(
   std::cout << "CPM_B1_LocalLinePoCA - candidate pairs: " << candidate_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - accepted pairs: " << accepted_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - min pair pt: " << min_pair_pt << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - max pair records per voxel: " << max_pair_records_per_voxel << std::endl;
+  std::cout << "CPM_B1_LocalLinePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
   if (grid_metadata.valid)
   {
     std::cout << "CPM_B1_LocalLinePoCA - grid bins: ("
