@@ -91,7 +91,8 @@ Target crossing solver:
   PCA/DCA.
 - CPM now has an initial CPM-local numerical helix PoCA helper,
   `CPMHelixPoCA`, with a narrow interface designed for later upstreaming. It is
-  not yet the default B1 solver.
+  available as an explicit B1 option for comparison, but it is not yet the
+  default B1 solver.
 
 ## Job B2: Voxel Accumulation
 

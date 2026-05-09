@@ -3,10 +3,12 @@
  *
  * This macro reads Job A cpm_records, groups ACTS-ready state snapshots by
  * voxel, forms opposite-charge track-state pairs inside each voxel, and computes
- * the first CPM local line-line point of closest approach. It does not require
- * seed objects or TRKR_CLUSTER in the CPM mini-DST.
+ * CPM crossing-point estimates. The default solver is the v1 local line-line
+ * PoCA; an experimental ideal-helix PoCA solver can be enabled for comparison.
+ * It does not require seed objects or TRKR_CLUSTER in the CPM mini-DST.
  */
 
+#include <CPMHelixPoCA.h>
 #include <CPMLocalLinePoCA.h>
 
 #include <TChain.h>
@@ -339,7 +341,7 @@ namespace CPMB1
   }
 }
 
-void CPM_B1_LocalLinePoCA(
+  void CPM_B1_LocalLinePoCA(
     const std::vector<std::string>& input_files,
     const std::string& output_file = "CPM_B1_local_line_poca.root",
     const double max_pair_dca = 2.0,
@@ -348,8 +350,18 @@ void CPM_B1_LocalLinePoCA(
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
-    const unsigned int max_pair_records_per_voxel = 0)
+    const unsigned int max_pair_records_per_voxel = 0,
+    const std::string& crossing_solver = "line",
+    const double magnetic_field_z = 1.4)
 {
+  const bool use_helix_solver = crossing_solver == "helix";
+  if (crossing_solver != "line" && crossing_solver != "helix")
+  {
+    std::cerr << "CPM_B1_LocalLinePoCA - invalid crossing_solver: "
+              << crossing_solver << " (expected line or helix)" << std::endl;
+    return;
+  }
+
   TChain chain("cpm_records");
   for (const auto& file : input_files)
   {
@@ -462,6 +474,8 @@ void CPM_B1_LocalLinePoCA(
   double pt_a = std::numeric_limits<double>::quiet_NaN();
   double pt_b = std::numeric_limits<double>::quiet_NaN();
   double pair_weight = std::numeric_limits<double>::quiet_NaN();
+  int solver_id = 0;
+  bool used_line_fallback = false;
   double dca = std::numeric_limits<double>::quiet_NaN();
   double s = std::numeric_limits<double>::quiet_NaN();
   double t = std::numeric_limits<double>::quiet_NaN();
@@ -498,6 +512,8 @@ void CPM_B1_LocalLinePoCA(
   pairs.Branch("pt_a", &pt_a);
   pairs.Branch("pt_b", &pt_b);
   pairs.Branch("pair_weight", &pair_weight);
+  pairs.Branch("solver_id", &solver_id);
+  pairs.Branch("used_line_fallback", &used_line_fallback);
   pairs.Branch("dca", &dca);
   pairs.Branch("s", &s);
   pairs.Branch("t", &t);
@@ -611,6 +627,8 @@ void CPM_B1_LocalLinePoCA(
 
   cpm::LocalLinePoCAOptions options;
   options.min_sin_angle = min_sin_angle;
+  cpm::HelixPoCAOptions helix_options;
+  helix_options.magnetic_field_z = magnetic_field_z;
 
   unsigned long long candidate_pairs = 0;
   unsigned long long accepted_pairs = 0;
@@ -835,14 +853,48 @@ void CPM_B1_LocalLinePoCA(
 
           const cpm::Vector3 point_a = a.state_position - a.offset;
           const cpm::Vector3 point_b = b.state_position - b.offset;
-          const auto result = cpm::computeLocalLinePoCA(
-              point_a,
-              a.state_momentum,
-              point_b,
-              b.state_momentum,
-              options);
+          cpm::Vector3 poca_point_a;
+          cpm::Vector3 poca_point_b;
+          cpm::Vector3 poca_midpoint;
+          double poca_s = std::numeric_limits<double>::quiet_NaN();
+          double poca_t = std::numeric_limits<double>::quiet_NaN();
+          double poca_dca = std::numeric_limits<double>::quiet_NaN();
+          bool poca_used_line_fallback = false;
+          bool poca_valid = false;
 
-          if (!result.valid || !(result.dca <= max_pair_dca))
+          if (use_helix_solver)
+          {
+            const auto result = cpm::computeHelixPoCA(
+                {point_a, a.state_momentum, a.charge},
+                {point_b, b.state_momentum, b.charge},
+                helix_options);
+            poca_valid = result.valid;
+            poca_s = result.s;
+            poca_t = result.t;
+            poca_dca = result.dca;
+            poca_point_a = result.point_a;
+            poca_point_b = result.point_b;
+            poca_midpoint = result.midpoint;
+            poca_used_line_fallback = result.used_line_fallback;
+          }
+          else
+          {
+            const auto result = cpm::computeLocalLinePoCA(
+                point_a,
+                a.state_momentum,
+                point_b,
+                b.state_momentum,
+                options);
+            poca_valid = result.valid;
+            poca_s = result.s;
+            poca_t = result.t;
+            poca_dca = result.dca;
+            poca_point_a = result.point_a;
+            poca_point_b = result.point_b;
+            poca_midpoint = result.midpoint;
+          }
+
+          if (!poca_valid || !(poca_dca <= max_pair_dca))
           {
             continue;
           }
@@ -860,18 +912,20 @@ void CPM_B1_LocalLinePoCA(
           charge_b = b.charge;
           pt_a = a.pt;
           pt_b = b.pt;
-          dca = result.dca;
-          s = result.s;
-          t = result.t;
-          point_ax = result.point_a.x;
-          point_ay = result.point_a.y;
-          point_az = result.point_a.z;
-          point_bx = result.point_b.x;
-          point_by = result.point_b.y;
-          point_bz = result.point_b.z;
-          midpoint_x = result.midpoint.x;
-          midpoint_y = result.midpoint.y;
-          midpoint_z = result.midpoint.z;
+          solver_id = use_helix_solver ? 1 : 0;
+          used_line_fallback = poca_used_line_fallback;
+          dca = poca_dca;
+          s = poca_s;
+          t = poca_t;
+          point_ax = poca_point_a.x;
+          point_ay = poca_point_a.y;
+          point_az = poca_point_a.z;
+          point_bx = poca_point_b.x;
+          point_by = poca_point_b.y;
+          point_bz = poca_point_b.z;
+          midpoint_x = poca_midpoint.x;
+          midpoint_y = poca_midpoint.y;
+          midpoint_z = poca_midpoint.z;
           voxel_center_x = a.voxel_center.x;
           voxel_center_y = a.voxel_center.y;
           voxel_center_z = a.voxel_center.z;
@@ -952,6 +1006,9 @@ void CPM_B1_LocalLinePoCA(
   double summary_min_pair_pt = min_pair_pt;
   unsigned int summary_max_pair_records_per_voxel = max_pair_records_per_voxel;
   unsigned int summary_max_pair_records_per_charge_batch = max_pair_records_per_voxel;
+  std::string summary_crossing_solver = crossing_solver;
+  bool summary_use_helix_solver = use_helix_solver;
+  double summary_magnetic_field_z = magnetic_field_z;
   int summary_phi_bins = grid_metadata.phi_bins;
   int summary_r_bins = grid_metadata.r_bins;
   int summary_z_bins = grid_metadata.z_bins;
@@ -973,6 +1030,9 @@ void CPM_B1_LocalLinePoCA(
   summary.Branch("min_pair_pt", &summary_min_pair_pt);
   summary.Branch("max_pair_records_per_voxel", &summary_max_pair_records_per_voxel);
   summary.Branch("max_pair_records_per_charge_batch", &summary_max_pair_records_per_charge_batch);
+  summary.Branch("crossing_solver", &summary_crossing_solver);
+  summary.Branch("use_helix_solver", &summary_use_helix_solver);
+  summary.Branch("magnetic_field_z", &summary_magnetic_field_z);
   summary.Branch("phi_bins", &summary_phi_bins);
   summary.Branch("r_bins", &summary_r_bins);
   summary.Branch("z_bins", &summary_z_bins);
@@ -993,6 +1053,11 @@ void CPM_B1_LocalLinePoCA(
   std::cout << "CPM_B1_LocalLinePoCA - accepted pairs: " << accepted_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - min pair pt: " << min_pair_pt << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
+  std::cout << "CPM_B1_LocalLinePoCA - crossing solver: " << crossing_solver << std::endl;
+  if (use_helix_solver)
+  {
+    std::cout << "CPM_B1_LocalLinePoCA - magnetic field z: " << magnetic_field_z << std::endl;
+  }
   if (grid_metadata.valid)
   {
     std::cout << "CPM_B1_LocalLinePoCA - grid bins: ("
@@ -1012,7 +1077,9 @@ void CPM_B1_LocalLinePoCA(
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
-    const unsigned int max_pair_records_per_voxel = 0)
+    const unsigned int max_pair_records_per_voxel = 0,
+    const std::string& crossing_solver = "line",
+    const double magnetic_field_z = 1.4)
 {
   CPM_B1_LocalLinePoCA(
       std::vector<std::string>{input_file},
@@ -1023,7 +1090,9 @@ void CPM_B1_LocalLinePoCA(
       min_records_per_charge,
       print_voxel_summaries,
       min_pair_pt,
-      max_pair_records_per_voxel);
+      max_pair_records_per_voxel,
+      crossing_solver,
+      magnetic_field_z);
 }
 
 void CPM_B1_LocalLinePoCA(
@@ -1036,7 +1105,9 @@ void CPM_B1_LocalLinePoCA(
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
-    const unsigned int max_pair_records_per_voxel = 0)
+    const unsigned int max_pair_records_per_voxel = 0,
+    const std::string& crossing_solver = "line",
+    const double magnetic_field_z = 1.4)
 {
   const auto input_files = input_is_list ?
       CPMB1::read_file_list(input_file_or_list) :
@@ -1051,5 +1122,7 @@ void CPM_B1_LocalLinePoCA(
       min_records_per_charge,
       print_voxel_summaries,
       min_pair_pt,
-      max_pair_records_per_voxel);
+      max_pair_records_per_voxel,
+      crossing_solver,
+      magnetic_field_z);
 }

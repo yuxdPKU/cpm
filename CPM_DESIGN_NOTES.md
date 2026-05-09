@@ -118,7 +118,7 @@ For the current CPM task, the target is the average distortion correction. `PHTp
 - No `TrackUtils` namespace/class was found in the inspected local `coresoftware/offline/packages` tree; the available utility is `TrackFitUtils`.
 - `TrackFitUtils` exposes `get_helix_pca`, `get_helix_tangent`, `get_helix_surface_intersection`, and `get_helix_pathlength`, but these are helix-to-point/surface helpers and local straight-line approximations. They do not provide a two-helix PoCA/crossing solver.
 - `KshortReconstruction::findPcaTwoTracks` and `PHSimpleVertexFinder` implement two-track PCA/DCA using skew-line formulae. `KshortReconstruction` explicitly comments that this is a rough straight-line answer and should be updated to circles.
-- Decision: no suitable ready-made ideal two-helix PoCA implementation was found. CPM now has an initial CPM-local numerical ideal-helix PoCA module, `CPMHelixPoCA`, with an interface narrow enough to upstream later into coresoftware if validation is successful. It is not yet wired into B1 by default.
+- Decision: no suitable ready-made ideal two-helix PoCA implementation was found. CPM now has an initial CPM-local numerical ideal-helix PoCA module, `CPMHelixPoCA`, with an interface narrow enough to upstream later into coresoftware if validation is successful. B1 can use it through an explicit `helix` solver option, while the default remains the local line-line solver.
 
 ### `TpcSpaceChargeMatrixContainer`
 
@@ -342,7 +342,7 @@ Decision: CPM v1 will use local line-line PoCA from `SvtxTrackState` as the firs
 - Added a first B0 event-index QA macro that checks object/event consistency before the mini-DST rehydration pass.
 - Added the first B1 local line-line PoCA macro. It reads Job A snapshots directly, groups records by 3D voxel, forms different-track pairs, and writes pair-level crossing QA without requiring seeds or `TRKR_CLUSTER` in the mini-DST.
 - Added the first B2 voxel accumulator macro. It reads B1 pair outputs, applies optional DCA and minimum-entry cuts, and writes one QA/correction-summary row per populated voxel. The B1/B2 delta convention is `voxel center - crossing point`, matching `TpcDistortionCorrection` where corrected coordinates are computed as `old - distortion`.
-- Added the first CPM-local ideal-helix PoCA helper, `CPMHelixPoCA`, plus framework-independent tests. This is a candidate replacement solver for B1 after physics review and validation.
+- Added the first CPM-local ideal-helix PoCA helper, `CPMHelixPoCA`, plus framework-independent tests. B1 can now run either the default local-line solver or the experimental helix solver by option, so the two methods can be compared on identical Job A input.
 - Draft the second CPM Job B0 rehydration/validation skeleton that reads `cpm_event_requests`, sequentially scans the mini-DST once, and writes an enriched validation output. This should be finalized against the server-side Fun4All input setup so the source-file identity and event synchronization policy are not guessed locally.
 - Draft a CPM Job B1 macro skeleton that reads CPM segment or enriched outputs and writes 3D `TpcDistortionCorrectionContainerAverage`-compatible histograms, with explicit TPOT phi/theta range overrides.
 - Define whether CPM should include an extrapolation step analogous to `TpcSpaceChargeMatrixInversion::extrapolate_distortion_corrections`, or only produce corrections in the acceptance where crossing-point statistics exist.

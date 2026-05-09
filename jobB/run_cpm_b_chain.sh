@@ -47,6 +47,8 @@ Options:
                                 closest record per unique track. 0 means one
                                 unlimited full-voxel batch.
                                 Default: 0
+  --b1-crossing-solver VALUE     B1 crossing solver: line or helix. Default: line
+  --b1-magnetic-field-z VALUE    B1 helix-solver Bz field in tesla. Default: 1.4
   --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
   --b2-min-entries VALUE        B2 minimum accepted pairs per voxel. Default: 1
@@ -120,6 +122,8 @@ B1_MAX_RECORDS="500"
 B1_MIN_RECORDS_PER_CHARGE="2"
 B1_MIN_PAIR_PT="0.5"
 B1_MAX_PAIR_RECORDS="0"
+B1_CROSSING_SOLVER="line"
+B1_MAGNETIC_FIELD_Z="1.4"
 B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
@@ -196,6 +200,14 @@ while [[ $# -gt 0 ]]; do
       B1_MAX_PAIR_RECORDS=${2:-}
       shift 2
       ;;
+    --b1-crossing-solver)
+      B1_CROSSING_SOLVER=${2:-}
+      shift 2
+      ;;
+    --b1-magnetic-field-z)
+      B1_MAGNETIC_FIELD_Z=${2:-}
+      shift 2
+      ;;
     --b1-print-voxel-summary)
       B1_PRINT_VOXEL_SUMMARY=1
       shift
@@ -248,6 +260,11 @@ if [[ ! -e "$INPUT" ]]; then
   exit 1
 fi
 
+if [[ "$B1_CROSSING_SOLVER" != "line" && "$B1_CROSSING_SOLVER" != "helix" ]]; then
+  echo "Invalid --b1-crossing-solver: $B1_CROSSING_SOLVER (expected line or helix)" >&2
+  exit 2
+fi
+
 mkdir -p "$OUT_DIR"
 
 if [[ -z "$METADATA" ]]; then
@@ -283,6 +300,7 @@ B1_Q=$(root_string "$B1_POCA")
 B2_Q=$(root_string "$B2_CORRECTIONS")
 B3_Q=$(root_string "$B3_HISTOGRAMS")
 METADATA_Q=$(root_string "$METADATA")
+B1_CROSSING_SOLVER_Q=$(root_string "$B1_CROSSING_SOLVER")
 
 echo "[run_cpm_b_chain] input: $INPUT"
 echo "[run_cpm_b_chain] input_is_list: $INPUT_IS_LIST"
@@ -295,6 +313,8 @@ echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
 echo "[run_cpm_b_chain] b1_print_voxel_summary: $B1_PRINT_VOXEL_SUMMARY"
 echo "[run_cpm_b_chain] b1_min_pair_pt: $B1_MIN_PAIR_PT"
 echo "[run_cpm_b_chain] b1_max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
+echo "[run_cpm_b_chain] b1_crossing_solver: $B1_CROSSING_SOLVER"
+echo "[run_cpm_b_chain] b1_magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
 echo "[run_cpm_b_chain] b2_use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 
 if [[ "$RUN_B0_QA" -eq 1 ]]; then
@@ -308,9 +328,9 @@ if [[ "$RUN_B0_QA" -eq 1 ]]; then
 fi
 
 if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z})"
 else
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z})"
 fi
 
 run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS})"
