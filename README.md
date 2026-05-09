@@ -16,6 +16,7 @@ Directory layout:
 - `module/`: CPM module source files, headers, and build helper files.
 - `macro/`: Fun4All running macros.
 - `jobB/`: ROOT Job B macros and the `run_cpm_b_chain.sh` driver.
+- `CPM_PROCEDURE_FOR_REVIEW.md`: living method note for external review.
 
 The first complete Job A macro is `macro/Fun4All_CPMTrackAnalysis.C`. It follows
 the current two-fit/prune tracking workflow and replaces the `PHTpcResiduals`

@@ -113,6 +113,13 @@ For the current CPM task, the target is the average distortion correction. `PHTp
 
 `PHSimpleVertexFinder` and `KshortReconstruction` contain two-track DCA/PCA calculations, but these are local straight-line calculations using track positions and momentum directions. They may be useful for first diagnostics, but they do not satisfy the desired final CPM crossing solver by themselves.
 
+2026-05-09 follow-up survey:
+
+- No `TrackUtils` namespace/class was found in the inspected local `coresoftware/offline/packages` tree; the available utility is `TrackFitUtils`.
+- `TrackFitUtils` exposes `get_helix_pca`, `get_helix_tangent`, `get_helix_surface_intersection`, and `get_helix_pathlength`, but these are helix-to-point/surface helpers and local straight-line approximations. They do not provide a two-helix PoCA/crossing solver.
+- `KshortReconstruction::findPcaTwoTracks` and `PHSimpleVertexFinder` implement two-track PCA/DCA using skew-line formulae. `KshortReconstruction` explicitly comments that this is a rough straight-line answer and should be updated to circles.
+- Decision: no suitable ready-made ideal two-helix PoCA implementation was found. CPM should add a CPM-local helix PoCA module next, with an interface narrow enough to upstream later into coresoftware if the validation is successful.
+
 ### `TpcSpaceChargeMatrixContainer`
 
 `TpcSpaceChargeMatrixContainer` stores accumulated matrix terms for existing space-charge residual inversion. Version 2 stores per-cell entries plus full and reduced left-hand/right-hand matrix arrays for `(drphi, dz, dr)` style fits.
