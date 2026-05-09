@@ -15,7 +15,7 @@ Usage:
 Runs the CPM Job B macro chain:
   optional B0 build/check event index QA
   B1 local line-line PoCA
-  B2 weighted voxel accumulator
+  B2 voxel accumulator
   B3 average-correction histogram writer
   B3 histogram check
   combined Job B ROOT file
@@ -39,9 +39,9 @@ Options:
   --b1-min-sin-angle VALUE      B1 minimum sin(opening angle). Default: 1.0e-4
   --b1-max-records VALUE        B1 max records per voxel. Default: 500
   --b1-min-records-per-charge VALUE
-                                B1 minimum same-charge records. Default: 2
+                                B1 minimum records per charge sign. Default: 2
   --b1-min-pair-pt VALUE        B1 minimum pT for records entering pair loops.
-                                Default: 0.0
+                                Default: 0.5
   --b1-max-pair-records VALUE   B1 max selected records per voxel entering pair
                                 loops after keeping the closest record per
                                 unique track and deterministic hash sampling.
@@ -51,6 +51,8 @@ Options:
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
   --b2-min-entries VALUE        B2 minimum accepted pairs per voxel. Default: 1
   --b2-max-pair-dca VALUE       Optional B2 max pair DCA. Default: -1.0
+  --b2-weighted                 Use B1 pair weights in B2 averaging. Default.
+  --b2-unweighted               Use a simple unweighted average in B2.
   --help                        Show this message.
 
 Example:
@@ -116,11 +118,12 @@ B1_MAX_PAIR_DCA="2.0"
 B1_MIN_SIN_ANGLE="1.0e-4"
 B1_MAX_RECORDS="500"
 B1_MIN_RECORDS_PER_CHARGE="2"
-B1_MIN_PAIR_PT="0.0"
+B1_MIN_PAIR_PT="0.5"
 B1_MAX_PAIR_RECORDS="0"
 B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
+B2_USE_PAIR_WEIGHTS=1
 RUN_B0_QA=0
 WRITE_COMBINED=1
 COMBINED_OUTPUT=""
@@ -209,6 +212,14 @@ while [[ $# -gt 0 ]]; do
       B2_MAX_PAIR_DCA=${2:-}
       shift 2
       ;;
+    --b2-weighted)
+      B2_USE_PAIR_WEIGHTS=1
+      shift
+      ;;
+    --b2-unweighted)
+      B2_USE_PAIR_WEIGHTS=0
+      shift
+      ;;
     --help|-h)
       usage
       exit 0
@@ -284,6 +295,7 @@ echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
 echo "[run_cpm_b_chain] b1_print_voxel_summary: $B1_PRINT_VOXEL_SUMMARY"
 echo "[run_cpm_b_chain] b1_min_pair_pt: $B1_MIN_PAIR_PT"
 echo "[run_cpm_b_chain] b1_max_pair_records: $B1_MAX_PAIR_RECORDS"
+echo "[run_cpm_b_chain] b2_use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 
 if [[ "$RUN_B0_QA" -eq 1 ]]; then
   if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
@@ -301,7 +313,7 @@ else
   run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS})"
 fi
 
-run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA})"
+run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS})"
 run_root "${MACRO_DIR}/CPM_B3_WriteAverageCorrectionHistograms.C(${B2_Q},${B3_Q},${METADATA_Q})"
 run_root_bool_check "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C" "CPM_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 

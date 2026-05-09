@@ -42,12 +42,12 @@ builds:
 mini-DST rehydration is attempted.
 
 `jobB/CPM_B1_LocalLinePoCA.C` reads one or more Job A outputs, groups records
-by voxel, applies the intra-voxel offset shift, forms same-charge local
+by voxel, applies the intra-voxel offset shift, forms opposite-charge local
 line-line PoCA pairs, and writes the pair QA tree. It stores a pair weight
 `1/(pt_a*pt_b)`, which is proportional to the method weight
 `(1/R_a)*(1/R_b)` for a fixed magnetic field. By default it prints one
 diagnostic line per voxel with `(iphi, ir, iz)`, total `(phi, r, z)` bins,
-record count, unique track count, unique track-pair count, same-charge counts,
+record count, unique track count, unique track-pair count, charge-pair counts,
 candidate pairs, accepted pairs, and the processing status. It also writes
 `cpm_b1_voxel_summary`, a persistent per-voxel QA tree. Optional pair-input
 controls can require `pt >= --b1-min-pair-pt`, keep only the record closest to
@@ -56,8 +56,9 @@ sample of at most `--b1-max-pair-records` records per voxel before forming
 pairs.
 
 `jobB/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
-accumulates pair-level PoCA deltas into voxel-level correction QA rows using
-that curvature-proxy weighted average.
+accumulates pair-level PoCA deltas into voxel-level correction QA rows. It can
+run either the default curvature-proxy weighted average or a simple unweighted
+average through the Job B driver.
 The B1/B2 delta convention is `voxel center - crossing point`, matching the
 distortion values subtracted by `TpcDistortionCorrection`.
 
@@ -103,8 +104,9 @@ jobB/run_cpm_b_chain.sh \
   --out-dir output/jobB/run79516 \
   --prefix merged \
   --b1-min-records-per-charge 10 \
-  --b1-min-pair-pt 1.0 \
+  --b1-min-pair-pt 0.5 \
   --b1-max-pair-records 100 \
+  --b2-unweighted \
   --run-b0-qa \
   --no-keep-intermediates
 ```

@@ -3,8 +3,9 @@
  *
  * This macro reads B1 local line-line PoCA pair outputs, groups accepted pairs
  * by 3D voxel, and writes one correction-summary row per voxel. Pairwise
- * crossing estimates are averaged with the B1 curvature proxy weight
- * 1/(pt_i pt_j), proportional to (1/R_i)(1/R_j) in a fixed magnetic field.
+ * crossing estimates can be averaged either with the B1 curvature proxy weight
+ * 1/(pt_i pt_j), proportional to (1/R_i)(1/R_j) in a fixed magnetic field, or
+ * with unit weights for a simple arithmetic mean.
  * The output is a QA/intermediate product. The input B1 delta convention is the
  * same as the TpcDistortionCorrection distortion convention:
  * voxel center - crossing point.
@@ -140,7 +141,8 @@ void CPM_B2_AccumulateVoxelCorrections(
     const std::vector<std::string>& input_files,
     const std::string& output_file = "CPM_B2_voxel_corrections.root",
     const unsigned int min_entries_per_voxel = 1,
-    const double max_pair_dca = -1.0)
+    const double max_pair_dca = -1.0,
+    const bool use_pair_weights = true)
 {
   TChain chain("cpm_poca_pairs");
   for (const auto& file : input_files)
@@ -195,7 +197,7 @@ void CPM_B2_AccumulateVoxelCorrections(
         !std::isfinite(delta_r) || !std::isfinite(delta_rphi) ||
         !std::isfinite(delta_phi) || !std::isfinite(delta_z) ||
         !std::isfinite(dca) ||
-        !std::isfinite(pair_weight) || pair_weight <= 0.0)
+        (use_pair_weights && (!std::isfinite(pair_weight) || pair_weight <= 0.0)))
     {
       ++rejected_pairs;
       continue;
@@ -206,13 +208,14 @@ void CPM_B2_AccumulateVoxelCorrections(
       continue;
     }
 
+    const double accumulation_weight = use_pair_weights ? pair_weight : 1.0;
     accumulators[{iphi, ir, iz}].add(
         delta_r,
         delta_rphi,
         delta_phi,
         delta_z,
         dca,
-        pair_weight,
+        accumulation_weight,
         voxel_center_x,
         voxel_center_y,
         voxel_center_z);
@@ -307,6 +310,8 @@ void CPM_B2_AccumulateVoxelCorrections(
   unsigned int summary_min_entries_per_voxel = min_entries_per_voxel;
   double summary_max_pair_dca = max_pair_dca;
   bool summary_has_pair_weight = has_pair_weight;
+  bool summary_use_pair_weights = use_pair_weights;
+  std::string summary_averaging_mode = use_pair_weights ? "weighted" : "unweighted";
 
   summary.Branch("input_files", &input_files_count);
   summary.Branch("input_pairs", &input_pairs);
@@ -318,6 +323,8 @@ void CPM_B2_AccumulateVoxelCorrections(
   summary.Branch("min_entries_per_voxel", &summary_min_entries_per_voxel);
   summary.Branch("max_pair_dca", &summary_max_pair_dca);
   summary.Branch("has_pair_weight", &summary_has_pair_weight);
+  summary.Branch("use_pair_weights", &summary_use_pair_weights);
+  summary.Branch("averaging_mode", &summary_averaging_mode);
   summary.Fill();
 
   voxels.Write();
@@ -330,6 +337,8 @@ void CPM_B2_AccumulateVoxelCorrections(
   std::cout << "CPM_B2_AccumulateVoxelCorrections - accumulator voxels: " << accumulator_voxels << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - filled voxels: " << filled_voxels << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - skipped low-entry voxels: " << skipped_low_entry_voxels << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - averaging mode: "
+            << summary_averaging_mode << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - output: " << output_file << std::endl;
 }
 
@@ -337,13 +346,15 @@ void CPM_B2_AccumulateVoxelCorrections(
     const std::string& input_file,
     const std::string& output_file = "CPM_B2_voxel_corrections.root",
     const unsigned int min_entries_per_voxel = 1,
-    const double max_pair_dca = -1.0)
+    const double max_pair_dca = -1.0,
+    const bool use_pair_weights = true)
 {
   CPM_B2_AccumulateVoxelCorrections(
       std::vector<std::string>{input_file},
       output_file,
       min_entries_per_voxel,
-      max_pair_dca);
+      max_pair_dca,
+      use_pair_weights);
 }
 
 void CPM_B2_AccumulateVoxelCorrections(
@@ -351,7 +362,8 @@ void CPM_B2_AccumulateVoxelCorrections(
     const std::string& output_file,
     const bool input_is_list,
     const unsigned int min_entries_per_voxel = 1,
-    const double max_pair_dca = -1.0)
+    const double max_pair_dca = -1.0,
+    const bool use_pair_weights = true)
 {
   const auto input_files = input_is_list ?
       CPMB2::read_file_list(input_file_or_list) :
@@ -361,5 +373,6 @@ void CPM_B2_AccumulateVoxelCorrections(
       input_files,
       output_file,
       min_entries_per_voxel,
-      max_pair_dca);
+      max_pair_dca,
+      use_pair_weights);
 }

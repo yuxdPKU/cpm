@@ -2,7 +2,7 @@
  * CPM Job B1 local line-line PoCA prototype.
  *
  * This macro reads Job A cpm_records, groups ACTS-ready state snapshots by
- * voxel, forms same-charge track-state pairs inside each voxel, and computes
+ * voxel, forms opposite-charge track-state pairs inside each voxel, and computes
  * the first CPM local line-line point of closest approach. It does not require
  * seed objects or TRKR_CLUSTER in the CPM mini-DST.
  */
@@ -96,6 +96,7 @@ namespace CPMB1
     unsigned long long cap_dropped_records = 0;
     unsigned long long raw_pairs = 0;
     unsigned long long same_charge_pairs = 0;
+    unsigned long long opposite_charge_pairs = 0;
     unsigned long long candidate_pairs = 0;
     unsigned long long accepted_pairs = 0;
   };
@@ -303,6 +304,7 @@ namespace CPMB1
               << " raw_record_pairs=" << summary.raw_pairs
               << " selected_record_pairs=" << summary.selected_record_pairs
               << " same_charge_pairs=" << summary.same_charge_pairs
+              << " opposite_charge_pairs=" << summary.opposite_charge_pairs
               << " candidate_pairs=" << summary.candidate_pairs
               << " accepted_pairs=" << summary.accepted_pairs
               << " status=" << status
@@ -334,7 +336,7 @@ void CPM_B1_LocalLinePoCA(
     const unsigned int max_records_per_voxel = 500,
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
-    const double min_pair_pt = 0.0,
+    const double min_pair_pt = 0.5,
     const unsigned int max_pair_records_per_voxel = 0)
 {
   TChain chain("cpm_records");
@@ -522,6 +524,7 @@ void CPM_B1_LocalLinePoCA(
   unsigned long long summary_raw_record_pairs = 0;
   unsigned long long summary_selected_record_pairs = 0;
   unsigned long long summary_same_charge_pairs = 0;
+  unsigned long long summary_opposite_charge_pairs = 0;
   unsigned long long summary_candidate_pairs = 0;
   unsigned long long summary_accepted_pairs = 0;
   unsigned int summary_positive_records = 0;
@@ -542,6 +545,7 @@ void CPM_B1_LocalLinePoCA(
   voxel_summaries.Branch("raw_record_pairs", &summary_raw_record_pairs);
   voxel_summaries.Branch("selected_record_pairs", &summary_selected_record_pairs);
   voxel_summaries.Branch("same_charge_pairs", &summary_same_charge_pairs);
+  voxel_summaries.Branch("opposite_charge_pairs", &summary_opposite_charge_pairs);
   voxel_summaries.Branch("candidate_pairs", &summary_candidate_pairs);
   voxel_summaries.Branch("accepted_pairs", &summary_accepted_pairs);
   voxel_summaries.Branch("positive_records", &summary_positive_records);
@@ -570,6 +574,7 @@ void CPM_B1_LocalLinePoCA(
     summary_raw_record_pairs = voxel_summary.raw_pairs;
     summary_selected_record_pairs = voxel_summary.selected_record_pairs;
     summary_same_charge_pairs = voxel_summary.same_charge_pairs;
+    summary_opposite_charge_pairs = voxel_summary.opposite_charge_pairs;
     summary_candidate_pairs = voxel_summary.candidate_pairs;
     summary_accepted_pairs = voxel_summary.accepted_pairs;
     summary_positive_records = positive_records;
@@ -667,6 +672,8 @@ void CPM_B1_LocalLinePoCA(
     voxel_summary.selected_record_pairs = CPMB1::pair_count(selected_records.size());
     voxel_summary.same_charge_pairs =
         CPMB1::pair_count(positive_records) + CPMB1::pair_count(negative_records);
+    voxel_summary.opposite_charge_pairs =
+        static_cast<unsigned long long>(positive_records) * negative_records;
 
     if (max_records_per_voxel > 0 && records.size() > max_records_per_voxel)
     {
@@ -714,7 +721,7 @@ void CPM_B1_LocalLinePoCA(
       continue;
     }
 
-    if (positive_records < min_records_per_charge &&
+    if (positive_records < min_records_per_charge ||
         negative_records < min_records_per_charge)
     {
       ++skipped_low_charge_voxels;
@@ -727,7 +734,7 @@ void CPM_B1_LocalLinePoCA(
             positive_records,
             negative_records,
             voxel_summary,
-            "skipped_low_charge_records");
+            "skipped_low_opposite_charge_records");
       }
       fill_voxel_summary(
           voxel,
@@ -735,7 +742,7 @@ void CPM_B1_LocalLinePoCA(
           positive_records,
           negative_records,
           voxel_summary,
-          "skipped_low_charge_records");
+          "skipped_low_opposite_charge_records");
       continue;
     }
 
@@ -752,7 +759,7 @@ void CPM_B1_LocalLinePoCA(
         }
         if (!CPMB1::has_good_curvature_proxy(a, min_pair_pt) ||
             !CPMB1::has_good_curvature_proxy(b, min_pair_pt) ||
-            a.charge != b.charge)
+            a.charge == b.charge)
         {
           continue;
         }
@@ -919,7 +926,7 @@ void CPM_B1_LocalLinePoCA(
     const unsigned int max_records_per_voxel = 500,
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
-    const double min_pair_pt = 0.0,
+    const double min_pair_pt = 0.5,
     const unsigned int max_pair_records_per_voxel = 0)
 {
   CPM_B1_LocalLinePoCA(
@@ -943,7 +950,7 @@ void CPM_B1_LocalLinePoCA(
     const unsigned int max_records_per_voxel = 500,
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
-    const double min_pair_pt = 0.0,
+    const double min_pair_pt = 0.5,
     const unsigned int max_pair_records_per_voxel = 0)
 {
   const auto input_files = input_is_list ?
