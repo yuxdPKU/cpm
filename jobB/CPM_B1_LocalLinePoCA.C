@@ -1,5 +1,5 @@
 /*
- * CPM Job B1 local line-line PoCA prototype.
+ * CPM Job B1 crossing-point PoCA prototype.
  *
  * This macro reads Job A cpm_records, groups ACTS-ready state snapshots by
  * voxel, forms opposite-charge track-state pairs inside each voxel, and computes
@@ -106,6 +106,77 @@ namespace CPMB1
     unsigned long long opposite_charge_pairs = 0;
     unsigned long long candidate_pairs = 0;
     unsigned long long accepted_pairs = 0;
+  };
+
+  struct BatchAccumulator
+  {
+    unsigned long long same_event_track_pairs = 0;
+    unsigned long long pt_rejected_pairs = 0;
+    unsigned long long candidate_pairs = 0;
+    unsigned long long invalid_weight_pairs = 0;
+    unsigned long long invalid_poca_pairs = 0;
+    unsigned long long dca_rejected_pairs = 0;
+    unsigned long long accepted_pairs = 0;
+    double sum_pair_weight = 0.0;
+    double sum_pair_weight2 = 0.0;
+    double sum_delta_r = 0.0;
+    double sum_delta_r2 = 0.0;
+    double sum_delta_rphi = 0.0;
+    double sum_delta_rphi2 = 0.0;
+    double sum_delta_phi = 0.0;
+    double sum_delta_phi2 = 0.0;
+    double sum_delta_z = 0.0;
+    double sum_delta_z2 = 0.0;
+    double sum_weighted_delta_r = 0.0;
+    double sum_weighted_delta_r2 = 0.0;
+    double sum_weighted_delta_rphi = 0.0;
+    double sum_weighted_delta_rphi2 = 0.0;
+    double sum_weighted_delta_phi = 0.0;
+    double sum_weighted_delta_phi2 = 0.0;
+    double sum_weighted_delta_z = 0.0;
+    double sum_weighted_delta_z2 = 0.0;
+    double sum_dca = 0.0;
+    double sum_dca2 = 0.0;
+    double sum_voxel_x = 0.0;
+    double sum_voxel_y = 0.0;
+    double sum_voxel_z = 0.0;
+
+    void add(
+        const double accepted_delta_r,
+        const double accepted_delta_rphi,
+        const double accepted_delta_phi,
+        const double accepted_delta_z,
+        const double accepted_dca,
+        const double accepted_weight,
+        const double voxel_x,
+        const double voxel_y,
+        const double voxel_z)
+    {
+      ++accepted_pairs;
+      sum_pair_weight += accepted_weight;
+      sum_pair_weight2 += accepted_weight * accepted_weight;
+      sum_delta_r += accepted_delta_r;
+      sum_delta_r2 += accepted_delta_r * accepted_delta_r;
+      sum_delta_rphi += accepted_delta_rphi;
+      sum_delta_rphi2 += accepted_delta_rphi * accepted_delta_rphi;
+      sum_delta_phi += accepted_delta_phi;
+      sum_delta_phi2 += accepted_delta_phi * accepted_delta_phi;
+      sum_delta_z += accepted_delta_z;
+      sum_delta_z2 += accepted_delta_z * accepted_delta_z;
+      sum_weighted_delta_r += accepted_weight * accepted_delta_r;
+      sum_weighted_delta_r2 += accepted_weight * accepted_delta_r * accepted_delta_r;
+      sum_weighted_delta_rphi += accepted_weight * accepted_delta_rphi;
+      sum_weighted_delta_rphi2 += accepted_weight * accepted_delta_rphi * accepted_delta_rphi;
+      sum_weighted_delta_phi += accepted_weight * accepted_delta_phi;
+      sum_weighted_delta_phi2 += accepted_weight * accepted_delta_phi * accepted_delta_phi;
+      sum_weighted_delta_z += accepted_weight * accepted_delta_z;
+      sum_weighted_delta_z2 += accepted_weight * accepted_delta_z * accepted_delta_z;
+      sum_dca += accepted_dca;
+      sum_dca2 += accepted_dca * accepted_dca;
+      sum_voxel_x += voxel_x;
+      sum_voxel_y += voxel_y;
+      sum_voxel_z += voxel_z;
+    }
   };
 
   using UniqueTrackId = std::tuple<
@@ -221,6 +292,51 @@ namespace CPMB1
   double pair_weight_from_curvature_proxy(const Record& a, const Record& b)
   {
     return 1.0 / (a.pt * b.pt);
+  }
+
+  double mean(const double sum, const unsigned long long entries)
+  {
+    return entries > 0 ? sum / static_cast<double>(entries) : std::numeric_limits<double>::quiet_NaN();
+  }
+
+  double weighted_mean(const double sum_weighted, const double sum_weight)
+  {
+    return sum_weight > 0.0 ? sum_weighted / sum_weight : std::numeric_limits<double>::quiet_NaN();
+  }
+
+  double rms(
+      const double sum,
+      const double sum2,
+      const unsigned long long entries)
+  {
+    if (entries == 0)
+    {
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double average = mean(sum, entries);
+    const double variance = sum2 / static_cast<double>(entries) - average * average;
+    return std::sqrt(std::max(0.0, variance));
+  }
+
+  double weighted_rms(
+      const double sum_weighted,
+      const double sum_weighted2,
+      const double sum_weight)
+  {
+    if (sum_weight <= 0.0)
+    {
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double average = weighted_mean(sum_weighted, sum_weight);
+    const double variance = sum_weighted2 / sum_weight - average * average;
+    return std::sqrt(std::max(0.0, variance));
+  }
+
+  double effective_entries(const double sum_weight, const double sum_weight2)
+  {
+    return sum_weight2 > 0.0 ?
+        sum_weight * sum_weight / sum_weight2 :
+        std::numeric_limits<double>::quiet_NaN();
   }
 
   double offset_magnitude2(const Record& record)
@@ -346,13 +462,14 @@ void CPM_B1_LocalLinePoCA(
     const std::string& output_file = "CPM_B1_local_line_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
-    const unsigned int max_records_per_voxel = 500,
+    const unsigned int max_records_per_voxel = 0,
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
-    const unsigned int max_pair_records_per_voxel = 0,
+    const unsigned int max_pair_records_per_voxel = 10,
     const std::string& crossing_solver = "helix",
-    const double magnetic_field_z = 1.4)
+    const double magnetic_field_z = 1.4,
+    const bool write_pair_tree = true)
 {
   const bool use_helix_solver = crossing_solver == "helix";
   if (crossing_solver != "line" && crossing_solver != "helix")
@@ -459,10 +576,11 @@ void CPM_B1_LocalLinePoCA(
 
   TFile output(output_file.c_str(), "RECREATE");
 
-  TTree pairs("cpm_poca_pairs", "CPM local line-line PoCA pairs");
+  TTree pairs("cpm_poca_pairs", "CPM crossing-point PoCA pairs");
   int out_iphi = -1;
   int out_ir = -1;
   int out_iz = -1;
+  unsigned long long out_batch_id = 0;
   Long64_t entry_a = -1;
   Long64_t entry_b = -1;
   unsigned int track_id_a = 0;
@@ -501,6 +619,7 @@ void CPM_B1_LocalLinePoCA(
   pairs.Branch("iphi", &out_iphi);
   pairs.Branch("ir", &out_ir);
   pairs.Branch("iz", &out_iz);
+  pairs.Branch("batch_id", &out_batch_id);
   pairs.Branch("entry_a", &entry_a);
   pairs.Branch("entry_b", &entry_b);
   pairs.Branch("track_id_a", &track_id_a);
@@ -535,6 +654,125 @@ void CPM_B1_LocalLinePoCA(
   pairs.Branch("delta_r", &delta_r);
   pairs.Branch("delta_phi", &delta_phi);
   pairs.Branch("delta_rphi", &delta_rphi);
+
+  TTree batch_corrections("cpm_b1_batch_corrections", "CPM B1 batch-level crossing correction sums");
+  int batch_iphi = -1;
+  int batch_ir = -1;
+  int batch_iz = -1;
+  unsigned long long batch_id = 0;
+  unsigned int batch_positive_records = 0;
+  unsigned int batch_negative_records = 0;
+  unsigned long long batch_record_pairs = 0;
+  unsigned long long batch_opposite_charge_pairs = 0;
+  unsigned long long batch_same_event_track_pairs = 0;
+  unsigned long long batch_pt_rejected_pairs = 0;
+  unsigned long long batch_candidate_pairs = 0;
+  unsigned long long batch_invalid_weight_pairs = 0;
+  unsigned long long batch_invalid_poca_pairs = 0;
+  unsigned long long batch_dca_rejected_pairs = 0;
+  unsigned long long batch_accepted_pairs = 0;
+  double batch_voxel_x = std::numeric_limits<double>::quiet_NaN();
+  double batch_voxel_y = std::numeric_limits<double>::quiet_NaN();
+  double batch_voxel_z = std::numeric_limits<double>::quiet_NaN();
+  double batch_sum_pair_weight = std::numeric_limits<double>::quiet_NaN();
+  double batch_sum_pair_weight2 = std::numeric_limits<double>::quiet_NaN();
+  double batch_mean_pair_weight = std::numeric_limits<double>::quiet_NaN();
+  double batch_effective_pair_entries = std::numeric_limits<double>::quiet_NaN();
+  double batch_sum_delta_r = 0.0;
+  double batch_sum_delta_r2 = 0.0;
+  double batch_sum_delta_rphi = 0.0;
+  double batch_sum_delta_rphi2 = 0.0;
+  double batch_sum_delta_phi = 0.0;
+  double batch_sum_delta_phi2 = 0.0;
+  double batch_sum_delta_z = 0.0;
+  double batch_sum_delta_z2 = 0.0;
+  double batch_sum_weighted_delta_r = 0.0;
+  double batch_sum_weighted_delta_r2 = 0.0;
+  double batch_sum_weighted_delta_rphi = 0.0;
+  double batch_sum_weighted_delta_rphi2 = 0.0;
+  double batch_sum_weighted_delta_phi = 0.0;
+  double batch_sum_weighted_delta_phi2 = 0.0;
+  double batch_sum_weighted_delta_z = 0.0;
+  double batch_sum_weighted_delta_z2 = 0.0;
+  double batch_sum_dca = 0.0;
+  double batch_sum_dca2 = 0.0;
+  double batch_mean_delta_r = std::numeric_limits<double>::quiet_NaN();
+  double batch_rms_delta_r = std::numeric_limits<double>::quiet_NaN();
+  double batch_mean_delta_rphi = std::numeric_limits<double>::quiet_NaN();
+  double batch_rms_delta_rphi = std::numeric_limits<double>::quiet_NaN();
+  double batch_mean_delta_phi = std::numeric_limits<double>::quiet_NaN();
+  double batch_rms_delta_phi = std::numeric_limits<double>::quiet_NaN();
+  double batch_mean_delta_z = std::numeric_limits<double>::quiet_NaN();
+  double batch_rms_delta_z = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_mean_delta_r = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_rms_delta_r = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_mean_delta_rphi = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_rms_delta_rphi = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_mean_delta_phi = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_rms_delta_phi = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_mean_delta_z = std::numeric_limits<double>::quiet_NaN();
+  double batch_weighted_rms_delta_z = std::numeric_limits<double>::quiet_NaN();
+  double batch_mean_dca = std::numeric_limits<double>::quiet_NaN();
+  double batch_rms_dca = std::numeric_limits<double>::quiet_NaN();
+
+  batch_corrections.Branch("iphi", &batch_iphi);
+  batch_corrections.Branch("ir", &batch_ir);
+  batch_corrections.Branch("iz", &batch_iz);
+  batch_corrections.Branch("batch_id", &batch_id);
+  batch_corrections.Branch("positive_records", &batch_positive_records);
+  batch_corrections.Branch("negative_records", &batch_negative_records);
+  batch_corrections.Branch("record_pairs", &batch_record_pairs);
+  batch_corrections.Branch("opposite_charge_pairs", &batch_opposite_charge_pairs);
+  batch_corrections.Branch("same_event_track_pairs", &batch_same_event_track_pairs);
+  batch_corrections.Branch("pt_rejected_pairs", &batch_pt_rejected_pairs);
+  batch_corrections.Branch("candidate_pairs", &batch_candidate_pairs);
+  batch_corrections.Branch("invalid_weight_pairs", &batch_invalid_weight_pairs);
+  batch_corrections.Branch("invalid_poca_pairs", &batch_invalid_poca_pairs);
+  batch_corrections.Branch("dca_rejected_pairs", &batch_dca_rejected_pairs);
+  batch_corrections.Branch("accepted_pairs", &batch_accepted_pairs);
+  batch_corrections.Branch("voxel_x", &batch_voxel_x);
+  batch_corrections.Branch("voxel_y", &batch_voxel_y);
+  batch_corrections.Branch("voxel_z", &batch_voxel_z);
+  batch_corrections.Branch("sum_pair_weight", &batch_sum_pair_weight);
+  batch_corrections.Branch("sum_pair_weight2", &batch_sum_pair_weight2);
+  batch_corrections.Branch("mean_pair_weight", &batch_mean_pair_weight);
+  batch_corrections.Branch("effective_pair_entries", &batch_effective_pair_entries);
+  batch_corrections.Branch("sum_delta_r", &batch_sum_delta_r);
+  batch_corrections.Branch("sum_delta_r2", &batch_sum_delta_r2);
+  batch_corrections.Branch("sum_delta_rphi", &batch_sum_delta_rphi);
+  batch_corrections.Branch("sum_delta_rphi2", &batch_sum_delta_rphi2);
+  batch_corrections.Branch("sum_delta_phi", &batch_sum_delta_phi);
+  batch_corrections.Branch("sum_delta_phi2", &batch_sum_delta_phi2);
+  batch_corrections.Branch("sum_delta_z", &batch_sum_delta_z);
+  batch_corrections.Branch("sum_delta_z2", &batch_sum_delta_z2);
+  batch_corrections.Branch("sum_weighted_delta_r", &batch_sum_weighted_delta_r);
+  batch_corrections.Branch("sum_weighted_delta_r2", &batch_sum_weighted_delta_r2);
+  batch_corrections.Branch("sum_weighted_delta_rphi", &batch_sum_weighted_delta_rphi);
+  batch_corrections.Branch("sum_weighted_delta_rphi2", &batch_sum_weighted_delta_rphi2);
+  batch_corrections.Branch("sum_weighted_delta_phi", &batch_sum_weighted_delta_phi);
+  batch_corrections.Branch("sum_weighted_delta_phi2", &batch_sum_weighted_delta_phi2);
+  batch_corrections.Branch("sum_weighted_delta_z", &batch_sum_weighted_delta_z);
+  batch_corrections.Branch("sum_weighted_delta_z2", &batch_sum_weighted_delta_z2);
+  batch_corrections.Branch("sum_dca", &batch_sum_dca);
+  batch_corrections.Branch("sum_dca2", &batch_sum_dca2);
+  batch_corrections.Branch("mean_delta_r", &batch_mean_delta_r);
+  batch_corrections.Branch("rms_delta_r", &batch_rms_delta_r);
+  batch_corrections.Branch("mean_delta_rphi", &batch_mean_delta_rphi);
+  batch_corrections.Branch("rms_delta_rphi", &batch_rms_delta_rphi);
+  batch_corrections.Branch("mean_delta_phi", &batch_mean_delta_phi);
+  batch_corrections.Branch("rms_delta_phi", &batch_rms_delta_phi);
+  batch_corrections.Branch("mean_delta_z", &batch_mean_delta_z);
+  batch_corrections.Branch("rms_delta_z", &batch_rms_delta_z);
+  batch_corrections.Branch("weighted_mean_delta_r", &batch_weighted_mean_delta_r);
+  batch_corrections.Branch("weighted_rms_delta_r", &batch_weighted_rms_delta_r);
+  batch_corrections.Branch("weighted_mean_delta_rphi", &batch_weighted_mean_delta_rphi);
+  batch_corrections.Branch("weighted_rms_delta_rphi", &batch_weighted_rms_delta_rphi);
+  batch_corrections.Branch("weighted_mean_delta_phi", &batch_weighted_mean_delta_phi);
+  batch_corrections.Branch("weighted_rms_delta_phi", &batch_weighted_rms_delta_phi);
+  batch_corrections.Branch("weighted_mean_delta_z", &batch_weighted_mean_delta_z);
+  batch_corrections.Branch("weighted_rms_delta_z", &batch_weighted_rms_delta_z);
+  batch_corrections.Branch("mean_dca", &batch_mean_dca);
+  batch_corrections.Branch("rms_dca", &batch_rms_dca);
 
   TTree voxel_summaries("cpm_b1_voxel_summary", "CPM B1 per-voxel pair input summary");
   int summary_iphi = -1;
@@ -819,6 +1057,7 @@ void CPM_B1_LocalLinePoCA(
       positive_index += positive_take;
       negative_index += negative_take;
 
+      const unsigned long long current_batch_id = voxel_summary.batch_count;
       ++voxel_summary.batch_count;
       voxel_summary.batched_positive_records += positive_take;
       voxel_summary.batched_negative_records += negative_take;
@@ -827,6 +1066,7 @@ void CPM_B1_LocalLinePoCA(
       voxel_summary.batched_opposite_charge_pairs +=
           static_cast<unsigned long long>(positive_take) * negative_take;
 
+      CPMB1::BatchAccumulator batch_accumulator;
       for (std::size_t ipos = 0; ipos < positive_take; ++ipos)
       {
         for (std::size_t ineg = 0; ineg < negative_take; ++ineg)
@@ -835,19 +1075,23 @@ void CPM_B1_LocalLinePoCA(
           const auto& b = *negative_selected_records[negative_begin + ineg];
           if (a.event_track == b.event_track)
           {
+            ++batch_accumulator.same_event_track_pairs;
             continue;
           }
           if (!CPMB1::has_good_curvature_proxy(a, min_pair_pt) ||
               !CPMB1::has_good_curvature_proxy(b, min_pair_pt))
           {
+            ++batch_accumulator.pt_rejected_pairs;
             continue;
           }
 
           ++candidate_pairs;
           ++voxel_summary.candidate_pairs;
+          ++batch_accumulator.candidate_pairs;
           pair_weight = CPMB1::pair_weight_from_curvature_proxy(a, b);
           if (!std::isfinite(pair_weight) || pair_weight <= 0.0)
           {
+            ++batch_accumulator.invalid_weight_pairs;
             continue;
           }
 
@@ -894,14 +1138,21 @@ void CPM_B1_LocalLinePoCA(
             poca_midpoint = result.midpoint;
           }
 
-          if (!poca_valid || !(poca_dca <= max_pair_dca))
+          if (!poca_valid)
           {
+            ++batch_accumulator.invalid_poca_pairs;
+            continue;
+          }
+          if (!(poca_dca <= max_pair_dca))
+          {
+            ++batch_accumulator.dca_rejected_pairs;
             continue;
           }
 
           out_iphi = voxel.iphi;
           out_ir = voxel.ir;
           out_iz = voxel.iz;
+          out_batch_id = current_batch_id;
           entry_a = a.entry;
           entry_b = b.entry;
           track_id_a = a.event_track.track_id;
@@ -941,10 +1192,89 @@ void CPM_B1_LocalLinePoCA(
           delta_phi = CPMB1::wrap_delta_phi(voxel_phi - midpoint_phi);
           delta_rphi = voxel_r * delta_phi;
 
-          pairs.Fill();
+          batch_accumulator.add(
+              delta_r,
+              delta_rphi,
+              delta_phi,
+              delta_z,
+              dca,
+              pair_weight,
+              voxel_center_x,
+              voxel_center_y,
+              voxel_center_z);
+          if (write_pair_tree)
+          {
+            pairs.Fill();
+          }
           ++accepted_pairs;
           ++voxel_summary.accepted_pairs;
         }
+      }
+
+      if (batch_accumulator.accepted_pairs > 0)
+      {
+        batch_iphi = voxel.iphi;
+        batch_ir = voxel.ir;
+        batch_iz = voxel.iz;
+        batch_id = current_batch_id;
+        batch_positive_records = positive_take;
+        batch_negative_records = negative_take;
+        batch_record_pairs = CPMB1::pair_count(positive_take + negative_take);
+        batch_opposite_charge_pairs =
+            static_cast<unsigned long long>(positive_take) * negative_take;
+        batch_same_event_track_pairs = batch_accumulator.same_event_track_pairs;
+        batch_pt_rejected_pairs = batch_accumulator.pt_rejected_pairs;
+        batch_candidate_pairs = batch_accumulator.candidate_pairs;
+        batch_invalid_weight_pairs = batch_accumulator.invalid_weight_pairs;
+        batch_invalid_poca_pairs = batch_accumulator.invalid_poca_pairs;
+        batch_dca_rejected_pairs = batch_accumulator.dca_rejected_pairs;
+        batch_accepted_pairs = batch_accumulator.accepted_pairs;
+        batch_voxel_x = CPMB1::mean(batch_accumulator.sum_voxel_x, batch_accumulator.accepted_pairs);
+        batch_voxel_y = CPMB1::mean(batch_accumulator.sum_voxel_y, batch_accumulator.accepted_pairs);
+        batch_voxel_z = CPMB1::mean(batch_accumulator.sum_voxel_z, batch_accumulator.accepted_pairs);
+        batch_sum_pair_weight = batch_accumulator.sum_pair_weight;
+        batch_sum_pair_weight2 = batch_accumulator.sum_pair_weight2;
+        batch_mean_pair_weight = CPMB1::mean(batch_accumulator.sum_pair_weight, batch_accumulator.accepted_pairs);
+        batch_effective_pair_entries = CPMB1::effective_entries(
+            batch_accumulator.sum_pair_weight,
+            batch_accumulator.sum_pair_weight2);
+        batch_sum_delta_r = batch_accumulator.sum_delta_r;
+        batch_sum_delta_r2 = batch_accumulator.sum_delta_r2;
+        batch_sum_delta_rphi = batch_accumulator.sum_delta_rphi;
+        batch_sum_delta_rphi2 = batch_accumulator.sum_delta_rphi2;
+        batch_sum_delta_phi = batch_accumulator.sum_delta_phi;
+        batch_sum_delta_phi2 = batch_accumulator.sum_delta_phi2;
+        batch_sum_delta_z = batch_accumulator.sum_delta_z;
+        batch_sum_delta_z2 = batch_accumulator.sum_delta_z2;
+        batch_sum_weighted_delta_r = batch_accumulator.sum_weighted_delta_r;
+        batch_sum_weighted_delta_r2 = batch_accumulator.sum_weighted_delta_r2;
+        batch_sum_weighted_delta_rphi = batch_accumulator.sum_weighted_delta_rphi;
+        batch_sum_weighted_delta_rphi2 = batch_accumulator.sum_weighted_delta_rphi2;
+        batch_sum_weighted_delta_phi = batch_accumulator.sum_weighted_delta_phi;
+        batch_sum_weighted_delta_phi2 = batch_accumulator.sum_weighted_delta_phi2;
+        batch_sum_weighted_delta_z = batch_accumulator.sum_weighted_delta_z;
+        batch_sum_weighted_delta_z2 = batch_accumulator.sum_weighted_delta_z2;
+        batch_sum_dca = batch_accumulator.sum_dca;
+        batch_sum_dca2 = batch_accumulator.sum_dca2;
+        batch_mean_delta_r = CPMB1::mean(batch_accumulator.sum_delta_r, batch_accumulator.accepted_pairs);
+        batch_rms_delta_r = CPMB1::rms(batch_accumulator.sum_delta_r, batch_accumulator.sum_delta_r2, batch_accumulator.accepted_pairs);
+        batch_mean_delta_rphi = CPMB1::mean(batch_accumulator.sum_delta_rphi, batch_accumulator.accepted_pairs);
+        batch_rms_delta_rphi = CPMB1::rms(batch_accumulator.sum_delta_rphi, batch_accumulator.sum_delta_rphi2, batch_accumulator.accepted_pairs);
+        batch_mean_delta_phi = CPMB1::mean(batch_accumulator.sum_delta_phi, batch_accumulator.accepted_pairs);
+        batch_rms_delta_phi = CPMB1::rms(batch_accumulator.sum_delta_phi, batch_accumulator.sum_delta_phi2, batch_accumulator.accepted_pairs);
+        batch_mean_delta_z = CPMB1::mean(batch_accumulator.sum_delta_z, batch_accumulator.accepted_pairs);
+        batch_rms_delta_z = CPMB1::rms(batch_accumulator.sum_delta_z, batch_accumulator.sum_delta_z2, batch_accumulator.accepted_pairs);
+        batch_weighted_mean_delta_r = CPMB1::weighted_mean(batch_accumulator.sum_weighted_delta_r, batch_accumulator.sum_pair_weight);
+        batch_weighted_rms_delta_r = CPMB1::weighted_rms(batch_accumulator.sum_weighted_delta_r, batch_accumulator.sum_weighted_delta_r2, batch_accumulator.sum_pair_weight);
+        batch_weighted_mean_delta_rphi = CPMB1::weighted_mean(batch_accumulator.sum_weighted_delta_rphi, batch_accumulator.sum_pair_weight);
+        batch_weighted_rms_delta_rphi = CPMB1::weighted_rms(batch_accumulator.sum_weighted_delta_rphi, batch_accumulator.sum_weighted_delta_rphi2, batch_accumulator.sum_pair_weight);
+        batch_weighted_mean_delta_phi = CPMB1::weighted_mean(batch_accumulator.sum_weighted_delta_phi, batch_accumulator.sum_pair_weight);
+        batch_weighted_rms_delta_phi = CPMB1::weighted_rms(batch_accumulator.sum_weighted_delta_phi, batch_accumulator.sum_weighted_delta_phi2, batch_accumulator.sum_pair_weight);
+        batch_weighted_mean_delta_z = CPMB1::weighted_mean(batch_accumulator.sum_weighted_delta_z, batch_accumulator.sum_pair_weight);
+        batch_weighted_rms_delta_z = CPMB1::weighted_rms(batch_accumulator.sum_weighted_delta_z, batch_accumulator.sum_weighted_delta_z2, batch_accumulator.sum_pair_weight);
+        batch_mean_dca = CPMB1::mean(batch_accumulator.sum_dca, batch_accumulator.accepted_pairs);
+        batch_rms_dca = CPMB1::rms(batch_accumulator.sum_dca, batch_accumulator.sum_dca2, batch_accumulator.accepted_pairs);
+        batch_corrections.Fill();
       }
     }
 
@@ -994,7 +1324,7 @@ void CPM_B1_LocalLinePoCA(
         "processed");
   }
 
-  TTree summary("cpm_b1_summary", "CPM B1 local line-line PoCA summary");
+  TTree summary("cpm_b1_summary", "CPM B1 crossing-point PoCA summary");
   unsigned long long input_records = entries;
   unsigned int input_files_count = input_files.size();
   unsigned int voxel_count = records_by_voxel.size();
@@ -1009,6 +1339,9 @@ void CPM_B1_LocalLinePoCA(
   std::string summary_crossing_solver = crossing_solver;
   bool summary_use_helix_solver = use_helix_solver;
   double summary_magnetic_field_z = magnetic_field_z;
+  bool summary_write_pair_tree = write_pair_tree;
+  Long64_t summary_output_pair_rows = pairs.GetEntries();
+  Long64_t summary_output_batch_rows = batch_corrections.GetEntries();
   int summary_phi_bins = grid_metadata.phi_bins;
   int summary_r_bins = grid_metadata.r_bins;
   int summary_z_bins = grid_metadata.z_bins;
@@ -1033,6 +1366,9 @@ void CPM_B1_LocalLinePoCA(
   summary.Branch("crossing_solver", &summary_crossing_solver);
   summary.Branch("use_helix_solver", &summary_use_helix_solver);
   summary.Branch("magnetic_field_z", &summary_magnetic_field_z);
+  summary.Branch("write_pair_tree", &summary_write_pair_tree);
+  summary.Branch("output_pair_rows", &summary_output_pair_rows);
+  summary.Branch("output_batch_rows", &summary_output_batch_rows);
   summary.Branch("phi_bins", &summary_phi_bins);
   summary.Branch("r_bins", &summary_r_bins);
   summary.Branch("z_bins", &summary_z_bins);
@@ -1040,6 +1376,7 @@ void CPM_B1_LocalLinePoCA(
   summary.Fill();
 
   pairs.Write();
+  batch_corrections.Write();
   voxel_summaries.Write();
   summary.Write();
   output.Close();
@@ -1051,6 +1388,8 @@ void CPM_B1_LocalLinePoCA(
   std::cout << "CPM_B1_LocalLinePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - candidate pairs: " << candidate_pairs << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - accepted pairs: " << accepted_pairs << std::endl;
+  std::cout << "CPM_B1_LocalLinePoCA - output pair rows: " << summary_output_pair_rows << std::endl;
+  std::cout << "CPM_B1_LocalLinePoCA - output batch rows: " << summary_output_batch_rows << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - min pair pt: " << min_pair_pt << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
   std::cout << "CPM_B1_LocalLinePoCA - crossing solver: " << crossing_solver << std::endl;
@@ -1073,13 +1412,14 @@ void CPM_B1_LocalLinePoCA(
     const std::string& output_file = "CPM_B1_local_line_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
-    const unsigned int max_records_per_voxel = 500,
+    const unsigned int max_records_per_voxel = 0,
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
-    const unsigned int max_pair_records_per_voxel = 0,
+    const unsigned int max_pair_records_per_voxel = 10,
     const std::string& crossing_solver = "helix",
-    const double magnetic_field_z = 1.4)
+    const double magnetic_field_z = 1.4,
+    const bool write_pair_tree = true)
 {
   CPM_B1_LocalLinePoCA(
       std::vector<std::string>{input_file},
@@ -1092,7 +1432,8 @@ void CPM_B1_LocalLinePoCA(
       min_pair_pt,
       max_pair_records_per_voxel,
       crossing_solver,
-      magnetic_field_z);
+      magnetic_field_z,
+      write_pair_tree);
 }
 
 void CPM_B1_LocalLinePoCA(
@@ -1101,13 +1442,14 @@ void CPM_B1_LocalLinePoCA(
     const bool input_is_list,
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
-    const unsigned int max_records_per_voxel = 500,
+    const unsigned int max_records_per_voxel = 0,
     const unsigned int min_records_per_charge = 2,
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
-    const unsigned int max_pair_records_per_voxel = 0,
+    const unsigned int max_pair_records_per_voxel = 10,
     const std::string& crossing_solver = "helix",
-    const double magnetic_field_z = 1.4)
+    const double magnetic_field_z = 1.4,
+    const bool write_pair_tree = true)
 {
   const auto input_files = input_is_list ?
       CPMB1::read_file_list(input_file_or_list) :
@@ -1124,5 +1466,6 @@ void CPM_B1_LocalLinePoCA(
       min_pair_pt,
       max_pair_records_per_voxel,
       crossing_solver,
-      magnetic_field_z);
+      magnetic_field_z,
+      write_pair_tree);
 }

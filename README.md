@@ -44,27 +44,37 @@ builds:
 mini-DST rehydration is attempted.
 
 `jobB/CPM_B1_LocalLinePoCA.C` reads one or more Job A outputs, groups records
-by voxel, applies the intra-voxel offset shift, forms opposite-charge local
-line-line PoCA pairs, and writes the pair QA tree. It stores a pair weight
-`1/(pt_a*pt_b)`, which is proportional to the method weight
+by voxel, applies the intra-voxel offset shift, forms opposite-charge crossing
+pairs, and writes batch-level correction sums plus optional pair QA rows. It
+stores a pair weight `1/(pt_a*pt_b)`, which is proportional to the method weight
 `(1/R_a)*(1/R_b)` for a fixed magnetic field. By default it prints one
 diagnostic line per voxel with `(iphi, ir, iz)`, total `(phi, r, z)` bins,
 record count, unique track count, unique track-pair count, charge-pair counts,
 batch counts, batched pair counts, candidate pairs, accepted pairs, and the
-processing status. It also writes
-`cpm_b1_voxel_summary`, a persistent per-voxel QA tree. Optional pair-input
-controls can require `pt >= --b1-min-pair-pt`, keep only the record closest to
-the voxel center for each unique track, and then process the selected records in
-deterministic hash-ordered opposite-charge batches. `--b1-max-pair-records`
-sets the maximum selected records per charge sign in each batch; `0` keeps one
-unlimited full-voxel batch. The default crossing solver is the CPM ideal-helix
-PoCA helper. The previous v1 local line-line solver can still be selected with
-`--b1-crossing-solver line` for comparison studies.
+processing status. It also writes `cpm_b1_voxel_summary`, a persistent
+per-voxel QA tree, and `cpm_b1_batch_corrections`, a persistent per-batch tree
+with unweighted and weighted sums, sum-of-squares, accepted pair counts, total
+weights, and DCA QA. Optional pair-input controls can require
+`pt >= --b1-min-pair-pt`, keep only the record closest to the voxel center for
+each unique track, and then process the selected records in deterministic
+hash-ordered opposite-charge batches. The raw per-voxel safety skip is disabled
+by default with `--b1-max-records 0`; high occupancy is controlled by batch
+size instead of skipping the voxel. `--b1-max-pair-records` sets the maximum
+selected records per charge sign in each batch; the default is `10`, while `0`
+keeps one unlimited full-voxel batch. The default crossing solver is the CPM
+ideal-helix PoCA helper using a configurable first-pass uniform `Bz` estimate
+that defaults to `1.4 T`. The previous v1 local line-line solver can still be
+selected with `--b1-crossing-solver line` for comparison studies. Use
+`--no-b1-write-pairs` to skip the large pair-level QA tree when only batch-level
+accumulation is needed.
 
 `jobB/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
-accumulates pair-level PoCA deltas into voxel-level correction QA rows. It can
-run either the default curvature-proxy weighted average or a simple unweighted
-average through the Job B driver.
+accumulates crossing deltas into voxel-level correction QA rows. In `auto` mode
+it prefers `cpm_b1_batch_corrections` and falls back to pair rows for older B1
+outputs. The batch mode preserves pair-equivalent weighted and unweighted sums
+without requiring every pair row to be persisted. B2 can run either the default
+curvature-proxy weighted average or a simple unweighted average through the Job
+B driver.
 The B1/B2 delta convention is `voxel center - crossing point`, matching the
 distortion values subtracted by `TpcDistortionCorrection`.
 
@@ -111,7 +121,9 @@ jobB/run_cpm_b_chain.sh \
   --prefix merged \
   --b1-min-records-per-charge 10 \
   --b1-min-pair-pt 0.5 \
-  --b1-max-pair-records 100 \
+  --b1-max-pair-records 10 \
+  --no-b1-write-pairs \
+  --b2-input-mode batches \
   --b2-unweighted \
   --run-b0-qa \
   --no-keep-intermediates

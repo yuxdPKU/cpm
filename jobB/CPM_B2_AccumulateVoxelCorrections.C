@@ -1,9 +1,10 @@
 /*
  * CPM Job B2 voxel-level accumulator.
  *
- * This macro reads B1 local line-line PoCA pair outputs, groups accepted pairs
- * by 3D voxel, and writes one correction-summary row per voxel. Pairwise
- * crossing estimates can be averaged either with the B1 curvature proxy weight
+ * This macro reads B1 crossing-point PoCA outputs, groups accepted pairs
+ * by 3D voxel, and writes one correction-summary row per voxel. It can read
+ * either pair-level rows or B1 batch-level running sums. Pairwise crossing
+ * estimates can be averaged either with the B1 curvature proxy weight
  * 1/(pt_i pt_j), proportional to (1/R_i)(1/R_j) in a fixed magnetic field, or
  * with unit weights for a simple arithmetic mean.
  * The output is a QA/intermediate product. The input B1 delta convention is the
@@ -86,6 +87,42 @@ namespace CPMB2
       sum_voxel_y += voxel_y;
       sum_voxel_z += voxel_z;
     }
+
+    void add_sums(
+        const unsigned long long added_entries,
+        const double added_sum_weight,
+        const double added_sum_weight2,
+        const double added_sum_weighted_delta_r,
+        const double added_sum_weighted_delta_r2,
+        const double added_sum_weighted_delta_rphi,
+        const double added_sum_weighted_delta_rphi2,
+        const double added_sum_weighted_delta_phi,
+        const double added_sum_weighted_delta_phi2,
+        const double added_sum_weighted_delta_z,
+        const double added_sum_weighted_delta_z2,
+        const double added_sum_dca,
+        const double added_sum_dca2,
+        const double voxel_x,
+        const double voxel_y,
+        const double voxel_z)
+    {
+      entries += added_entries;
+      sum_weight += added_sum_weight;
+      sum_weight2 += added_sum_weight2;
+      sum_weighted_delta_r += added_sum_weighted_delta_r;
+      sum_weighted_delta_r2 += added_sum_weighted_delta_r2;
+      sum_weighted_delta_rphi += added_sum_weighted_delta_rphi;
+      sum_weighted_delta_rphi2 += added_sum_weighted_delta_rphi2;
+      sum_weighted_delta_phi += added_sum_weighted_delta_phi;
+      sum_weighted_delta_phi2 += added_sum_weighted_delta_phi2;
+      sum_weighted_delta_z += added_sum_weighted_delta_z;
+      sum_weighted_delta_z2 += added_sum_weighted_delta_z2;
+      sum_dca += added_sum_dca;
+      sum_dca2 += added_sum_dca2;
+      sum_voxel_x += voxel_x * static_cast<double>(added_entries);
+      sum_voxel_y += voxel_y * static_cast<double>(added_entries);
+      sum_voxel_z += voxel_z * static_cast<double>(added_entries);
+    }
   };
 
   double mean(const double sum, const unsigned long long entries)
@@ -135,6 +172,26 @@ namespace CPMB2
     }
     return files;
   }
+
+  bool has_tree_with_entries(
+      const std::vector<std::string>& input_files,
+      const std::string& tree_name)
+  {
+    for (const auto& file : input_files)
+    {
+      TFile input(file.c_str(), "READ");
+      if (input.IsZombie())
+      {
+        continue;
+      }
+      auto* tree = dynamic_cast<TTree*>(input.Get(tree_name.c_str()));
+      if (tree && tree->GetEntries() > 0)
+      {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 void CPM_B2_AccumulateVoxelCorrections(
@@ -142,84 +199,259 @@ void CPM_B2_AccumulateVoxelCorrections(
     const std::string& output_file = "CPM_B2_voxel_corrections.root",
     const unsigned int min_entries_per_voxel = 1,
     const double max_pair_dca = -1.0,
-    const bool use_pair_weights = true)
+    const bool use_pair_weights = true,
+    const std::string& input_mode = "auto")
 {
-  TChain chain("cpm_poca_pairs");
-  for (const auto& file : input_files)
+  const bool has_batch_tree =
+      CPMB2::has_tree_with_entries(input_files, "cpm_b1_batch_corrections");
+  std::string resolved_input_mode = input_mode;
+  if (resolved_input_mode == "auto")
   {
-    chain.Add(file.c_str());
+    resolved_input_mode = has_batch_tree ? "batches" : "pairs";
   }
-
-  int iphi = -1;
-  int ir = -1;
-  int iz = -1;
-  double dca = std::numeric_limits<double>::quiet_NaN();
-  double voxel_center_x = std::numeric_limits<double>::quiet_NaN();
-  double voxel_center_y = std::numeric_limits<double>::quiet_NaN();
-  double voxel_center_z = std::numeric_limits<double>::quiet_NaN();
-  double pair_weight = 1.0;
-  double delta_r = std::numeric_limits<double>::quiet_NaN();
-  double delta_rphi = std::numeric_limits<double>::quiet_NaN();
-  double delta_phi = std::numeric_limits<double>::quiet_NaN();
-  double delta_z = std::numeric_limits<double>::quiet_NaN();
-
-  chain.SetBranchAddress("iphi", &iphi);
-  chain.SetBranchAddress("ir", &ir);
-  chain.SetBranchAddress("iz", &iz);
-  chain.SetBranchAddress("dca", &dca);
-  chain.SetBranchAddress("voxel_center_x", &voxel_center_x);
-  chain.SetBranchAddress("voxel_center_y", &voxel_center_y);
-  chain.SetBranchAddress("voxel_center_z", &voxel_center_z);
-  const bool has_pair_weight = chain.GetBranch("pair_weight") != nullptr;
-  if (has_pair_weight)
+  if (resolved_input_mode != "pairs" && resolved_input_mode != "batches")
   {
-    chain.SetBranchAddress("pair_weight", &pair_weight);
+    std::cerr << "CPM_B2_AccumulateVoxelCorrections - invalid input_mode: "
+              << input_mode << " (expected auto, pairs, or batches)" << std::endl;
+    return;
   }
-  chain.SetBranchAddress("delta_r", &delta_r);
-  chain.SetBranchAddress("delta_rphi", &delta_rphi);
-  chain.SetBranchAddress("delta_phi", &delta_phi);
-  chain.SetBranchAddress("delta_z", &delta_z);
+  if (resolved_input_mode == "batches" && !has_batch_tree)
+  {
+    std::cerr << "CPM_B2_AccumulateVoxelCorrections - requested batch input, "
+              << "but no cpm_b1_batch_corrections tree with entries was found"
+              << std::endl;
+    return;
+  }
+  if (resolved_input_mode == "batches" && max_pair_dca >= 0.0)
+  {
+    std::cout << "CPM_B2_AccumulateVoxelCorrections - warning: max_pair_dca "
+              << "is already applied in B1 batch sums; B2 will not refilter "
+              << "individual pairs in batch input mode" << std::endl;
+  }
 
   std::map<CPMB2::VoxelKey, CPMB2::Accumulator> accumulators;
   unsigned long long accepted_pairs = 0;
-  unsigned long long rejected_pairs = 0;
+  unsigned long long rejected_rows = 0;
+  Long64_t input_rows = 0;
+  Long64_t input_pair_rows = 0;
+  Long64_t input_batch_rows = 0;
+  bool has_pair_weight = false;
 
-  Long64_t input_pairs = chain.GetEntries();
-  for (Long64_t entry = 0; entry < input_pairs; ++entry)
+  if (resolved_input_mode == "pairs")
   {
-    chain.GetEntry(entry);
-    if (!has_pair_weight)
+    TChain chain("cpm_poca_pairs");
+    for (const auto& file : input_files)
     {
-      pair_weight = 1.0;
+      chain.Add(file.c_str());
     }
 
-    if (iphi < 0 || ir < 0 || iz < 0 ||
-        !std::isfinite(delta_r) || !std::isfinite(delta_rphi) ||
-        !std::isfinite(delta_phi) || !std::isfinite(delta_z) ||
-        !std::isfinite(dca) ||
-        (use_pair_weights && (!std::isfinite(pair_weight) || pair_weight <= 0.0)))
+    int iphi = -1;
+    int ir = -1;
+    int iz = -1;
+    double dca = std::numeric_limits<double>::quiet_NaN();
+    double voxel_center_x = std::numeric_limits<double>::quiet_NaN();
+    double voxel_center_y = std::numeric_limits<double>::quiet_NaN();
+    double voxel_center_z = std::numeric_limits<double>::quiet_NaN();
+    double pair_weight = 1.0;
+    double delta_r = std::numeric_limits<double>::quiet_NaN();
+    double delta_rphi = std::numeric_limits<double>::quiet_NaN();
+    double delta_phi = std::numeric_limits<double>::quiet_NaN();
+    double delta_z = std::numeric_limits<double>::quiet_NaN();
+
+    chain.SetBranchAddress("iphi", &iphi);
+    chain.SetBranchAddress("ir", &ir);
+    chain.SetBranchAddress("iz", &iz);
+    chain.SetBranchAddress("dca", &dca);
+    chain.SetBranchAddress("voxel_center_x", &voxel_center_x);
+    chain.SetBranchAddress("voxel_center_y", &voxel_center_y);
+    chain.SetBranchAddress("voxel_center_z", &voxel_center_z);
+    has_pair_weight = chain.GetBranch("pair_weight") != nullptr;
+    if (has_pair_weight)
     {
-      ++rejected_pairs;
-      continue;
+      chain.SetBranchAddress("pair_weight", &pair_weight);
     }
-    if (max_pair_dca >= 0.0 && dca > max_pair_dca)
+    chain.SetBranchAddress("delta_r", &delta_r);
+    chain.SetBranchAddress("delta_rphi", &delta_rphi);
+    chain.SetBranchAddress("delta_phi", &delta_phi);
+    chain.SetBranchAddress("delta_z", &delta_z);
+
+    input_rows = chain.GetEntries();
+    input_pair_rows = input_rows;
+    for (Long64_t entry = 0; entry < input_rows; ++entry)
     {
-      ++rejected_pairs;
-      continue;
+      chain.GetEntry(entry);
+      if (!has_pair_weight)
+      {
+        pair_weight = 1.0;
+      }
+
+      if (iphi < 0 || ir < 0 || iz < 0 ||
+          !std::isfinite(delta_r) || !std::isfinite(delta_rphi) ||
+          !std::isfinite(delta_phi) || !std::isfinite(delta_z) ||
+          !std::isfinite(dca) ||
+          (use_pair_weights && (!std::isfinite(pair_weight) || pair_weight <= 0.0)))
+      {
+        ++rejected_rows;
+        continue;
+      }
+      if (max_pair_dca >= 0.0 && dca > max_pair_dca)
+      {
+        ++rejected_rows;
+        continue;
+      }
+
+      const double accumulation_weight = use_pair_weights ? pair_weight : 1.0;
+      accumulators[{iphi, ir, iz}].add(
+          delta_r,
+          delta_rphi,
+          delta_phi,
+          delta_z,
+          dca,
+          accumulation_weight,
+          voxel_center_x,
+          voxel_center_y,
+          voxel_center_z);
+      ++accepted_pairs;
+    }
+  }
+  else
+  {
+    TChain chain("cpm_b1_batch_corrections");
+    for (const auto& file : input_files)
+    {
+      chain.Add(file.c_str());
     }
 
-    const double accumulation_weight = use_pair_weights ? pair_weight : 1.0;
-    accumulators[{iphi, ir, iz}].add(
-        delta_r,
-        delta_rphi,
-        delta_phi,
-        delta_z,
-        dca,
-        accumulation_weight,
-        voxel_center_x,
-        voxel_center_y,
-        voxel_center_z);
-    ++accepted_pairs;
+    int iphi = -1;
+    int ir = -1;
+    int iz = -1;
+    unsigned long long batch_entries = 0;
+    double voxel_x = std::numeric_limits<double>::quiet_NaN();
+    double voxel_y = std::numeric_limits<double>::quiet_NaN();
+    double voxel_z = std::numeric_limits<double>::quiet_NaN();
+    double sum_pair_weight = std::numeric_limits<double>::quiet_NaN();
+    double sum_pair_weight2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_r = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_r2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_rphi = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_rphi2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_phi = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_phi2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_z = std::numeric_limits<double>::quiet_NaN();
+    double sum_delta_z2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_r = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_r2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_rphi = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_rphi2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_phi = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_phi2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_z = std::numeric_limits<double>::quiet_NaN();
+    double sum_weighted_delta_z2 = std::numeric_limits<double>::quiet_NaN();
+    double sum_dca = std::numeric_limits<double>::quiet_NaN();
+    double sum_dca2 = std::numeric_limits<double>::quiet_NaN();
+
+    chain.SetBranchAddress("iphi", &iphi);
+    chain.SetBranchAddress("ir", &ir);
+    chain.SetBranchAddress("iz", &iz);
+    chain.SetBranchAddress("accepted_pairs", &batch_entries);
+    chain.SetBranchAddress("voxel_x", &voxel_x);
+    chain.SetBranchAddress("voxel_y", &voxel_y);
+    chain.SetBranchAddress("voxel_z", &voxel_z);
+    chain.SetBranchAddress("sum_pair_weight", &sum_pair_weight);
+    chain.SetBranchAddress("sum_pair_weight2", &sum_pair_weight2);
+    chain.SetBranchAddress("sum_delta_r", &sum_delta_r);
+    chain.SetBranchAddress("sum_delta_r2", &sum_delta_r2);
+    chain.SetBranchAddress("sum_delta_rphi", &sum_delta_rphi);
+    chain.SetBranchAddress("sum_delta_rphi2", &sum_delta_rphi2);
+    chain.SetBranchAddress("sum_delta_phi", &sum_delta_phi);
+    chain.SetBranchAddress("sum_delta_phi2", &sum_delta_phi2);
+    chain.SetBranchAddress("sum_delta_z", &sum_delta_z);
+    chain.SetBranchAddress("sum_delta_z2", &sum_delta_z2);
+    chain.SetBranchAddress("sum_weighted_delta_r", &sum_weighted_delta_r);
+    chain.SetBranchAddress("sum_weighted_delta_r2", &sum_weighted_delta_r2);
+    chain.SetBranchAddress("sum_weighted_delta_rphi", &sum_weighted_delta_rphi);
+    chain.SetBranchAddress("sum_weighted_delta_rphi2", &sum_weighted_delta_rphi2);
+    chain.SetBranchAddress("sum_weighted_delta_phi", &sum_weighted_delta_phi);
+    chain.SetBranchAddress("sum_weighted_delta_phi2", &sum_weighted_delta_phi2);
+    chain.SetBranchAddress("sum_weighted_delta_z", &sum_weighted_delta_z);
+    chain.SetBranchAddress("sum_weighted_delta_z2", &sum_weighted_delta_z2);
+    chain.SetBranchAddress("sum_dca", &sum_dca);
+    chain.SetBranchAddress("sum_dca2", &sum_dca2);
+
+    has_pair_weight = true;
+    input_rows = chain.GetEntries();
+    input_batch_rows = input_rows;
+    for (Long64_t entry = 0; entry < input_rows; ++entry)
+    {
+      chain.GetEntry(entry);
+      if (iphi < 0 || ir < 0 || iz < 0 || batch_entries == 0 ||
+          !std::isfinite(voxel_x) || !std::isfinite(voxel_y) ||
+          !std::isfinite(voxel_z) ||
+          !std::isfinite(sum_dca) || !std::isfinite(sum_dca2))
+      {
+        ++rejected_rows;
+        continue;
+      }
+
+      double add_sum_weight = static_cast<double>(batch_entries);
+      double add_sum_weight2 = static_cast<double>(batch_entries);
+      double add_sum_delta_r = sum_delta_r;
+      double add_sum_delta_r2 = sum_delta_r2;
+      double add_sum_delta_rphi = sum_delta_rphi;
+      double add_sum_delta_rphi2 = sum_delta_rphi2;
+      double add_sum_delta_phi = sum_delta_phi;
+      double add_sum_delta_phi2 = sum_delta_phi2;
+      double add_sum_delta_z = sum_delta_z;
+      double add_sum_delta_z2 = sum_delta_z2;
+
+      if (use_pair_weights)
+      {
+        add_sum_weight = sum_pair_weight;
+        add_sum_weight2 = sum_pair_weight2;
+        add_sum_delta_r = sum_weighted_delta_r;
+        add_sum_delta_r2 = sum_weighted_delta_r2;
+        add_sum_delta_rphi = sum_weighted_delta_rphi;
+        add_sum_delta_rphi2 = sum_weighted_delta_rphi2;
+        add_sum_delta_phi = sum_weighted_delta_phi;
+        add_sum_delta_phi2 = sum_weighted_delta_phi2;
+        add_sum_delta_z = sum_weighted_delta_z;
+        add_sum_delta_z2 = sum_weighted_delta_z2;
+      }
+
+      if (!std::isfinite(add_sum_weight) || add_sum_weight <= 0.0 ||
+          !std::isfinite(add_sum_weight2) ||
+          !std::isfinite(add_sum_delta_r) ||
+          !std::isfinite(add_sum_delta_r2) ||
+          !std::isfinite(add_sum_delta_rphi) ||
+          !std::isfinite(add_sum_delta_rphi2) ||
+          !std::isfinite(add_sum_delta_phi) ||
+          !std::isfinite(add_sum_delta_phi2) ||
+          !std::isfinite(add_sum_delta_z) ||
+          !std::isfinite(add_sum_delta_z2))
+      {
+        ++rejected_rows;
+        continue;
+      }
+
+      accumulators[{iphi, ir, iz}].add_sums(
+          batch_entries,
+          add_sum_weight,
+          add_sum_weight2,
+          add_sum_delta_r,
+          add_sum_delta_r2,
+          add_sum_delta_rphi,
+          add_sum_delta_rphi2,
+          add_sum_delta_phi,
+          add_sum_delta_phi2,
+          add_sum_delta_z,
+          add_sum_delta_z2,
+          sum_dca,
+          sum_dca2,
+          voxel_x,
+          voxel_y,
+          voxel_z);
+      accepted_pairs += batch_entries;
+    }
   }
 
   TFile output(output_file.c_str(), "RECREATE");
@@ -312,11 +544,26 @@ void CPM_B2_AccumulateVoxelCorrections(
   bool summary_has_pair_weight = has_pair_weight;
   bool summary_use_pair_weights = use_pair_weights;
   std::string summary_averaging_mode = use_pair_weights ? "weighted" : "unweighted";
+  std::string summary_requested_input_mode = input_mode;
+  std::string summary_input_mode = resolved_input_mode;
+  Long64_t summary_input_rows = input_rows;
+  Long64_t summary_input_pair_rows = input_pair_rows;
+  Long64_t summary_input_batch_rows = input_batch_rows;
+  unsigned long long summary_input_pairs =
+      resolved_input_mode == "pairs" ?
+      static_cast<unsigned long long>(input_pair_rows) :
+      accepted_pairs;
+  unsigned long long summary_rejected_rows = rejected_rows;
 
   summary.Branch("input_files", &input_files_count);
-  summary.Branch("input_pairs", &input_pairs);
+  summary.Branch("requested_input_mode", &summary_requested_input_mode);
+  summary.Branch("input_mode", &summary_input_mode);
+  summary.Branch("input_rows", &summary_input_rows);
+  summary.Branch("input_pair_rows", &summary_input_pair_rows);
+  summary.Branch("input_batch_rows", &summary_input_batch_rows);
+  summary.Branch("input_pairs", &summary_input_pairs);
   summary.Branch("accepted_pairs", &accepted_pairs);
-  summary.Branch("rejected_pairs", &rejected_pairs);
+  summary.Branch("rejected_rows", &summary_rejected_rows);
   summary.Branch("accumulator_voxels", &accumulator_voxels);
   summary.Branch("filled_voxels", &filled_voxels);
   summary.Branch("skipped_low_entry_voxels", &skipped_low_entry_voxels);
@@ -331,9 +578,15 @@ void CPM_B2_AccumulateVoxelCorrections(
   summary.Write();
   output.Close();
 
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - input pairs: " << input_pairs << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - input mode: "
+            << resolved_input_mode << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - input rows: " << input_rows << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - input pair rows: " << input_pair_rows << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - input batch rows: " << input_batch_rows << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - input pair estimates: "
+            << summary_input_pairs << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - accepted pairs: " << accepted_pairs << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - rejected pairs: " << rejected_pairs << std::endl;
+  std::cout << "CPM_B2_AccumulateVoxelCorrections - rejected rows: " << rejected_rows << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - accumulator voxels: " << accumulator_voxels << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - filled voxels: " << filled_voxels << std::endl;
   std::cout << "CPM_B2_AccumulateVoxelCorrections - skipped low-entry voxels: " << skipped_low_entry_voxels << std::endl;
@@ -347,14 +600,16 @@ void CPM_B2_AccumulateVoxelCorrections(
     const std::string& output_file = "CPM_B2_voxel_corrections.root",
     const unsigned int min_entries_per_voxel = 1,
     const double max_pair_dca = -1.0,
-    const bool use_pair_weights = true)
+    const bool use_pair_weights = true,
+    const std::string& input_mode = "auto")
 {
   CPM_B2_AccumulateVoxelCorrections(
       std::vector<std::string>{input_file},
       output_file,
       min_entries_per_voxel,
       max_pair_dca,
-      use_pair_weights);
+      use_pair_weights,
+      input_mode);
 }
 
 void CPM_B2_AccumulateVoxelCorrections(
@@ -363,7 +618,8 @@ void CPM_B2_AccumulateVoxelCorrections(
     const bool input_is_list,
     const unsigned int min_entries_per_voxel = 1,
     const double max_pair_dca = -1.0,
-    const bool use_pair_weights = true)
+    const bool use_pair_weights = true,
+    const std::string& input_mode = "auto")
 {
   const auto input_files = input_is_list ?
       CPMB2::read_file_list(input_file_or_list) :
@@ -374,5 +630,6 @@ void CPM_B2_AccumulateVoxelCorrections(
       output_file,
       min_entries_per_voxel,
       max_pair_dca,
-      use_pair_weights);
+      use_pair_weights,
+      input_mode);
 }

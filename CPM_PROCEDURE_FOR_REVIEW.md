@@ -67,18 +67,27 @@ Current implemented selection:
 High-occupancy handling:
 
 - The old first-N cap is replaced by deterministic hash-ordered batching.
+- The raw per-voxel safety skip is disabled by default (`--b1-max-records 0`);
+  high occupancy is controlled by batch size rather than by dropping the voxel.
 - `--b1-max-pair-records N` means at most `N` selected positive records and
   `N` selected negative records per batch.
-- `N = 0` means one unlimited full-voxel batch.
+- The current default is `N = 10`; `N = 0` means one unlimited full-voxel batch.
 - B1 writes per-voxel QA including total selected records, selected positive and
   negative records, batch count, batched positive/negative records, theoretical
   opposite-charge pairs, batched opposite-charge pairs, candidate pairs, and
   accepted pairs.
+- B1 also writes `cpm_b1_batch_corrections`, one row per accepted batch. Each
+  row stores the accepted pair count, total pair weights, effective entries,
+  unweighted sums and sum-of-squares, weighted sums and sum-of-squares, and DCA
+  QA. This is the persistent running-average input for B2.
 
 Default crossing solver:
 
 - The current default solver is the CPM-local numerical ideal-helix PoCA helper,
   `CPMHelixPoCA`.
+- The first implementation uses a configurable uniform `Bz` estimate. The
+  default is `1.4 T`. This is an explicit approximation for early algorithm
+  development, not a replacement for later field-map or ACTS-based validation.
 - The pair crossing estimate is the midpoint of the two closest points.
 - The pair DCA is stored as QA and can be cut in B1/B2.
 - The previous framework-building local line-line PoCA solver remains available
@@ -98,7 +107,9 @@ Target crossing solver:
 
 ## Job B2: Voxel Accumulation
 
-B2 reads accepted B1 pair rows and accumulates one correction row per voxel.
+B2 reads B1 batch-level correction sums by default and accumulates one
+correction row per voxel. It can still read pair-level rows for backwards
+compatibility and detailed QA studies.
 
 Implemented averaging modes:
 
@@ -107,16 +118,10 @@ Implemented averaging modes:
 
 B2 stores per-voxel QA including entries, sum of weights, effective weighted
 entries, means, and RMS values for `delta_r`, `delta_phi`, `delta_rphi`,
-`delta_z`, and DCA.
-
-Open accumulation question:
-
-- The current implementation accumulates all accepted pair rows directly.
-- The expert-suggested running-average version may instead compute one
-  correction and uncertainty per batch, then merge batch-level results into the
-  voxel accumulator. This needs a physics/statistics decision because averaging
-  all pairs and averaging batch means are not identical when batch sizes or
-  weights differ.
+`delta_z`, and DCA. Batch input is pair-equivalent: unweighted mode combines
+batch sums with accepted-pair counts, while weighted mode combines batch
+weighted sums with total pair weights. It therefore does not average all batch
+means equally unless the batch sizes and weights happen to match.
 
 ## Job B3: Average-Correction Histograms
 

@@ -14,7 +14,7 @@ Usage:
 
 Runs the CPM Job B macro chain:
   optional B0 build/check event index QA
-  B1 local line-line PoCA
+  B1 crossing-point PoCA
   B2 voxel accumulator
   B3 average-correction histogram writer
   B3 histogram check
@@ -37,7 +37,8 @@ Options:
                                 combined output.
   --b1-max-pair-dca VALUE       B1 max pair DCA. Default: 2.0
   --b1-min-sin-angle VALUE      B1 minimum sin(opening angle). Default: 1.0e-4
-  --b1-max-records VALUE        B1 max records per voxel. Default: 500
+  --b1-max-records VALUE        B1 max raw records per voxel before skipping.
+                                0 disables this safety skip. Default: 0
   --b1-min-records-per-charge VALUE
                                 B1 minimum records per charge sign. Default: 2
   --b1-min-pair-pt VALUE        B1 minimum pT for records entering pair loops.
@@ -46,13 +47,17 @@ Options:
                                 opposite-charge pair batch after keeping the
                                 closest record per unique track. 0 means one
                                 unlimited full-voxel batch.
-                                Default: 0
+                                Default: 10
   --b1-crossing-solver VALUE     B1 crossing solver: helix or line. Default: helix
   --b1-magnetic-field-z VALUE    B1 helix-solver Bz field in tesla. Default: 1.4
+  --b1-write-pairs               Write B1 pair-level QA tree. Default.
+  --no-b1-write-pairs            Skip B1 pair rows and keep batch-level sums.
   --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
   --b2-min-entries VALUE        B2 minimum accepted pairs per voxel. Default: 1
   --b2-max-pair-dca VALUE       Optional B2 max pair DCA. Default: -1.0
+  --b2-input-mode VALUE          B2 input source: auto, batches, or pairs.
+                                Default: auto. Auto prefers B1 batch sums.
   --b2-weighted                 Use B1 pair weights in B2 averaging. Default.
   --b2-unweighted               Use a simple unweighted average in B2.
   --help                        Show this message.
@@ -118,15 +123,17 @@ PREFIX="CPM"
 METADATA=""
 B1_MAX_PAIR_DCA="2.0"
 B1_MIN_SIN_ANGLE="1.0e-4"
-B1_MAX_RECORDS="500"
+B1_MAX_RECORDS="0"
 B1_MIN_RECORDS_PER_CHARGE="2"
 B1_MIN_PAIR_PT="0.5"
-B1_MAX_PAIR_RECORDS="0"
+B1_MAX_PAIR_RECORDS="10"
 B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
+B1_WRITE_PAIR_TREE=1
 B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
+B2_INPUT_MODE="auto"
 B2_USE_PAIR_WEIGHTS=1
 RUN_B0_QA=0
 WRITE_COMBINED=1
@@ -208,6 +215,14 @@ while [[ $# -gt 0 ]]; do
       B1_MAGNETIC_FIELD_Z=${2:-}
       shift 2
       ;;
+    --b1-write-pairs)
+      B1_WRITE_PAIR_TREE=1
+      shift
+      ;;
+    --no-b1-write-pairs)
+      B1_WRITE_PAIR_TREE=0
+      shift
+      ;;
     --b1-print-voxel-summary)
       B1_PRINT_VOXEL_SUMMARY=1
       shift
@@ -222,6 +237,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --b2-max-pair-dca)
       B2_MAX_PAIR_DCA=${2:-}
+      shift 2
+      ;;
+    --b2-input-mode)
+      B2_INPUT_MODE=${2:-}
       shift 2
       ;;
     --b2-weighted)
@@ -265,6 +284,11 @@ if [[ "$B1_CROSSING_SOLVER" != "line" && "$B1_CROSSING_SOLVER" != "helix" ]]; th
   exit 2
 fi
 
+if [[ "$B2_INPUT_MODE" != "auto" && "$B2_INPUT_MODE" != "batches" && "$B2_INPUT_MODE" != "pairs" ]]; then
+  echo "Invalid --b2-input-mode: $B2_INPUT_MODE (expected auto, batches, or pairs)" >&2
+  exit 2
+fi
+
 mkdir -p "$OUT_DIR"
 
 if [[ -z "$METADATA" ]]; then
@@ -301,6 +325,7 @@ B2_Q=$(root_string "$B2_CORRECTIONS")
 B3_Q=$(root_string "$B3_HISTOGRAMS")
 METADATA_Q=$(root_string "$METADATA")
 B1_CROSSING_SOLVER_Q=$(root_string "$B1_CROSSING_SOLVER")
+B2_INPUT_MODE_Q=$(root_string "$B2_INPUT_MODE")
 
 echo "[run_cpm_b_chain] input: $INPUT"
 echo "[run_cpm_b_chain] input_is_list: $INPUT_IS_LIST"
@@ -315,6 +340,8 @@ echo "[run_cpm_b_chain] b1_min_pair_pt: $B1_MIN_PAIR_PT"
 echo "[run_cpm_b_chain] b1_max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
 echo "[run_cpm_b_chain] b1_crossing_solver: $B1_CROSSING_SOLVER"
 echo "[run_cpm_b_chain] b1_magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
+echo "[run_cpm_b_chain] b1_write_pair_tree: $B1_WRITE_PAIR_TREE"
+echo "[run_cpm_b_chain] b2_input_mode: $B2_INPUT_MODE"
 echo "[run_cpm_b_chain] b2_use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 
 if [[ "$RUN_B0_QA" -eq 1 ]]; then
@@ -328,12 +355,12 @@ if [[ "$RUN_B0_QA" -eq 1 ]]; then
 fi
 
 if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE})"
 else
-  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z})"
+  run_root "${MACRO_DIR}/CPM_B1_LocalLinePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE})"
 fi
 
-run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS})"
+run_root "${MACRO_DIR}/CPM_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q})"
 run_root "${MACRO_DIR}/CPM_B3_WriteAverageCorrectionHistograms.C(${B2_Q},${B3_Q},${METADATA_Q})"
 run_root_bool_check "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C" "CPM_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 
