@@ -57,9 +57,9 @@ controls can require `pt >= --b1-min-pair-pt`, keep only the record closest to
 the voxel center for each unique track, and then process the selected records in
 deterministic hash-ordered opposite-charge batches. `--b1-max-pair-records`
 sets the maximum selected records per charge sign in each batch; `0` keeps one
-unlimited full-voxel batch. The default crossing solver remains the v1 local
-line-line PoCA. The experimental CPM helix helper can be selected with
-`--b1-crossing-solver helix` for comparison studies.
+unlimited full-voxel batch. The default crossing solver is the CPM ideal-helix
+PoCA helper. The previous v1 local line-line solver can still be selected with
+`--b1-crossing-solver line` for comparison studies.
 
 `jobB/CPM_B2_AccumulateVoxelCorrections.C` reads one or more B1 outputs and
 accumulates pair-level PoCA deltas into voxel-level correction QA rows. It can

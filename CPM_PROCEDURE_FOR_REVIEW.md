@@ -75,12 +75,14 @@ High-occupancy handling:
   opposite-charge pairs, batched opposite-charge pairs, candidate pairs, and
   accepted pairs.
 
-Current crossing solver:
+Default crossing solver:
 
-- The current framework-building solver is local line-line PoCA using the two
-  reference-state positions and momentum directions.
+- The current default solver is the CPM-local numerical ideal-helix PoCA helper,
+  `CPMHelixPoCA`.
 - The pair crossing estimate is the midpoint of the two closest points.
 - The pair DCA is stored as QA and can be cut in B1/B2.
+- The previous framework-building local line-line PoCA solver remains available
+  through `--b1-crossing-solver line` for comparison.
 
 Target crossing solver:
 
@@ -91,8 +93,8 @@ Target crossing solver:
   PCA/DCA.
 - CPM now has an initial CPM-local numerical helix PoCA helper,
   `CPMHelixPoCA`, with a narrow interface designed for later upstreaming. It is
-  available as an explicit B1 option for comparison, but it is not yet the
-  default B1 solver.
+  now the default B1 solver, while the local line-line solver remains available
+  as a control option.
 
 ## Job B2: Voxel Accumulation
 

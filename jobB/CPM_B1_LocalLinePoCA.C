@@ -3,8 +3,8 @@
  *
  * This macro reads Job A cpm_records, groups ACTS-ready state snapshots by
  * voxel, forms opposite-charge track-state pairs inside each voxel, and computes
- * CPM crossing-point estimates. The default solver is the v1 local line-line
- * PoCA; an experimental ideal-helix PoCA solver can be enabled for comparison.
+ * CPM crossing-point estimates. The default solver is the ideal-helix PoCA;
+ * the v1 local line-line PoCA solver can be enabled for comparison.
  * It does not require seed objects or TRKR_CLUSTER in the CPM mini-DST.
  */
 
@@ -341,7 +341,7 @@ namespace CPMB1
   }
 }
 
-  void CPM_B1_LocalLinePoCA(
+void CPM_B1_LocalLinePoCA(
     const std::vector<std::string>& input_files,
     const std::string& output_file = "CPM_B1_local_line_poca.root",
     const double max_pair_dca = 2.0,
@@ -351,7 +351,7 @@ namespace CPMB1
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
     const unsigned int max_pair_records_per_voxel = 0,
-    const std::string& crossing_solver = "line",
+    const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4)
 {
   const bool use_helix_solver = crossing_solver == "helix";
@@ -1078,7 +1078,7 @@ void CPM_B1_LocalLinePoCA(
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
     const unsigned int max_pair_records_per_voxel = 0,
-    const std::string& crossing_solver = "line",
+    const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4)
 {
   CPM_B1_LocalLinePoCA(
@@ -1106,7 +1106,7 @@ void CPM_B1_LocalLinePoCA(
     const bool print_voxel_summaries = true,
     const double min_pair_pt = 0.5,
     const unsigned int max_pair_records_per_voxel = 0,
-    const std::string& crossing_solver = "line",
+    const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4)
 {
   const auto input_files = input_is_list ?

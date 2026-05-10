@@ -47,7 +47,7 @@ Options:
                                 closest record per unique track. 0 means one
                                 unlimited full-voxel batch.
                                 Default: 0
-  --b1-crossing-solver VALUE     B1 crossing solver: line or helix. Default: line
+  --b1-crossing-solver VALUE     B1 crossing solver: helix or line. Default: helix
   --b1-magnetic-field-z VALUE    B1 helix-solver Bz field in tesla. Default: 1.4
   --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
   --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
@@ -122,7 +122,7 @@ B1_MAX_RECORDS="500"
 B1_MIN_RECORDS_PER_CHARGE="2"
 B1_MIN_PAIR_PT="0.5"
 B1_MAX_PAIR_RECORDS="0"
-B1_CROSSING_SOLVER="line"
+B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
 B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
