@@ -612,18 +612,15 @@ void CPM_B2_AccumulateVoxelCorrections(
       input_mode);
 }
 
-void CPM_B2_AccumulateVoxelCorrections(
+void CPM_B2_AccumulateVoxelCorrectionsFromList(
     const std::string& input_file_or_list,
     const std::string& output_file,
-    const bool input_is_list,
     const unsigned int min_entries_per_voxel = 1,
     const double max_pair_dca = -1.0,
     const bool use_pair_weights = true,
     const std::string& input_mode = "auto")
 {
-  const auto input_files = input_is_list ?
-      CPMB2::read_file_list(input_file_or_list) :
-      std::vector<std::string>{input_file_or_list};
+  const auto input_files = CPMB2::read_file_list(input_file_or_list);
 
   CPM_B2_AccumulateVoxelCorrections(
       input_files,

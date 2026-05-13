@@ -82,6 +82,10 @@ root_string() {
   printf '"%s"' "$value"
 }
 
+root_std_string() {
+  printf 'std::string(%s)' "$(root_string "$1")"
+}
+
 first_list_entry() {
   local list_file=$1
   local line
@@ -324,8 +328,8 @@ B1_Q=$(root_string "$B1_POCA")
 B2_Q=$(root_string "$B2_CORRECTIONS")
 B3_Q=$(root_string "$B3_HISTOGRAMS")
 METADATA_Q=$(root_string "$METADATA")
-B1_CROSSING_SOLVER_Q=$(root_string "$B1_CROSSING_SOLVER")
-B2_INPUT_MODE_Q=$(root_string "$B2_INPUT_MODE")
+B1_CROSSING_SOLVER_Q=$(root_std_string "$B1_CROSSING_SOLVER")
+B2_INPUT_MODE_Q=$(root_std_string "$B2_INPUT_MODE")
 
 echo "[run_cpm_b_chain] input: $INPUT"
 echo "[run_cpm_b_chain] input_is_list: $INPUT_IS_LIST"
