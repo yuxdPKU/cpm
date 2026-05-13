@@ -8,7 +8,7 @@ This repository currently contains the framework-independent CPM core:
 
 - ACTS-ready CPM record/data structures under `module`;
 - a voxel container keyed by `(iphi, ir, iz)`;
-- a first local line-line PoCA solver for CPM v1 validation;
+- a solver-agnostic B1 PoCA driver with selectable `helix` and `line` modes;
 - an initial CPM-local ideal-helix PoCA helper for review and validation;
 - a small CMake test source for the PoCA and voxel-container basics.
 
@@ -43,7 +43,7 @@ builds:
 `jobB/CPM_B0_CheckEventIndex.C` performs a light QA pass on that index before
 mini-DST rehydration is attempted.
 
-`jobB/CPM_B1_LocalLinePoCA.C` reads one or more Job A outputs, groups records
+`jobB/CPM_B1_ComputePoCA.C` reads one or more Job A outputs, groups records
 by voxel, applies the intra-voxel offset shift, forms opposite-charge crossing
 pairs, and writes batch-level correction sums plus optional pair QA rows. It
 stores a pair weight `1/(pt_a*pt_b)`, which is proportional to the method weight
@@ -93,8 +93,8 @@ Example B0/B1 preflight:
 root -l -b -q 'jobB/CPM_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root","CPM_B0_event_index.root")'
 root -l -b -q 'jobB/CPM_B0_BuildEventIndex.C("cpm_filelist.txt","CPM_B0_event_index.root",true)'
 root -l -b -q 'jobB/CPM_B0_CheckEventIndex.C("CPM_B0_event_index.root")'
-root -l -b -q 'jobB/CPM_B1_LocalLinePoCA.C("jobA_CPMVoxelContainer.root","CPM_B1_local_line_poca.root")'
-root -l -b -q 'jobB/CPM_B2_AccumulateVoxelCorrections.C("CPM_B1_local_line_poca.root","CPM_B2_voxel_corrections.root")'
+root -l -b -q 'jobB/CPM_B1_ComputePoCA.C("jobA_CPMVoxelContainer.root","CPM_B1_poca.root")'
+root -l -b -q 'jobB/CPM_B2_AccumulateVoxelCorrections.C("CPM_B1_poca.root","CPM_B2_voxel_corrections.root")'
 root -l -b -q 'jobB/CPM_B3_WriteAverageCorrectionHistograms.C("CPM_B2_voxel_corrections.root","CPM_B3_average_correction_histograms.root","jobA_CPMVoxelContainer.root")'
 root -l -b -q 'jobB/CPM_B3_CheckAverageCorrectionHistograms.C("CPM_B3_average_correction_histograms.root")'
 ```

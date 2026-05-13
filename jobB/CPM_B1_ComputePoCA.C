@@ -403,7 +403,7 @@ namespace CPMB1
       const VoxelSummary& summary,
       const std::string& status)
   {
-    std::cout << "CPM_B1_LocalLinePoCA - voxel (iphi,ir,iz)=("
+    std::cout << "CPM_B1_ComputePoCA - voxel (iphi,ir,iz)=("
               << voxel.iphi << "," << voxel.ir << "," << voxel.iz << ")";
     if (metadata.valid)
     {
@@ -457,9 +457,9 @@ namespace CPMB1
   }
 }
 
-void CPM_B1_LocalLinePoCA(
+void CPM_B1_ComputePoCA(
     const std::vector<std::string>& input_files,
-    const std::string& output_file = "CPM_B1_local_line_poca.root",
+    const std::string& output_file = "CPM_B1_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 0,
@@ -474,7 +474,7 @@ void CPM_B1_LocalLinePoCA(
   const bool use_helix_solver = crossing_solver == "helix";
   if (crossing_solver != "line" && crossing_solver != "helix")
   {
-    std::cerr << "CPM_B1_LocalLinePoCA - invalid crossing_solver: "
+    std::cerr << "CPM_B1_ComputePoCA - invalid crossing_solver: "
               << crossing_solver << " (expected line or helix)" << std::endl;
     return;
   }
@@ -1381,35 +1381,35 @@ void CPM_B1_LocalLinePoCA(
   summary.Write();
   output.Close();
 
-  std::cout << "CPM_B1_LocalLinePoCA - input records: " << input_records << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - voxels: " << voxel_count << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - processed voxels: " << processed_voxels << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - skipped large voxels: " << skipped_large_voxels << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - candidate pairs: " << candidate_pairs << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - accepted pairs: " << accepted_pairs << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - output pair rows: " << summary_output_pair_rows << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - output batch rows: " << summary_output_batch_rows << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - min pair pt: " << min_pair_pt << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
-  std::cout << "CPM_B1_LocalLinePoCA - crossing solver: " << crossing_solver << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - input records: " << input_records << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - voxels: " << voxel_count << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - processed voxels: " << processed_voxels << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - skipped large voxels: " << skipped_large_voxels << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - candidate pairs: " << candidate_pairs << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - accepted pairs: " << accepted_pairs << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - output pair rows: " << summary_output_pair_rows << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - output batch rows: " << summary_output_batch_rows << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - min pair pt: " << min_pair_pt << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - crossing solver: " << crossing_solver << std::endl;
   if (use_helix_solver)
   {
-    std::cout << "CPM_B1_LocalLinePoCA - magnetic field z: " << magnetic_field_z << std::endl;
+    std::cout << "CPM_B1_ComputePoCA - magnetic field z: " << magnetic_field_z << std::endl;
   }
   if (grid_metadata.valid)
   {
-    std::cout << "CPM_B1_LocalLinePoCA - grid bins: ("
+    std::cout << "CPM_B1_ComputePoCA - grid bins: ("
               << grid_metadata.phi_bins << ", "
               << grid_metadata.r_bins << ", "
               << grid_metadata.z_bins << ")" << std::endl;
   }
-  std::cout << "CPM_B1_LocalLinePoCA - output: " << output_file << std::endl;
+  std::cout << "CPM_B1_ComputePoCA - output: " << output_file << std::endl;
 }
 
-void CPM_B1_LocalLinePoCA(
+void CPM_B1_ComputePoCA(
     const std::string& input_file,
-    const std::string& output_file = "CPM_B1_local_line_poca.root",
+    const std::string& output_file = "CPM_B1_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 0,
@@ -1421,7 +1421,7 @@ void CPM_B1_LocalLinePoCA(
     const double magnetic_field_z = 1.4,
     const bool write_pair_tree = true)
 {
-  CPM_B1_LocalLinePoCA(
+  CPM_B1_ComputePoCA(
       std::vector<std::string>{input_file},
       output_file,
       max_pair_dca,
@@ -1436,7 +1436,7 @@ void CPM_B1_LocalLinePoCA(
       write_pair_tree);
 }
 
-void CPM_B1_LocalLinePoCA(
+void CPM_B1_ComputePoCA(
     const std::string& input_file_or_list,
     const std::string& output_file,
     const bool input_is_list,
@@ -1455,7 +1455,7 @@ void CPM_B1_LocalLinePoCA(
       CPMB1::read_file_list(input_file_or_list) :
       std::vector<std::string>{input_file_or_list};
 
-  CPM_B1_LocalLinePoCA(
+  CPM_B1_ComputePoCA(
       input_files,
       output_file,
       max_pair_dca,
