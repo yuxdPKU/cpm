@@ -16,7 +16,7 @@ namespace
 int main()
 {
   {
-    const auto result = cpm::computeLocalLinePoCA(
+    const auto result = computeLocalLinePoCA(
         {-1.0, 0.0, 0.0},
         {1.0, 0.0, 0.0},
         {0.0, -1.0, 0.0},
@@ -30,7 +30,7 @@ int main()
   }
 
   {
-    const auto result = cpm::computeLocalLinePoCA(
+    const auto result = computeLocalLinePoCA(
         {0.0, 0.0, 0.0},
         {1.0, 0.0, 0.0},
         {0.0, 1.0, 0.0},
@@ -40,19 +40,19 @@ int main()
   }
 
   {
-    cpm::TrackStateRecord first;
+    TrackStateRecord first;
     first.voxel = {1, 2, 3};
     first.state.position = {-1.0, 0.2, 0.0};
     first.state.momentum = {1.0, 0.0, 0.0};
     first.cluster.cluster_minus_voxel_center = {0.0, 0.2, 0.0};
 
-    cpm::TrackStateRecord second;
+    TrackStateRecord second;
     second.voxel = {1, 2, 3};
     second.state.position = {0.1, -1.0, 0.0};
     second.state.momentum = {0.0, 1.0, 0.0};
     second.cluster.cluster_minus_voxel_center = {0.1, 0.0, 0.0};
 
-    cpm::VoxelContainer container;
+    VoxelContainer container;
     container.add(first);
     container.add(second);
 
@@ -63,7 +63,7 @@ int main()
     assert(records != nullptr);
     assert(records->size() == 2);
 
-    const auto result = cpm::computeVoxelCenterPoCA(records->at(0), records->at(1));
+    const auto result = computeVoxelCenterPoCA(records->at(0), records->at(1));
     assert(result.valid);
     assert(near(result.midpoint.x, 0.0));
     assert(near(result.midpoint.y, 0.0));
@@ -71,9 +71,9 @@ int main()
   }
 
   {
-    cpm::HelixPoCAOptions options;
+    HelixPoCAOptions options;
     options.magnetic_field_z = 0.0;
-    const auto result = cpm::computeHelixPoCA(
+    const auto result = computeHelixPoCA(
         {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 1},
         {{0.0, -1.0, 0.0}, {0.0, 1.0, 0.0}, -1},
         options);
@@ -87,7 +87,7 @@ int main()
   }
 
   {
-    const auto result = cpm::computeHelixPoCA(
+    const auto result = computeHelixPoCA(
         {{0.0, 0.0, 0.0}, {1.0, 0.2, 0.1}, 1},
         {{0.0, 0.0, 0.0}, {-0.2, 1.0, 0.1}, -1});
 
@@ -100,10 +100,10 @@ int main()
   }
 
   {
-    cpm::HelixPoCAOptions options;
+    HelixPoCAOptions options;
     options.magnetic_field_z = 0.0;
-    const cpm::HelixState state{{1.0, 2.0, 3.0}, {0.0, 3.0, 4.0}, 1};
-    const auto eval = cpm::evaluateHelix(state, 5.0, options);
+    const HelixState state{{1.0, 2.0, 3.0}, {0.0, 3.0, 4.0}, 1};
+    const auto eval = evaluateHelix(state, 5.0, options);
 
     assert(eval.valid);
     assert(near(eval.position.x, 1.0));

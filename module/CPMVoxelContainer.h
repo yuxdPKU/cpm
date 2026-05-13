@@ -8,50 +8,47 @@
 #include <utility>
 #include <vector>
 
-namespace cpm
+class VoxelContainer
 {
-  class VoxelContainer
+ public:
+  using Record = TrackStateRecord;
+  using RecordVector = std::vector<Record>;
+  using Map = std::map<VoxelId, RecordVector>;
+  using const_iterator = Map::const_iterator;
+
+  void add(Record record)
   {
-   public:
-    using Record = TrackStateRecord;
-    using RecordVector = std::vector<Record>;
-    using Map = std::map<VoxelId, RecordVector>;
-    using const_iterator = Map::const_iterator;
+    m_records[record.voxel].push_back(std::move(record));
+  }
 
-    void add(Record record)
+  [[nodiscard]] const RecordVector* find(const VoxelId& voxel) const
+  {
+    const auto iter = m_records.find(voxel);
+    return iter == m_records.end() ? nullptr : &iter->second;
+  }
+
+  [[nodiscard]] std::size_t voxel_count() const { return m_records.size(); }
+
+  [[nodiscard]] std::size_t record_count() const
+  {
+    std::size_t out = 0;
+    for (const auto& [voxel, records] : m_records)
     {
-      m_records[record.voxel].push_back(std::move(record));
+      (void) voxel;
+      out += records.size();
     }
+    return out;
+  }
 
-    [[nodiscard]] const RecordVector* find(const VoxelId& voxel) const
-    {
-      const auto iter = m_records.find(voxel);
-      return iter == m_records.end() ? nullptr : &iter->second;
-    }
+  [[nodiscard]] bool empty() const { return m_records.empty(); }
 
-    [[nodiscard]] std::size_t voxel_count() const { return m_records.size(); }
+  [[nodiscard]] const_iterator begin() const { return m_records.begin(); }
+  [[nodiscard]] const_iterator end() const { return m_records.end(); }
 
-    [[nodiscard]] std::size_t record_count() const
-    {
-      std::size_t out = 0;
-      for (const auto& [voxel, records] : m_records)
-      {
-        (void) voxel;
-        out += records.size();
-      }
-      return out;
-    }
+  void clear() { m_records.clear(); }
 
-    [[nodiscard]] bool empty() const { return m_records.empty(); }
-
-    [[nodiscard]] const_iterator begin() const { return m_records.begin(); }
-    [[nodiscard]] const_iterator end() const { return m_records.end(); }
-
-    void clear() { m_records.clear(); }
-
-   private:
-    Map m_records;
-  };
-}
+ private:
+  Map m_records;
+};
 
 #endif

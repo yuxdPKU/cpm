@@ -72,10 +72,10 @@ namespace CPMB1
     int charge = 0;
     double pt = std::numeric_limits<double>::quiet_NaN();
     VoxelKey voxel;
-    cpm::Vector3 voxel_center;
-    cpm::Vector3 offset;
-    cpm::Vector3 state_position;
-    cpm::Vector3 state_momentum;
+    Vector3 voxel_center;
+    Vector3 offset;
+    Vector3 state_position;
+    Vector3 state_momentum;
   };
 
   struct GridMetadata
@@ -863,9 +863,9 @@ void CPM_B1_LocalLinePoCA(
     voxel_summaries.Fill();
   };
 
-  cpm::LocalLinePoCAOptions options;
+  LocalLinePoCAOptions options;
   options.min_sin_angle = min_sin_angle;
-  cpm::HelixPoCAOptions helix_options;
+  HelixPoCAOptions helix_options;
   helix_options.magnetic_field_z = magnetic_field_z;
 
   unsigned long long candidate_pairs = 0;
@@ -1095,11 +1095,11 @@ void CPM_B1_LocalLinePoCA(
             continue;
           }
 
-          const cpm::Vector3 point_a = a.state_position - a.offset;
-          const cpm::Vector3 point_b = b.state_position - b.offset;
-          cpm::Vector3 poca_point_a;
-          cpm::Vector3 poca_point_b;
-          cpm::Vector3 poca_midpoint;
+          const Vector3 point_a = a.state_position - a.offset;
+          const Vector3 point_b = b.state_position - b.offset;
+          Vector3 poca_point_a;
+          Vector3 poca_point_b;
+          Vector3 poca_midpoint;
           double poca_s = std::numeric_limits<double>::quiet_NaN();
           double poca_t = std::numeric_limits<double>::quiet_NaN();
           double poca_dca = std::numeric_limits<double>::quiet_NaN();
@@ -1108,7 +1108,7 @@ void CPM_B1_LocalLinePoCA(
 
           if (use_helix_solver)
           {
-            const auto result = cpm::computeHelixPoCA(
+            const auto result = computeHelixPoCA(
                 {point_a, a.state_momentum, a.charge},
                 {point_b, b.state_momentum, b.charge},
                 helix_options);
@@ -1123,7 +1123,7 @@ void CPM_B1_LocalLinePoCA(
           }
           else
           {
-            const auto result = cpm::computeLocalLinePoCA(
+            const auto result = computeLocalLinePoCA(
                 point_a,
                 a.state_momentum,
                 point_b,

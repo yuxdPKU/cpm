@@ -391,7 +391,7 @@ void Fun4All_CPMTrackAnalysis(
   std::string cpmmindstfinalstring;
   if (G4TRACKING::SC_CALIBMODE)
   {
-    auto cpmreco = new cpm::PHCPMTpcCalibration;
+    auto cpmreco = new PHCPMTpcCalibration;
     const TString cpmoutfile = theOutfile + "_CPMVoxelContainer.root";
     cpmstring = cpmoutfile.Data();
     cpmmindststring = theOutfile + "_cpm_mini_dst.root";
