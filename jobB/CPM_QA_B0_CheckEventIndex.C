@@ -1,12 +1,12 @@
 /*
- * CPM Job B0 event-index QA.
+ * CPM QA Job B0 event-index QA.
  *
- * This macro checks the index produced by CPM_B0_BuildEventIndex.C before a
+ * This macro checks the index produced by CPM_QA_B0_BuildEventIndex.C before a
  * later mini-DST rehydration pass uses it for sequential event readback.
  *
  * Example:
  *
- *   root -l -b -q 'jobB/CPM_B0_CheckEventIndex.C("CPM_B0_event_index.root")'
+ *   root -l -b -q 'jobB/CPM_QA_B0_CheckEventIndex.C("CPM_QA_B0_event_index.root")'
  */
 
 #include <TFile.h>
@@ -17,13 +17,13 @@
 #include <set>
 #include <string>
 
-bool CPM_B0_CheckEventIndex(
-    const std::string& index_file = "CPM_B0_event_index.root")
+bool CPM_QA_B0_CheckEventIndex(
+    const std::string& index_file = "CPM_QA_B0_event_index.root")
 {
   TFile input(index_file.c_str(), "READ");
   if (input.IsZombie())
   {
-    std::cerr << "CPM_B0_CheckEventIndex - cannot open " << index_file << std::endl;
+    std::cerr << "CPM_QA_B0_CheckEventIndex - cannot open " << index_file << std::endl;
     return false;
   }
 
@@ -31,7 +31,7 @@ bool CPM_B0_CheckEventIndex(
   auto* objects = dynamic_cast<TTree*>(input.Get("cpm_object_requests"));
   if (!events || !objects)
   {
-    std::cerr << "CPM_B0_CheckEventIndex - missing cpm_event_requests or cpm_object_requests" << std::endl;
+    std::cerr << "CPM_QA_B0_CheckEventIndex - missing cpm_event_requests or cpm_object_requests" << std::endl;
     return false;
   }
 
@@ -69,7 +69,7 @@ bool CPM_B0_CheckEventIndex(
 
     if (!event_indices.insert(event_index).second)
     {
-      std::cerr << "CPM_B0_CheckEventIndex - duplicate event_index " << event_index << std::endl;
+      std::cerr << "CPM_QA_B0_CheckEventIndex - duplicate event_index " << event_index << std::endl;
       ok = false;
     }
 
@@ -97,7 +97,7 @@ bool CPM_B0_CheckEventIndex(
   {
     if (event_indices.find(expected) == event_indices.end())
     {
-      std::cerr << "CPM_B0_CheckEventIndex - missing sequential event_index " << expected << std::endl;
+      std::cerr << "CPM_QA_B0_CheckEventIndex - missing sequential event_index " << expected << std::endl;
       ok = false;
     }
   }
@@ -158,26 +158,26 @@ bool CPM_B0_CheckEventIndex(
     const unsigned int actual = actual_it == actual_counts.end() ? 0 : actual_it->second;
     if (declared != actual)
     {
-      std::cerr << "CPM_B0_CheckEventIndex - event_index " << idx
+      std::cerr << "CPM_QA_B0_CheckEventIndex - event_index " << idx
                 << " declares " << declared << " objects but has " << actual << std::endl;
       ok = false;
     }
   }
 
-  std::cout << "CPM_B0_CheckEventIndex - file: " << index_file << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - events: " << n_events << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - objects: " << n_objects << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - empty track_source events: " << empty_track_source_events << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - empty cluster_source events: " << empty_cluster_source_events << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - invalid object event links: " << invalid_object_event << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - invalid voxel indices: " << invalid_voxel << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - invalid keys: " << invalid_keys << std::endl;
-  std::cout << "CPM_B0_CheckEventIndex - events by track_source:" << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - file: " << index_file << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - events: " << n_events << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - objects: " << n_objects << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - empty track_source events: " << empty_track_source_events << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - empty cluster_source events: " << empty_cluster_source_events << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - invalid object event links: " << invalid_object_event << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - invalid voxel indices: " << invalid_voxel << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - invalid keys: " << invalid_keys << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - events by track_source:" << std::endl;
   for (const auto& [source, count] : events_by_track_source)
   {
     std::cout << "  " << (source.empty() ? "<empty>" : source) << ": " << count << std::endl;
   }
-  std::cout << "CPM_B0_CheckEventIndex - status: " << (ok ? "OK" : "FAILED") << std::endl;
+  std::cout << "CPM_QA_B0_CheckEventIndex - status: " << (ok ? "OK" : "FAILED") << std::endl;
 
   return ok;
 }

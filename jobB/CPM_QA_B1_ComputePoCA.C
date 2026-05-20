@@ -1,5 +1,5 @@
 /*
- * CPM Job B1 crossing-point PoCA prototype.
+ * CPM QA Job B1 crossing-point PoCA prototype.
  *
  * This macro reads Job A cpm_records, groups ACTS-ready state snapshots by
  * voxel, forms opposite-charge track-state pairs inside each voxel, and computes
@@ -83,7 +83,14 @@ namespace CPMB1
     int phi_bins = -1;
     int r_bins = -1;
     int z_bins = -1;
+    double r_min = std::numeric_limits<double>::quiet_NaN();
+    double r_max = std::numeric_limits<double>::quiet_NaN();
+    double z_min = std::numeric_limits<double>::quiet_NaN();
+    double z_max = std::numeric_limits<double>::quiet_NaN();
     bool valid = false;
+    bool consistent = true;
+    std::string source_file;
+    std::string message;
   };
 
   struct VoxelSummary
@@ -366,31 +373,110 @@ namespace CPMB1
     return candidate.entry < current_best.entry;
   }
 
-  GridMetadata load_grid_metadata(const std::vector<std::string>& input_files)
+  bool same_metadata_value(const double lhs, const double rhs)
+  {
+    return std::fabs(lhs - rhs) < 1.0e-9;
+  }
+
+  bool same_grid_metadata(const GridMetadata& lhs, const GridMetadata& rhs)
+  {
+    return lhs.phi_bins == rhs.phi_bins &&
+           lhs.r_bins == rhs.r_bins &&
+           lhs.z_bins == rhs.z_bins &&
+           same_metadata_value(lhs.r_min, rhs.r_min) &&
+           same_metadata_value(lhs.r_max, rhs.r_max) &&
+           same_metadata_value(lhs.z_min, rhs.z_min) &&
+           same_metadata_value(lhs.z_max, rhs.z_max);
+  }
+
+  GridMetadata load_grid_metadata_file(const std::string& input_file)
   {
     GridMetadata metadata;
-    if (input_files.empty())
-    {
-      return metadata;
-    }
+    metadata.source_file = input_file;
 
-    TFile input(input_files.front().c_str(), "READ");
+    TFile input(input_file.c_str(), "READ");
     if (input.IsZombie())
     {
+      metadata.message = "could not open " + input_file;
       return metadata;
     }
 
     auto* tree = dynamic_cast<TTree*>(input.Get("cpm_metadata"));
     if (!tree || tree->GetEntries() <= 0)
     {
+      metadata.message = "missing cpm_metadata tree in " + input_file;
       return metadata;
+    }
+
+    for (const auto& branch_name : {"phi_bins", "r_bins", "z_bins", "r_min", "r_max", "z_min", "z_max"})
+    {
+      if (!tree->GetBranch(branch_name))
+      {
+        metadata.message = std::string("missing cpm_metadata branch ") + branch_name + " in " + input_file;
+        return metadata;
+      }
     }
 
     tree->SetBranchAddress("phi_bins", &metadata.phi_bins);
     tree->SetBranchAddress("r_bins", &metadata.r_bins);
     tree->SetBranchAddress("z_bins", &metadata.z_bins);
+    tree->SetBranchAddress("r_min", &metadata.r_min);
+    tree->SetBranchAddress("r_max", &metadata.r_max);
+    tree->SetBranchAddress("z_min", &metadata.z_min);
+    tree->SetBranchAddress("z_max", &metadata.z_max);
     tree->GetEntry(0);
-    metadata.valid = metadata.phi_bins > 0 && metadata.r_bins > 0 && metadata.z_bins > 0;
+    metadata.valid =
+        metadata.phi_bins > 0 &&
+        metadata.r_bins > 0 &&
+        metadata.z_bins > 0 &&
+        std::isfinite(metadata.r_min) &&
+        std::isfinite(metadata.r_max) &&
+        std::isfinite(metadata.z_min) &&
+        std::isfinite(metadata.z_max) &&
+        metadata.r_min < metadata.r_max &&
+        metadata.z_min < metadata.z_max;
+    if (!metadata.valid)
+    {
+      metadata.message = "invalid cpm_metadata values in " + input_file;
+    }
+    return metadata;
+  }
+
+  GridMetadata load_grid_metadata(const std::vector<std::string>& input_files)
+  {
+    GridMetadata metadata;
+    if (input_files.empty())
+    {
+      metadata.consistent = false;
+      metadata.message = "no input files";
+      return metadata;
+    }
+
+    for (const auto& input_file : input_files)
+    {
+      const auto current = load_grid_metadata_file(input_file);
+      if (!current.valid)
+      {
+        metadata = current;
+        metadata.consistent = false;
+        return metadata;
+      }
+
+      if (!metadata.valid)
+      {
+        metadata = current;
+        continue;
+      }
+
+      if (!same_grid_metadata(metadata, current))
+      {
+        metadata.consistent = false;
+        metadata.message = "cpm_metadata mismatch between " + metadata.source_file + " and " + input_file;
+        return metadata;
+      }
+    }
+
+    metadata.consistent = true;
     return metadata;
   }
 
@@ -403,7 +489,7 @@ namespace CPMB1
       const VoxelSummary& summary,
       const std::string& status)
   {
-    std::cout << "CPM_B1_ComputePoCA - voxel (iphi,ir,iz)=("
+    std::cout << "CPM_QA_B1_ComputePoCA - voxel (iphi,ir,iz)=("
               << voxel.iphi << "," << voxel.ir << "," << voxel.iz << ")";
     if (metadata.valid)
     {
@@ -457,9 +543,9 @@ namespace CPMB1
   }
 }
 
-void CPM_B1_ComputePoCA(
+void CPM_QA_B1_ComputePoCA(
     const std::vector<std::string>& input_files,
-    const std::string& output_file = "CPM_B1_poca.root",
+    const std::string& output_file = "CPM_QA_B1_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 0,
@@ -474,7 +560,7 @@ void CPM_B1_ComputePoCA(
   const bool use_helix_solver = crossing_solver == "helix";
   if (crossing_solver != "line" && crossing_solver != "helix")
   {
-    std::cerr << "CPM_B1_ComputePoCA - invalid crossing_solver: "
+    std::cerr << "CPM_QA_B1_ComputePoCA - invalid crossing_solver: "
               << crossing_solver << " (expected line or helix)" << std::endl;
     return;
   }
@@ -485,6 +571,12 @@ void CPM_B1_ComputePoCA(
     chain.Add(file.c_str());
   }
   const auto grid_metadata = CPMB1::load_grid_metadata(input_files);
+  if (!grid_metadata.valid || !grid_metadata.consistent)
+  {
+    std::cerr << "CPM_QA_B1_ComputePoCA - refusing to merge inputs with invalid or inconsistent cpm_metadata: "
+              << grid_metadata.message << std::endl;
+    return;
+  }
 
   std::string* cluster_source = nullptr;
   std::string* track_source = nullptr;
@@ -1345,7 +1437,12 @@ void CPM_B1_ComputePoCA(
   int summary_phi_bins = grid_metadata.phi_bins;
   int summary_r_bins = grid_metadata.r_bins;
   int summary_z_bins = grid_metadata.z_bins;
+  double summary_r_min = grid_metadata.r_min;
+  double summary_r_max = grid_metadata.r_max;
+  double summary_z_min = grid_metadata.z_min;
+  double summary_z_max = grid_metadata.z_max;
   bool summary_grid_metadata_valid = grid_metadata.valid;
+  bool summary_grid_metadata_consistent = grid_metadata.consistent;
 
   summary.Branch("input_records", &input_records);
   summary.Branch("input_files", &input_files_count);
@@ -1372,7 +1469,12 @@ void CPM_B1_ComputePoCA(
   summary.Branch("phi_bins", &summary_phi_bins);
   summary.Branch("r_bins", &summary_r_bins);
   summary.Branch("z_bins", &summary_z_bins);
+  summary.Branch("r_min", &summary_r_min);
+  summary.Branch("r_max", &summary_r_max);
+  summary.Branch("z_min", &summary_z_min);
+  summary.Branch("z_max", &summary_z_max);
   summary.Branch("grid_metadata_valid", &summary_grid_metadata_valid);
+  summary.Branch("grid_metadata_consistent", &summary_grid_metadata_consistent);
   summary.Fill();
 
   pairs.Write();
@@ -1381,35 +1483,38 @@ void CPM_B1_ComputePoCA(
   summary.Write();
   output.Close();
 
-  std::cout << "CPM_B1_ComputePoCA - input records: " << input_records << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - voxels: " << voxel_count << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - processed voxels: " << processed_voxels << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - skipped large voxels: " << skipped_large_voxels << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - candidate pairs: " << candidate_pairs << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - accepted pairs: " << accepted_pairs << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - output pair rows: " << summary_output_pair_rows << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - output batch rows: " << summary_output_batch_rows << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - min pair pt: " << min_pair_pt << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
-  std::cout << "CPM_B1_ComputePoCA - crossing solver: " << crossing_solver << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - input records: " << input_records << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - voxels: " << voxel_count << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - processed voxels: " << processed_voxels << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - skipped large voxels: " << skipped_large_voxels << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - skipped low-charge voxels: " << skipped_low_charge_voxels << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - candidate pairs: " << candidate_pairs << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - accepted pairs: " << accepted_pairs << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - output pair rows: " << summary_output_pair_rows << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - output batch rows: " << summary_output_batch_rows << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - min pair pt: " << min_pair_pt << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - max pair records per charge batch: " << max_pair_records_per_voxel << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - crossing solver: " << crossing_solver << std::endl;
   if (use_helix_solver)
   {
-    std::cout << "CPM_B1_ComputePoCA - magnetic field z: " << magnetic_field_z << std::endl;
+    std::cout << "CPM_QA_B1_ComputePoCA - magnetic field z: " << magnetic_field_z << std::endl;
   }
   if (grid_metadata.valid)
   {
-    std::cout << "CPM_B1_ComputePoCA - grid bins: ("
+    std::cout << "CPM_QA_B1_ComputePoCA - grid bins: ("
               << grid_metadata.phi_bins << ", "
               << grid_metadata.r_bins << ", "
-              << grid_metadata.z_bins << ")" << std::endl;
+              << grid_metadata.z_bins << ")"
+              << " r=[" << grid_metadata.r_min << ", " << grid_metadata.r_max << "]"
+              << " z=[" << grid_metadata.z_min << ", " << grid_metadata.z_max << "]"
+              << std::endl;
   }
-  std::cout << "CPM_B1_ComputePoCA - output: " << output_file << std::endl;
+  std::cout << "CPM_QA_B1_ComputePoCA - output: " << output_file << std::endl;
 }
 
-void CPM_B1_ComputePoCA(
+void CPM_QA_B1_ComputePoCA(
     const std::string& input_file,
-    const std::string& output_file = "CPM_B1_poca.root",
+    const std::string& output_file = "CPM_QA_B1_poca.root",
     const double max_pair_dca = 2.0,
     const double min_sin_angle = 1.0e-4,
     const unsigned int max_records_per_voxel = 0,
@@ -1421,7 +1526,7 @@ void CPM_B1_ComputePoCA(
     const double magnetic_field_z = 1.4,
     const bool write_pair_tree = true)
 {
-  CPM_B1_ComputePoCA(
+  CPM_QA_B1_ComputePoCA(
       std::vector<std::string>{input_file},
       output_file,
       max_pair_dca,
@@ -1436,7 +1541,7 @@ void CPM_B1_ComputePoCA(
       write_pair_tree);
 }
 
-void CPM_B1_ComputePoCA(
+void CPM_QA_B1_ComputePoCA(
     const std::string& input_file_or_list,
     const std::string& output_file,
     const bool input_is_list,
@@ -1455,7 +1560,7 @@ void CPM_B1_ComputePoCA(
       CPMB1::read_file_list(input_file_or_list) :
       std::vector<std::string>{input_file_or_list};
 
-  CPM_B1_ComputePoCA(
+  CPM_QA_B1_ComputePoCA(
       input_files,
       output_file,
       max_pair_dca,

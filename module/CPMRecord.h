@@ -91,24 +91,9 @@ struct TrackStateSnapshot
   Matrix6 covariance{};
 };
 
-struct SurfaceSnapshot
-{
-  std::uint64_t geometry_id = 0;
-  std::uint64_t volume = 0;
-  std::uint64_t layer = 0;
-  std::uint64_t sensitive = 0;
-  std::uint64_t approach = 0;
-  std::uint64_t boundary = 0;
-  Vector3 center;
-  Vector3 normal;
-  Vector3 local_x_axis;
-  Vector3 local_y_axis;
-};
-
 struct SelectionFlags
 {
   bool has_crossing = false;
-  bool passes_cm = false;
   bool passes_tpot = false;
   bool passes_track_quality = false;
   bool passes_geometry = false;
@@ -123,7 +108,6 @@ struct TrackStateRecord
   VoxelId voxel;
   ClusterSnapshot cluster;
   TrackStateSnapshot state;
-  SurfaceSnapshot surface;
   SelectionFlags selection;
 };
 

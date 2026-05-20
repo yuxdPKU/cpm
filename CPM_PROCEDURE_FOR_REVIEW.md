@@ -44,10 +44,82 @@ with a silicon-TPOT reference track, it stores an ACTS-ready record containing:
 - cluster geometry: corrected cluster position, voxel center, and
   `cluster - voxel center` offset;
 - reference state snapshot: state position, momentum, local parameters, path
-  length, covariance, and optional ACTS surface diagnostics.
+  length, and covariance.
 
 The Job A output is segment-friendly: each Condor job writes one compact CPM
 ROOT file, and Job B can read either a single file or a file list.
+
+Job A also fills a `CPMCorrectionContainer` during reconstruction. For each
+voxel, accepted records are kept in positive-charge and negative-charge FIFO
+queues. Whenever both queues reach the configured running threshold, CPM forms
+all opposite-charge pairs from the currently queued records in that voxel,
+accumulates the resulting distortion samples into the container, and clears the
+voxel queues before collecting the next group. This preserves event-order
+locality and avoids the large offline track reordering needed by the diagnostic
+B1 path.
+
+The mergeable `CPMCorrectionContainer` and `cpm_metadata` are the default Job A
+outputs. The flat `cpm_records` tree is a QA/diagnostic product, disabled by
+default, and should be enabled with `writeCpmRecords=true` only for B0/B1
+rehydration or offline-PoCA studies.
+
+## Job B: Macro Roles
+
+The Job B macros support two routes. The production route follows the
+matrix-inversion style: Job A writes additive `CPMCorrectionContainer` objects,
+and `CPM_ReconstructAverageCorrection.C` calls
+`CPMAverageCorrectionReconstruction` to merge them, calculate average voxel
+corrections, and write the final average-correction histograms plus QA objects
+in one ROOT file. The diagnostic route starts from the optional `cpm_records`
+tree produced with `writeCpmRecords=true` and uses
+`CPM_QA_RunOfflineDiagnostics.C` as the single user-facing macro; it still
+writes separate B0/B1/B2/B3 stage ROOT files for offline debugging.
+
+Macro responsibilities:
+
+- `CPM_QA_B0_BuildEventIndex.C`: scan one or more Job A `cpm_records` files and
+  write `cpm_event_requests` plus `cpm_object_requests` for optional event-wise
+  mini-DST rehydration studies.
+- `CPM_QA_B0_CheckEventIndex.C`: validate the B0 event/object request index before
+  any sequential readback is attempted.
+- `CPM_QA_RunOfflineDiagnostics.C`: record-based diagnostic driver. It can run
+  optional B0 QA and then writes the B1 PoCA, B2 voxel-correction, and B3
+  histogram stage outputs from one macro call.
+- `CPM_QA_B1_ComputePoCA.C`: diagnostic offline crossing-point step. It groups
+  Job A records by voxel, forms opposite-charge pairs, computes PoCA with the
+  helix or line solver, and writes pair-level QA plus batch-level correction
+  sums.
+- `CPM_QA_B2_AccumulateVoxelCorrections.C`: diagnostic B2 for B1 outputs. It
+  accumulates B1 pair rows or B1 batch sums into one `cpm_voxel_corrections`
+  row per voxel.
+- `CPM_ReconstructAverageCorrection.C`: recommended production macro. It uses
+  `CPMAverageCorrectionReconstruction` to merge Job A
+  `CPMCorrectionContainer` objects with grid/range guards, calculate weighted
+  or plain averages, and write the merged container, `cpm_voxel_corrections`,
+  `cpm_metadata`, reconstructed QA histograms, final guarded histograms, and
+  summary.
+- `CPM_B2_MergeCorrectionContainers.C`: lower-level split-stage container debug
+  macro. Its main product is the `cpm_voxel_corrections` TTree consumed by B3.
+- `CPM_B3_WriteAverageCorrectionHistograms.C`: convert B2 voxel rows to the
+  guarded half-TPC average-correction histograms expected by the correction
+  loader.
+- `CPM_B3_CheckAverageCorrectionHistograms.C`: verify that the required B3
+  histograms and summary outputs exist and have valid dimensions.
+
+The recommended production sequence is:
+
+```text
+Job A output with CPMCorrectionContainer
+  -> CPM_ReconstructAverageCorrection.C
+  -> CPM_B3_CheckAverageCorrectionHistograms.C
+```
+
+The diagnostic/offline-PoCA sequence is:
+
+```text
+Job A cpm_records, with writeCpmRecords=true
+  -> CPM_QA_RunOfflineDiagnostics.C
+```
 
 ## Job B1: Pair Construction And Crossing Estimates
 
@@ -107,28 +179,38 @@ Target crossing solver:
 
 ## Job B2: Voxel Accumulation
 
-B2 reads B1 batch-level correction sums by default and accumulates one
-correction row per voxel. It can still read pair-level rows for backwards
-compatibility and detailed QA studies.
+In the production route, voxel accumulation now lives inside
+`CPMAverageCorrectionReconstruction`. It reads the `CPMCorrectionContainer`
+objects written by Job A, checks grid compatibility through the container merge
+guard, adds the stored per-voxel sums, and writes one `cpm_voxel_corrections`
+row per accepted voxel in the same ROOT file as the final histograms.
+
+The split-stage `CPM_B2_MergeCorrectionContainers.C` macro remains available
+when the intermediate voxel TTree should be produced separately. The diagnostic
+`CPM_QA_B2_AccumulateVoxelCorrections.C` can still read B1 batch-level
+correction sums and accumulate one correction row per voxel. It can also read
+pair-level rows for backwards compatibility and detailed QA studies.
 
 Implemented averaging modes:
 
-- weighted mode: use the B1 curvature-proxy weight `1/(pt_a * pt_b)`;
+- weighted mode: use the curvature-proxy pair weight `1/(pt_a * pt_b)`;
 - unweighted mode: use unit weights for a simple arithmetic mean.
 
-B2 stores per-voxel QA including entries, sum of weights, effective weighted
-entries, means, and RMS values for `delta_r`, `delta_phi`, `delta_rphi`,
-`delta_z`, and DCA. Batch input is pair-equivalent: unweighted mode combines
-batch sums with accepted-pair counts, while weighted mode combines batch
-weighted sums with total pair weights. It therefore does not average all batch
-means equally unless the batch sizes and weights happen to match.
+The voxel TTree stores per-voxel QA including entries, sum of weights,
+effective weighted entries, means, and RMS values for `delta_r`, `delta_phi`,
+`delta_rphi`, `delta_z`, and DCA. Batch input is pair-equivalent: unweighted
+mode combines batch sums with accepted-pair counts, while weighted mode combines
+batch weighted sums with total pair weights. It therefore does not average all
+batch means equally unless the batch sizes and weights happen to match.
 
 ## Job B3: Average-Correction Histograms
 
-B3 converts B2 voxel rows into average-correction histograms. It uses the Job A
-metadata for grid dimensions, fills reconstructed QA histograms, splits negative
-and positive z, applies the existing guard-bin style, and writes the histogram
-names expected by the average correction loader.
+B3 converts voxel correction rows into average-correction histograms. In the
+production route this happens inside `CPMAverageCorrectionReconstruction`; the
+split-stage `CPM_B3_WriteAverageCorrectionHistograms.C` macro is retained for
+QA and compatibility. Both paths fill reconstructed QA histograms, split
+negative and positive z, apply the existing guard-bin style, and write the
+histogram names expected by the average correction loader.
 
 ## Validation Plan
 
@@ -144,8 +226,8 @@ The final method should be validated on simulation, not only on real data:
 
 ## Questions For Expert Review
 
-1. Is opposite-charge pairing always preferred, or should there be a diagnostic
-   same-charge control sample?
+1. Should a same-charge control sample be kept for QA, given that the production
+   estimator uses opposite-charge pairs?
 2. Should the default pair weight remain curvature-proxy based, or should the
    helix version use a DCA/covariance-based weight?
 3. Should high-occupancy batching merge all pair rows directly, or merge

@@ -1,5 +1,5 @@
 /*
- * CPM Job B0 skeleton.
+ * CPM QA Job B0 skeleton.
  *
  * This macro reads one or more Job A CPM flat ROOT files, scans cpm_records,
  * groups all referenced objects by event, and writes an event-ordered request
@@ -9,8 +9,8 @@
  *
  * Example:
  *
- *   root -l -b -q 'jobB/CPM_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root",
- *                                                  "CPM_B0_event_index.root")'
+ *   root -l -b -q 'jobB/CPM_QA_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root",
+ *                                                  "CPM_QA_B0_event_index.root")'
  */
 
 #include <TChain.h>
@@ -65,9 +65,9 @@ namespace CPMB0
   };
 }
 
-void CPM_B0_BuildEventIndex(
+void CPM_QA_B0_BuildEventIndex(
     const std::vector<std::string>& input_files,
-    const std::string& output_file = "CPM_B0_event_index.root")
+    const std::string& output_file = "CPM_QA_B0_event_index.root")
 {
   TChain chain("cpm_records");
   for (const auto& file : input_files)
@@ -211,26 +211,26 @@ void CPM_B0_BuildEventIndex(
   objects.Write();
   output.Close();
 
-  std::cout << "CPM_B0_BuildEventIndex - input records: " << entries << std::endl;
-  std::cout << "CPM_B0_BuildEventIndex - unique events: " << event_requests.size() << std::endl;
+  std::cout << "CPM_QA_B0_BuildEventIndex - input records: " << entries << std::endl;
+  std::cout << "CPM_QA_B0_BuildEventIndex - unique events: " << event_requests.size() << std::endl;
   unsigned long long n_object_requests = 0;
   for (const auto& [key, requests] : event_requests)
   {
     (void) key;
     n_object_requests += requests.size();
   }
-  std::cout << "CPM_B0_BuildEventIndex - unique object requests: " << n_object_requests << std::endl;
-  std::cout << "CPM_B0_BuildEventIndex - output: " << output_file << std::endl;
+  std::cout << "CPM_QA_B0_BuildEventIndex - unique object requests: " << n_object_requests << std::endl;
+  std::cout << "CPM_QA_B0_BuildEventIndex - output: " << output_file << std::endl;
 }
 
-void CPM_B0_BuildEventIndexFromList(
+void CPM_QA_B0_BuildEventIndexFromList(
     const std::string& input_list,
-    const std::string& output_file = "CPM_B0_event_index.root")
+    const std::string& output_file = "CPM_QA_B0_event_index.root")
 {
   std::ifstream input(input_list);
   if (!input.good())
   {
-    std::cerr << "CPM_B0_BuildEventIndexFromList - cannot open " << input_list << std::endl;
+    std::cerr << "CPM_QA_B0_BuildEventIndexFromList - cannot open " << input_list << std::endl;
     return;
   }
 
@@ -245,29 +245,29 @@ void CPM_B0_BuildEventIndexFromList(
     input_files.push_back(line);
   }
 
-  std::cout << "CPM_B0_BuildEventIndexFromList - input list: " << input_list << std::endl;
-  std::cout << "CPM_B0_BuildEventIndexFromList - files: " << input_files.size() << std::endl;
-  CPM_B0_BuildEventIndex(input_files, output_file);
+  std::cout << "CPM_QA_B0_BuildEventIndexFromList - input list: " << input_list << std::endl;
+  std::cout << "CPM_QA_B0_BuildEventIndexFromList - files: " << input_files.size() << std::endl;
+  CPM_QA_B0_BuildEventIndex(input_files, output_file);
 }
 
-void CPM_B0_BuildEventIndex(
+void CPM_QA_B0_BuildEventIndex(
     const std::string& input_file_or_list,
     const std::string& output_file,
     const bool input_is_list)
 {
   if (input_is_list)
   {
-    CPM_B0_BuildEventIndexFromList(input_file_or_list, output_file);
+    CPM_QA_B0_BuildEventIndexFromList(input_file_or_list, output_file);
   }
   else
   {
-    CPM_B0_BuildEventIndex(std::vector<std::string>{input_file_or_list}, output_file);
+    CPM_QA_B0_BuildEventIndex(std::vector<std::string>{input_file_or_list}, output_file);
   }
 }
 
-void CPM_B0_BuildEventIndex(
+void CPM_QA_B0_BuildEventIndex(
     const std::string& input_file,
-    const std::string& output_file = "CPM_B0_event_index.root")
+    const std::string& output_file = "CPM_QA_B0_event_index.root")
 {
-  CPM_B0_BuildEventIndex(std::vector<std::string>{input_file}, output_file);
+  CPM_QA_B0_BuildEventIndex(std::vector<std::string>{input_file}, output_file);
 }

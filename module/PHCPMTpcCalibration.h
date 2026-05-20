@@ -1,12 +1,15 @@
 #ifndef CPM_PHCPMTPCCALIBRATION_H
 #define CPM_PHCPMTPCCALIBRATION_H
 
+#include "CPMCorrectionContainer.h"
 #include "CPMVoxelContainer.h"
 
 #include <fun4all/SubsysReco.h>
 #include <tpc/TpcGlobalPositionWrapper.h>
 
 #include <cstdint>
+#include <deque>
+#include <map>
 #include <string>
 
 class ActsGeometry;
@@ -31,6 +34,7 @@ class PHCPMTpcCalibration : public SubsysReco
   int End(PHCompositeNode* topNode) override;
 
   void setOutputfile(const std::string& outputfile) { m_outputfile = outputfile; }
+  void setOutputObjectName(const std::string& value) { m_outputObjectName = value; }
   void setClusterSource(const std::string& value) { m_cluster_source = value; }
   void setTrackSource(const std::string& value) { m_track_source = value; }
   void setTrackMapName(const std::string& value) { m_trackmapname = value; }
@@ -42,7 +46,10 @@ class PHCPMTpcCalibration : public SubsysReco
   void setMinPt(const double value) { m_minPt = value; }
   void requireCrossing(const bool value = true) { m_requireCrossing = value; }
   void requireTPOT(const bool value = true) { m_requireTPOT = value; }
-  void requireCM(const bool value = true) { m_requireCM = value; }
+  void setWriteRecords(const bool value = true) { m_writeRecords = value; }
+  void setRunningBatchSize(const unsigned int value) { m_runningBatchSize = value; }
+  void setMaxPairDca(const double value) { m_maxPairDca = value; }
+  void setMagneticFieldZ(const double value) { m_magneticFieldZ = value; }
 
   void setGridDimensions(int phiBins, int rBins, int zBins);
 
@@ -70,6 +77,9 @@ class PHCPMTpcCalibration : public SubsysReco
   int getNodes(PHCompositeNode* topNode);
   int processTracks();
   int writeOutput() const;
+  void addRecord(TrackStateRecord record);
+  void processPendingBatches(const VoxelId& voxel);
+  void processBatch(const VoxelId& voxel);
 
   bool checkTrack(const SvtxTrack* track) const;
   bool checkState(const SvtxTrackState* state) const;
@@ -85,15 +95,19 @@ class PHCPMTpcCalibration : public SubsysReco
 
   EventReference makeEventReference() const;
   TrackSummary makeTrackSummary(const SvtxTrack* track) const;
-  SurfaceSnapshot makeSurfaceSnapshot(const TrkrCluster* cluster, ClusterKey cluskey) const;
 
   Vector3 getVoxelCenter(const VoxelId& voxel) const;
   static Matrix6 copyCovariance(const SvtxTrackState* state);
   static unsigned int countTrackStates(const SvtxTrack* track, unsigned int trkrId);
   static unsigned int countTrackClusters(const SvtxTrack* track, unsigned int trkrId);
+  static bool sameTrack(const TrackStateRecord& lhs, const TrackStateRecord& rhs);
+  static bool isCloserToVoxelCenter(const TrackStateRecord& candidate, const TrackStateRecord& current);
+  static double offsetMagnitude2(const TrackStateRecord& record);
+  static double wrapDeltaPhi(double value);
 
   std::string m_trackmapname = "SvtxSiliconMMTrackMap";
   std::string m_outputfile = "CPMVoxelContainer.root";
+  std::string m_outputObjectName = "CPMCorrectionContainer";
   std::string m_cluster_source;
   std::string m_track_source;
   int m_run = -1;
@@ -107,6 +121,14 @@ class PHCPMTpcCalibration : public SubsysReco
 
   TpcGlobalPositionWrapper m_globalPositionWrapper;
   VoxelContainer m_voxelContainer;
+  CPMCorrectionContainer m_correctionContainer;
+
+  struct PendingVoxelRecords
+  {
+    std::deque<TrackStateRecord> positive;
+    std::deque<TrackStateRecord> negative;
+  };
+  std::map<VoxelId, PendingVoxelRecords> m_pendingRecords;
 
   int m_phiBins = 36;
   int m_rBins = 16;
@@ -120,10 +142,13 @@ class PHCPMTpcCalibration : public SubsysReco
   double m_zMin = 0.0;
   double m_zMax = 0.0;
   double m_minPt = 0.5;
+  double m_maxPairDca = 2.0;
+  double m_magneticFieldZ = 1.4;
+  unsigned int m_runningBatchSize = 10;
 
   bool m_requireCrossing = false;
   bool m_requireTPOT = true;
-  bool m_requireCM = true;
+  bool m_writeRecords = false;
 
   std::uint64_t m_event = 0;
 
@@ -131,6 +156,9 @@ class PHCPMTpcCalibration : public SubsysReco
   std::uint64_t m_accepted_tracks = 0;
   std::uint64_t m_total_states = 0;
   std::uint64_t m_accepted_states = 0;
+  std::uint64_t m_candidate_pairs = 0;
+  std::uint64_t m_accepted_pairs = 0;
+  std::uint64_t m_batches = 0;
 };
 
 #endif

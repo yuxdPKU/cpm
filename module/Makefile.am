@@ -24,6 +24,7 @@ libcpm_la_LIBADD = \
   -lActsCore \
   -lCore \
   -lffaobjects \
+  -lHist \
   -lphool \
   -lRIO \
   -lSubsysReco \
@@ -33,9 +34,12 @@ libcpm_la_LIBADD = \
   -ltrack \
   -ltrackbase_historic_io \
   -ltrackbase_historic \
-  -ltpc_io
+  -ltpc_io \
+  -ltpccalib
 
 pkginclude_HEADERS = \
+  CPMAverageCorrectionReconstruction.h \
+  CPMCorrectionContainer.h \
   CPMHelixPoCA.h \
   CPMLocalLinePoCA.h \
   CPMRecord.h \
@@ -43,10 +47,25 @@ pkginclude_HEADERS = \
   CPMVoxelContainer.h \
   PHCPMTpcCalibration.h
 
+ROOTDICTS = \
+  CPMCorrectionContainer_Dict.cc
+
+pcmdir = $(libdir)
+nobase_dist_pcm_DATA = \
+  CPMCorrectionContainer_Dict_rdict.pcm
+
 libcpm_la_SOURCES = \
+  $(ROOTDICTS) \
+  CPMAverageCorrectionReconstruction.cc \
+  CPMCorrectionContainer.cc \
   CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
   PHCPMTpcCalibration.cc
+
+%_Dict.cc: %.h %LinkDef.h
+	rootcint -f $@ @CINTDEFS@ $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $^
+
+%_Dict_rdict.pcm: %_Dict.cc ;
 
 noinst_PROGRAMS = \
   testexternals_cpm \

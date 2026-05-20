@@ -72,7 +72,8 @@ void Fun4All_CPMTrackAnalysis(
     const int stepsize = 10,
     const bool convertSeeds = false,
     const bool writeMiniDst = true,
-    const bool writePrunedSeedsToMiniDst = false)
+    const bool writePrunedSeedsToMiniDst = false,
+    const bool writeCpmRecords = false)
 {
   std::string inputclusterFile = clusterfilename;
 
@@ -402,10 +403,13 @@ void Fun4All_CPMTrackAnalysis(
     cpmreco->setTrackSource(writeMiniDst ? cpmmindstfinalstring : "");
     cpmreco->setRunSegment(runnumber, segment);
     cpmreco->setTrackMapName("SvtxSiliconMMTrackMap");
+    cpmreco->setWriteRecords(writeCpmRecords);
     cpmreco->setMinPt(0.5);
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
-    cpmreco->requireCM(true);
+    cpmreco->setRunningBatchSize(10);
+    cpmreco->setMaxPairDca(2.0);
+    cpmreco->setMagneticFieldZ(1.4);
     cpmreco->disableAverageCorr();
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
@@ -414,6 +418,12 @@ void Fun4All_CPMTrackAnalysis(
     {
       std::cout << "Fun4All_CPMTrackAnalysis - writeMiniDst is false. "
                 << "CPM snapshots remain usable, but SvtxTrack object rehydration is disabled."
+                << std::endl;
+    }
+    if (!writeCpmRecords)
+    {
+      std::cout << "Fun4All_CPMTrackAnalysis - writeCpmRecords is false. "
+                << "Only CPMCorrectionContainer and cpm_metadata will be written."
                 << std::endl;
     }
 

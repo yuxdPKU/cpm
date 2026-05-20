@@ -1,5 +1,5 @@
 /*
- * CPM Job B2 voxel-level accumulator.
+ * CPM QA Job B2 voxel-level accumulator.
  *
  * This macro reads B1 crossing-point PoCA outputs, groups accepted pairs
  * by 3D voxel, and writes one correction-summary row per voxel. It can read
@@ -194,9 +194,9 @@ namespace CPMB2
   }
 }
 
-void CPM_B2_AccumulateVoxelCorrections(
+void CPM_QA_B2_AccumulateVoxelCorrections(
     const std::vector<std::string>& input_files,
-    const std::string& output_file = "CPM_B2_voxel_corrections.root",
+    const std::string& output_file = "CPM_QA_B2_voxel_corrections.root",
     const unsigned int min_entries_per_voxel = 1,
     const double max_pair_dca = -1.0,
     const bool use_pair_weights = true,
@@ -211,20 +211,20 @@ void CPM_B2_AccumulateVoxelCorrections(
   }
   if (resolved_input_mode != "pairs" && resolved_input_mode != "batches")
   {
-    std::cerr << "CPM_B2_AccumulateVoxelCorrections - invalid input_mode: "
+    std::cerr << "CPM_QA_B2_AccumulateVoxelCorrections - invalid input_mode: "
               << input_mode << " (expected auto, pairs, or batches)" << std::endl;
     return;
   }
   if (resolved_input_mode == "batches" && !has_batch_tree)
   {
-    std::cerr << "CPM_B2_AccumulateVoxelCorrections - requested batch input, "
+    std::cerr << "CPM_QA_B2_AccumulateVoxelCorrections - requested batch input, "
               << "but no cpm_b1_batch_corrections tree with entries was found"
               << std::endl;
     return;
   }
   if (resolved_input_mode == "batches" && max_pair_dca >= 0.0)
   {
-    std::cout << "CPM_B2_AccumulateVoxelCorrections - warning: max_pair_dca "
+    std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - warning: max_pair_dca "
               << "is already applied in B1 batch sums; B2 will not refilter "
               << "individual pairs in batch input mode" << std::endl;
   }
@@ -578,32 +578,32 @@ void CPM_B2_AccumulateVoxelCorrections(
   summary.Write();
   output.Close();
 
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - input mode: "
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - input mode: "
             << resolved_input_mode << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - input rows: " << input_rows << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - input pair rows: " << input_pair_rows << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - input batch rows: " << input_batch_rows << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - input pair estimates: "
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - input rows: " << input_rows << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - input pair rows: " << input_pair_rows << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - input batch rows: " << input_batch_rows << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - input pair estimates: "
             << summary_input_pairs << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - accepted pairs: " << accepted_pairs << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - rejected rows: " << rejected_rows << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - accumulator voxels: " << accumulator_voxels << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - filled voxels: " << filled_voxels << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - skipped low-entry voxels: " << skipped_low_entry_voxels << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - averaging mode: "
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - accepted pairs: " << accepted_pairs << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - rejected rows: " << rejected_rows << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - accumulator voxels: " << accumulator_voxels << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - filled voxels: " << filled_voxels << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - skipped low-entry voxels: " << skipped_low_entry_voxels << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - averaging mode: "
             << summary_averaging_mode << std::endl;
-  std::cout << "CPM_B2_AccumulateVoxelCorrections - output: " << output_file << std::endl;
+  std::cout << "CPM_QA_B2_AccumulateVoxelCorrections - output: " << output_file << std::endl;
 }
 
-void CPM_B2_AccumulateVoxelCorrections(
+void CPM_QA_B2_AccumulateVoxelCorrections(
     const std::string& input_file,
-    const std::string& output_file = "CPM_B2_voxel_corrections.root",
+    const std::string& output_file = "CPM_QA_B2_voxel_corrections.root",
     const unsigned int min_entries_per_voxel = 1,
     const double max_pair_dca = -1.0,
     const bool use_pair_weights = true,
     const std::string& input_mode = "auto")
 {
-  CPM_B2_AccumulateVoxelCorrections(
+  CPM_QA_B2_AccumulateVoxelCorrections(
       std::vector<std::string>{input_file},
       output_file,
       min_entries_per_voxel,
@@ -612,7 +612,7 @@ void CPM_B2_AccumulateVoxelCorrections(
       input_mode);
 }
 
-void CPM_B2_AccumulateVoxelCorrectionsFromList(
+void CPM_QA_B2_AccumulateVoxelCorrectionsFromList(
     const std::string& input_file_or_list,
     const std::string& output_file,
     const unsigned int min_entries_per_voxel = 1,
@@ -622,7 +622,7 @@ void CPM_B2_AccumulateVoxelCorrectionsFromList(
 {
   const auto input_files = CPMB2::read_file_list(input_file_or_list);
 
-  CPM_B2_AccumulateVoxelCorrections(
+  CPM_QA_B2_AccumulateVoxelCorrections(
       input_files,
       output_file,
       min_entries_per_voxel,

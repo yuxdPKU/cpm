@@ -108,7 +108,12 @@ void CPM_B3_WriteAverageCorrectionHistograms(
     const unsigned int min_entries_per_voxel = 1)
 {
   CPMB3::GridConfig grid;
-  CPMB3::load_grid_metadata(metadata_file, grid);
+  const bool loaded_metadata = CPMB3::load_grid_metadata(metadata_file, grid);
+  if (!metadata_file.empty() && !loaded_metadata)
+  {
+    std::cout << "CPM_B3_WriteAverageCorrectionHistograms - metadata file was provided but could not be loaded; aborting" << std::endl;
+    return;
+  }
 
   if (grid.phi_bins <= 0 || grid.r_bins <= 0 || grid.z_bins <= 0 ||
       grid.phi_min >= grid.phi_max || grid.r_min >= grid.r_max || grid.z_min >= grid.z_max)
