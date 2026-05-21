@@ -280,7 +280,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     cpmreco->setMinPt(0.5);
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
-    cpmreco->requireCM(true);
+    // CPM does not apply the legacy PHTpcResiduals central-membrane requirement.
     cpmreco->disableAverageCorr();
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
