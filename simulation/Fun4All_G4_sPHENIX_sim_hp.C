@@ -32,7 +32,7 @@ R__LOAD_LIBRARY(libfun4all.so)
 //____________________________________________________________________
 int Fun4All_G4_sPHENIX_sim_hp(
   const int nEvents = 10,
-  const char* outputFile = "DST/G4Hits.root"
+  const char* outputFile = "G4Hits.root"
   )
 {
 

@@ -43,8 +43,8 @@ Initialdir     = /sphenix/u/xyu3/workarea/cpm
 # The executable we want to run.
 Executable     = $(Initialdir)/simulation/run_sim.sh
 
-Nevent    = 100
-NJob      = 1000
+Nevent    = 500
+NJob      = 2000
 
 Segment        = $(Process)
 OutDir         = /sphenix/u/xyu3/hftg01/DST_FOR_DISTORTION/SimulationDST/

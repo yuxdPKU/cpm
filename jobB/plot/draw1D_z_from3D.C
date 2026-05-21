@@ -105,9 +105,13 @@ for (int i = 0; i < nrun; i++)
 
   draw1Dmap(Form("/sphenix/u/xyu3/workarea/TPCdistortion/Si_TPOT_fit/run3pp_newSiFieldonAlignment_newTPOTzfAlignment/jobB/Rootfiles/Distortions_full_mm_%d.root",runs[i]), Form("%d_MI",runs[i]), selectR, h_R_pos_method1[i], h_R_neg_method1[i], h_P_pos_method1[i], h_P_neg_method1[i], h_Z_pos_method1[i], h_Z_neg_method1[i], 2);
 
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/merged/run%d_B3_average_correction_histograms.root",runs[i]), Form("%d_cpm",runs[i]), selectR, h_R_pos_method2[i], h_R_neg_method2[i], h_P_pos_method2[i], h_P_neg_method2[i], h_Z_pos_method2[i], h_Z_neg_method2[i], 4);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d/run%d_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm",runs[i]), selectR, h_R_pos_method2[i], h_R_neg_method2[i], h_P_pos_method2[i], h_P_neg_method2[i], h_Z_pos_method2[i], h_Z_neg_method2[i], 4);
 
 }
+
+TH1 *h_N_pos_method3, *h_R_pos_method3, *h_P_pos_method3, *h_Z_pos_method3;
+TH1 *h_N_neg_method3, *h_R_neg_method3, *h_P_neg_method3, *h_Z_neg_method3;
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim/sim_B3_average_correction_histograms.root"), Form("sim_cpm"), selectR, h_R_pos_method3, h_R_neg_method3, h_P_pos_method3, h_P_neg_method3, h_Z_pos_method3, h_Z_neg_method3, 1);
 
 std::vector<TH1*> hists_P; hists_P.clear();
 std::vector<TH1*> hists_R; hists_R.clear();
@@ -286,6 +290,34 @@ delete can_MI_CPM_LAM;
 delete can_MI_CPM_LAM_leg;
 
 }
+
+TCanvas* can_sim = new TCanvas("can_sim","",2400,1200);
+can_sim->Divide(3,2);
+can_sim->cd(1);
+gPad->SetLogy(0);
+h_P_pos_method3->Draw("hist,same");
+can_sim->cd(2);
+gPad->SetLogy(0);
+h_R_pos_method3->Draw("hist,same");
+can_sim->cd(3);
+gPad->SetLogy(0);
+h_Z_pos_method3->Draw("hist,same");
+can_sim->cd(4);
+gPad->SetLogy(0);
+h_P_neg_method3->Draw("hist,same");
+can_sim->cd(5);
+gPad->SetLogy(0);
+h_R_neg_method3->Draw("hist,same");
+can_sim->cd(6);
+gPad->SetLogy(0);
+h_Z_neg_method3->Draw("hist,same");
+
+gPad->RedrawAxis();
+
+can_sim->Update();
+can_sim->SaveAs(Form("figure/resid_vsZ_from3D_atR%d_sim.pdf",(int)selectR));
+
+delete can_sim;
 
 }
 
