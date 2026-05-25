@@ -51,8 +51,20 @@ bool CPM_B3_CheckAverageCorrectionHistograms(
     }
   }
 
-  auto* summary = dynamic_cast<TTree*>(input.Get("cpm_b3_summary"));
-  const bool has_summary = summary != nullptr && summary->GetEntries() > 0;
+  const std::vector<std::string> summary_trees = {
+      "cpm_b3_summary",
+      "cpm_average_correction_summary"};
+  std::string found_summary_tree;
+  for (const auto& name : summary_trees)
+  {
+    auto* summary = dynamic_cast<TTree*>(input.Get(name.c_str()));
+    if (summary && summary->GetEntries() > 0)
+    {
+      found_summary_tree = name;
+      break;
+    }
+  }
+  const bool has_summary = !found_summary_tree.empty();
 
   std::cout << "CPM_B3_CheckAverageCorrectionHistograms - file: " << input_file << std::endl;
   std::cout << "CPM_B3_CheckAverageCorrectionHistograms - required histograms: "
@@ -63,10 +75,14 @@ bool CPM_B3_CheckAverageCorrectionHistograms(
             << invalid_dimensions << std::endl;
   std::cout << "CPM_B3_CheckAverageCorrectionHistograms - has summary: "
             << has_summary << std::endl;
+  if (has_summary)
+  {
+    std::cout << "CPM_B3_CheckAverageCorrectionHistograms - summary tree: "
+              << found_summary_tree << std::endl;
+  }
 
   const bool ok = missing_histograms == 0 && invalid_dimensions == 0 && has_summary;
   std::cout << "CPM_B3_CheckAverageCorrectionHistograms - status: "
             << (ok ? "OK" : "FAILED") << std::endl;
   return ok;
 }
-
