@@ -39,9 +39,11 @@ libcpm_la_LIBADD = \
 
 pkginclude_HEADERS = \
   CPMAverageCorrectionReconstruction.h \
+  CPMCorrectionAccumulator.h \
   CPMCorrectionContainer.h \
   CPMHelixPoCA.h \
   CPMLocalLinePoCA.h \
+  CPMPairUtils.h \
   CPMRecord.h \
   CPMTypes.h \
   CPMVoxelContainer.h \
@@ -60,6 +62,7 @@ libcpm_la_SOURCES = \
   CPMCorrectionContainer.cc \
   CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
+  CPMPairUtils.cc \
   PHCPMTpcCalibration.cc
 
 %_Dict.cc: %.h %LinkDef.h

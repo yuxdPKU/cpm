@@ -79,6 +79,7 @@ class PHCPMTpcCalibration : public SubsysReco
   int writeOutput() const;
   void addRecord(TrackStateRecord record);
   void processPendingBatches(const VoxelId& voxel);
+  void flushPendingBatches();
   void processBatch(const VoxelId& voxel);
 
   bool checkTrack(const SvtxTrack* track) const;
@@ -103,7 +104,6 @@ class PHCPMTpcCalibration : public SubsysReco
   static bool sameTrack(const TrackStateRecord& lhs, const TrackStateRecord& rhs);
   static bool isCloserToVoxelCenter(const TrackStateRecord& candidate, const TrackStateRecord& current);
   static double offsetMagnitude2(const TrackStateRecord& record);
-  static double wrapDeltaPhi(double value);
 
   std::string m_trackmapname = "SvtxSiliconMMTrackMap";
   std::string m_outputfile = "CPMVoxelContainer.root";
@@ -148,7 +148,7 @@ class PHCPMTpcCalibration : public SubsysReco
 
   bool m_requireCrossing = false;
   bool m_requireTPOT = true;
-  bool m_writeRecords = false;
+  bool m_writeRecords = true;
 
   std::uint64_t m_event = 0;
 
@@ -159,6 +159,11 @@ class PHCPMTpcCalibration : public SubsysReco
   std::uint64_t m_candidate_pairs = 0;
   std::uint64_t m_accepted_pairs = 0;
   std::uint64_t m_batches = 0;
+  std::uint64_t m_final_flush_batches = 0;
+  std::uint64_t m_final_flush_positive_records = 0;
+  std::uint64_t m_final_flush_negative_records = 0;
+  std::uint64_t m_unflushed_positive_records = 0;
+  std::uint64_t m_unflushed_negative_records = 0;
 };
 
 #endif

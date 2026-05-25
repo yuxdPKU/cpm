@@ -1,5 +1,7 @@
+#include "CPMCorrectionAccumulator.h"
 #include "CPMHelixPoCA.h"
 #include "CPMLocalLinePoCA.h"
+#include "CPMPairUtils.h"
 #include "CPMVoxelContainer.h"
 
 #include <cassert>
@@ -112,6 +114,43 @@ int main()
     assert(near(eval.tangent.x, 0.0));
     assert(near(eval.tangent.y, 0.6));
     assert(near(eval.tangent.z, 0.8));
+  }
+
+  {
+    CPMPairOptions options;
+    options.solver = CPMPairSolver::Line;
+    options.min_pt = 0.5;
+    const CPMPairInput first{
+        1,
+        2.0,
+        {-1.0, 0.0, 0.0},
+        {1.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0}};
+    const CPMPairInput second{
+        -1,
+        4.0,
+        {0.0, -1.0, 0.0},
+        {0.0, 1.0, 0.0},
+        {0.0, 0.0, 0.0}};
+    const auto result = computeCPMPair(first, second, {0.0, 0.0, 1.0}, options);
+
+    assert(result.accepted());
+    assert(near(result.pair_weight, 0.125));
+    assert(near(result.delta_z, 1.0));
+
+    CPMCorrectionAccumulator accumulator;
+    accumulator.add(
+        result.delta_r,
+        result.delta_rphi,
+        result.delta_phi,
+        result.delta_z,
+        result.dca,
+        result.pair_weight,
+        0.0,
+        0.0,
+        1.0);
+    assert(accumulator.entries == 1);
+    assert(near(cpmCorrectionWeightedMean(accumulator.sum_weighted_delta_z, accumulator.sum_pair_weight), 1.0));
   }
 
   return 0;

@@ -33,7 +33,7 @@ OutDir=$3
 OutPrefix=$4
 Index=$5
 StepSize=$6
-WriteCpmRecords=${7:-false}
+WriteCpmRecords=${7:-true}
 
 #getinputfiles.pl $InClusterDst $InSeedDst
 getinputfiles.pl --filelist $InDstList

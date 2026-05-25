@@ -47,7 +47,8 @@ int Fun4All_G4_sPHENIX_reco_hp(
     const int stepsize = 10,
     const int segment = 0,
     const bool writeMiniDst = true,
-    const bool writePrunedSeedsToMiniDst = false)
+    const bool writePrunedSeedsToMiniDst = false,
+    const bool writeCpmRecords = true)
 {
   // print inputs
   std::cout << "Fun4All_G4_sPHENIX_reco_hp - nEvents: " << nEvents << std::endl;
@@ -277,9 +278,13 @@ int Fun4All_G4_sPHENIX_reco_hp(
     cpmreco->setTrackSource(writeMiniDst ? cpmmindstfinalstring : "");
     cpmreco->setRunSegment(runnumber, segment);
     cpmreco->setTrackMapName("SvtxSiliconMMTrackMap");
+    cpmreco->setWriteRecords(writeCpmRecords);
     cpmreco->setMinPt(0.5);
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
+    cpmreco->setRunningBatchSize(10);
+    cpmreco->setMaxPairDca(2.0);
+    cpmreco->setMagneticFieldZ(1.4);
     // CPM does not apply the legacy PHTpcResiduals central-membrane requirement.
     cpmreco->disableAverageCorr();
     cpmreco->setGridDimensions(36, 16, 80);
@@ -287,8 +292,14 @@ int Fun4All_G4_sPHENIX_reco_hp(
 
     if (!writeMiniDst)
     {
-      std::cout << "Fun4All_CPMTrackAnalysis - writeMiniDst is false. "
+      std::cout << "Fun4All_G4_sPHENIX_reco_hp - writeMiniDst is false. "
                 << "CPM snapshots remain usable, but SvtxTrack object rehydration is disabled."
+                << std::endl;
+    }
+    if (!writeCpmRecords)
+    {
+      std::cout << "Fun4All_G4_sPHENIX_reco_hp - writeCpmRecords is false. "
+                << "Only CPMCorrectionContainer and cpm_metadata will be written."
                 << std::endl;
     }
     if (writeMiniDst)

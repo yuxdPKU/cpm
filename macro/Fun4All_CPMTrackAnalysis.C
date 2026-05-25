@@ -73,7 +73,7 @@ void Fun4All_CPMTrackAnalysis(
     const bool convertSeeds = false,
     const bool writeMiniDst = true,
     const bool writePrunedSeedsToMiniDst = false,
-    const bool writeCpmRecords = false)
+    const bool writeCpmRecords = true)
 {
   std::string inputclusterFile = clusterfilename;
 
