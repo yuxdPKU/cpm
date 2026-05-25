@@ -7,7 +7,7 @@ R__LOAD_LIBRARY(libphool.so)
 
 std::pair<double,double> SetCommonYRange(const std::vector<TH1*>& histograms);
 TH1* SubtractHistograms(const TH1* h1, const TH1* h2, const char* name = "diff");
-void draw1Dmap(TString filename, TString tag, double selectZ, TH1*& h_R_pos, TH1*& h_R_neg, TH1*& h_P_pos, TH1*& h_P_neg, TH1*& h_Z_pos, TH1*& h_Z_neg, int color=1, bool convert_RP_2_P=false);
+void draw1Dmap(TString filename, TString tag, double selectZ, TH1*& h_R_pos, TH1*& h_R_neg, TH1*& h_P_pos, TH1*& h_P_neg, TH1*& h_Z_pos, TH1*& h_Z_neg, TH1*& h_N_pos, TH1*& h_N_neg, int color=1, bool convert_RP_2_P=false);
 void draw1Dmap_2D(TString filename, TString tag, TH1*& h_R_pos, TH1*& h_R_neg, TH1*& h_P_pos, TH1*& h_P_neg, TH1*& h_Z_pos, TH1*& h_Z_neg, int color);
 
 void plot1D_Zbin(TH3* h3, TH1* h1, float z, bool convert_RP_2_P=false)
@@ -97,15 +97,15 @@ TH1 *h_N_neg_method2[nrun], *h_R_neg_method2[nrun], *h_P_neg_method2[nrun], *h_Z
 
 for (int i = 0; i < nrun; i++)
 {
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/TPCdistortion/Si_TPOT_fit/run3pp_newSiFieldonAlignment_newTPOTzfAlignment/jobB/Rootfiles/Distortions_full_mm_%d.root",runs[i]), Form("%d_MI",runs[i]), selectZ, h_R_pos_method1[i], h_R_neg_method1[i], h_P_pos_method1[i], h_P_neg_method1[i], h_Z_pos_method1[i], h_Z_neg_method1[i], 2);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/TPCdistortion/Si_TPOT_fit/run3pp_newSiFieldonAlignment_newTPOTzfAlignment/jobB/Rootfiles/Distortions_full_mm_%d.root",runs[i]), Form("%d_MI",runs[i]), selectZ, h_R_pos_method1[i], h_R_neg_method1[i], h_P_pos_method1[i], h_P_neg_method1[i], h_Z_pos_method1[i], h_Z_neg_method1[i], h_N_pos_method1[i], h_N_neg_method1[i], 2);
 
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d/run%d_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm",runs[i]), selectZ, h_R_pos_method2[i], h_R_neg_method2[i], h_P_pos_method2[i], h_P_neg_method2[i], h_Z_pos_method2[i], h_Z_neg_method2[i], 4);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d/run%d_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm",runs[i]), selectZ, h_R_pos_method2[i], h_R_neg_method2[i], h_P_pos_method2[i], h_P_neg_method2[i], h_Z_pos_method2[i], h_Z_neg_method2[i], h_N_pos_method2[i], h_N_neg_method2[i], 4);
 }
 
 TH1 *h_N_pos_method3, *h_R_pos_method3, *h_P_pos_method3, *h_Z_pos_method3;
 TH1 *h_N_neg_method3, *h_R_neg_method3, *h_P_neg_method3, *h_Z_neg_method3;
 
-draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim/sim_B3_average_correction_histograms.root"), Form("sim_cpm"), selectZ, h_R_pos_method3, h_R_neg_method3, h_P_pos_method3, h_P_neg_method3, h_Z_pos_method3, h_Z_neg_method3, 1);
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim/sim_B3_average_correction_histograms.root"), Form("sim_cpm"), selectZ, h_R_pos_method3, h_R_neg_method3, h_P_pos_method3, h_P_neg_method3, h_Z_pos_method3, h_Z_neg_method3, h_N_pos_method3, h_N_neg_method3, 1);
 
 std::vector<TH1*> hists_P; hists_P.clear();
 std::vector<TH1*> hists_R; hists_R.clear();
@@ -230,24 +230,42 @@ delete can_MI_CPM_LAM_leg;
 }
 
 TCanvas* can_sim = new TCanvas("can_sim","",2400,1200);
-can_sim->Divide(3,2);
+can_sim->Divide(4,2);
 can_sim->cd(1);
 gPad->SetLogy(0);
-h_P_pos_method3->Draw("hist,same");
+h_N_pos_method3->Draw("hist,same");
 can_sim->cd(2);
 gPad->SetLogy(0);
-h_R_pos_method3->Draw("hist,same");
+h_P_pos_method3->SetMaximum(0.03);
+h_P_pos_method3->SetMinimum(-0.01);
+h_P_pos_method3->Draw("hist,same");
 can_sim->cd(3);
 gPad->SetLogy(0);
-h_Z_pos_method3->Draw("hist,same");
+h_R_pos_method3->SetMaximum(0.5);
+h_R_pos_method3->SetMinimum(-0.5);
+h_R_pos_method3->Draw("hist,same");
 can_sim->cd(4);
 gPad->SetLogy(0);
-h_P_neg_method3->Draw("hist,same");
+h_Z_pos_method3->SetMaximum(0.1);
+h_Z_pos_method3->SetMinimum(-0.1);
+h_Z_pos_method3->Draw("hist,same");
 can_sim->cd(5);
 gPad->SetLogy(0);
-h_R_neg_method3->Draw("hist,same");
+h_N_neg_method3->Draw("hist,same");
 can_sim->cd(6);
 gPad->SetLogy(0);
+h_P_neg_method3->SetMaximum(0.03);
+h_P_neg_method3->SetMinimum(-0.01);
+h_P_neg_method3->Draw("hist,same");
+can_sim->cd(7);
+gPad->SetLogy(0);
+h_R_neg_method3->SetMaximum(0.5);
+h_R_neg_method3->SetMinimum(-0.5);
+h_R_neg_method3->Draw("hist,same");
+can_sim->cd(8);
+gPad->SetLogy(0);
+h_Z_neg_method3->SetMaximum(0.1);
+h_Z_neg_method3->SetMinimum(-0.1);
 h_Z_neg_method3->Draw("hist,same");
 
 gPad->RedrawAxis();
@@ -319,6 +337,7 @@ void draw1Dmap(TString filename, TString tag, double selectZ,
   TH1*& h_R_pos, TH1*& h_R_neg,
   TH1*& h_P_pos, TH1*& h_P_neg,
   TH1*& h_Z_pos, TH1*& h_Z_neg,
+  TH1*& h_N_pos, TH1*& h_N_neg,
   int color=1,
   bool convert_RP_2_P=false)
 {
@@ -331,11 +350,11 @@ void draw1Dmap(TString filename, TString tag, double selectZ,
   TH3* h_R_prz_pos = (TH3*) file_3D_map->Get("hIntDistortionR_posz");
   TH3* h_P_prz_pos = (TH3*) file_3D_map->Get("hIntDistortionP_posz");
   TH3* h_Z_prz_pos = (TH3*) file_3D_map->Get("hIntDistortionZ_posz");
-  //TH3* h_N_prz_pos = (TH3*) file_3D_map->Get("hentries_posz");
+  TH3* h_N_prz_pos = (TH3*) file_3D_map->Get("hentries_posz");
   TH3* h_R_prz_neg = (TH3*) file_3D_map->Get("hIntDistortionR_negz");
   TH3* h_P_prz_neg = (TH3*) file_3D_map->Get("hIntDistortionP_negz");
   TH3* h_Z_prz_neg = (TH3*) file_3D_map->Get("hIntDistortionZ_negz");
-  //TH3* h_N_prz_neg = (TH3*) file_3D_map->Get("hentries_negz");
+  TH3* h_N_prz_neg = (TH3*) file_3D_map->Get("hentries_negz");
 
   if (!h_R_prz_pos || !h_P_prz_pos || !h_Z_prz_pos ||
       !h_R_prz_neg || !h_P_prz_neg || !h_Z_prz_neg) {
@@ -344,40 +363,40 @@ void draw1Dmap(TString filename, TString tag, double selectZ,
       return;
   }
 
-  //h_N_pos = new TH1F(Form("hentries_posz_%s",tag.Data()),Form("N @ Z=%d cm;R (cm);N",(int)selectZ),h_N_prz_pos->GetYaxis()->GetNbins(),h_N_prz_pos->GetYaxis()->GetXmin(),h_N_prz_pos->GetYaxis()->GetXmax());
+  h_N_pos = new TH1F(Form("hentries_posz_%s",tag.Data()),Form("N @ Z=%d cm;R (cm);N",(int)selectZ),h_N_prz_pos->GetYaxis()->GetNbins(),h_N_prz_pos->GetYaxis()->GetXmin(),h_N_prz_pos->GetYaxis()->GetXmax());
   h_R_pos = new TH1F(Form("hIntDistortionR_posz_%s",tag.Data()),Form("dR @ Z=%d cm;R (cm);dR (cm)",(int)selectZ),h_R_prz_pos->GetYaxis()->GetNbins(),h_R_prz_pos->GetYaxis()->GetXmin(),h_R_prz_pos->GetYaxis()->GetXmax());
   h_P_pos = new TH1F(Form("hIntDistortionP_posz_%s",tag.Data()),Form("dphi @ Z=%d cm;R (cm);dphi (rad)",(int)selectZ),h_P_prz_pos->GetYaxis()->GetNbins(),h_P_prz_pos->GetYaxis()->GetXmin(),h_P_prz_pos->GetYaxis()->GetXmax());
   h_Z_pos = new TH1F(Form("hIntDistortionZ_posz_%s",tag.Data()),Form("dz @ Z=%d cm;R (cm);dz (cm)",(int)selectZ),h_Z_prz_pos->GetYaxis()->GetNbins(),h_Z_prz_pos->GetYaxis()->GetXmin(),h_Z_prz_pos->GetYaxis()->GetXmax());
-  //h_N_neg = new TH1F(Form("hentries_negz_%s",tag.Data()),Form("N @ Z=-%d cm;R (cm);N",(int)selectZ),h_N_prz_neg->GetYaxis()->GetNbins(),h_N_prz_neg->GetYaxis()->GetXmin(),h_N_prz_neg->GetYaxis()->GetXmax());
+  h_N_neg = new TH1F(Form("hentries_negz_%s",tag.Data()),Form("N @ Z=-%d cm;R (cm);N",(int)selectZ),h_N_prz_neg->GetYaxis()->GetNbins(),h_N_prz_neg->GetYaxis()->GetXmin(),h_N_prz_neg->GetYaxis()->GetXmax());
   h_R_neg = new TH1F(Form("hIntDistortionR_negz_%s",tag.Data()),Form("dR @ Z=-%d cm;R (cm);dR (cm)",(int)selectZ),h_R_prz_neg->GetYaxis()->GetNbins(),h_R_prz_neg->GetYaxis()->GetXmin(),h_R_prz_neg->GetYaxis()->GetXmax());
   h_P_neg = new TH1F(Form("hIntDistortionP_negz_%s",tag.Data()),Form("dphi @ Z=-%d cm;R (cm);dphi (rad)",(int)selectZ),h_P_prz_neg->GetYaxis()->GetNbins(),h_P_prz_neg->GetYaxis()->GetXmin(),h_P_prz_neg->GetYaxis()->GetXmax());
   h_Z_neg = new TH1F(Form("hIntDistortionZ_negz_%s",tag.Data()),Form("dz @ Z=-%d cm;R (cm);dz (cm)",(int)selectZ),h_Z_prz_neg->GetYaxis()->GetNbins(),h_Z_prz_neg->GetYaxis()->GetXmin(),h_Z_prz_neg->GetYaxis()->GetXmax());
 
   // do not save in the file_3D_map
   // directly saved in the stack memory
-  //h_N_pos->SetDirectory(0);
+  h_N_pos->SetDirectory(0);
   h_R_pos->SetDirectory(0);
   h_P_pos->SetDirectory(0);
   h_Z_pos->SetDirectory(0);
-  //h_N_neg->SetDirectory(0);
+  h_N_neg->SetDirectory(0);
   h_R_neg->SetDirectory(0);
   h_P_neg->SetDirectory(0);
   h_Z_neg->SetDirectory(0);
 
-  //plot1D_Zbin(h_N_prz_pos,h_N_pos,selectZ, false);
+  plot1D_Zbin(h_N_prz_pos,h_N_pos,selectZ, false);
   plot1D_Zbin(h_R_prz_pos,h_R_pos,selectZ, false);
   plot1D_Zbin(h_P_prz_pos,h_P_pos,selectZ, convert_RP_2_P);
   plot1D_Zbin(h_Z_prz_pos,h_Z_pos,selectZ, false);
-  //plot1D_Zbin(h_N_prz_neg,h_N_neg,-selectZ, false);
+  plot1D_Zbin(h_N_prz_neg,h_N_neg,-selectZ, false);
   plot1D_Zbin(h_R_prz_neg,h_R_neg,-selectZ, false);
   plot1D_Zbin(h_P_prz_neg,h_P_neg,-selectZ, convert_RP_2_P);
   plot1D_Zbin(h_Z_prz_neg,h_Z_neg,-selectZ, false);
 
-  //h_N_pos->SetLineColor(color); h_N_pos->SetLineWidth(1); h_N_pos->SetFillColor(0); h_N_pos->SetMarkerColor(color);
+  h_N_pos->SetLineColor(color); h_N_pos->SetLineWidth(1); h_N_pos->SetFillColor(0); h_N_pos->SetMarkerColor(color);
   h_R_pos->SetLineColor(color); h_R_pos->SetLineWidth(1); h_R_pos->SetFillColor(0); h_R_pos->SetMarkerColor(color);
   h_P_pos->SetLineColor(color); h_P_pos->SetLineWidth(1); h_P_pos->SetFillColor(0); h_P_pos->SetMarkerColor(color);
   h_Z_pos->SetLineColor(color); h_Z_pos->SetLineWidth(1); h_Z_pos->SetFillColor(0); h_Z_pos->SetMarkerColor(color);
-  //h_N_neg->SetLineColor(color); h_N_neg->SetLineWidth(1); h_N_neg->SetFillColor(0); h_R_neg->SetMarkerColor(color);
+  h_N_neg->SetLineColor(color); h_N_neg->SetLineWidth(1); h_N_neg->SetFillColor(0); h_R_neg->SetMarkerColor(color);
   h_R_neg->SetLineColor(color); h_R_neg->SetLineWidth(1); h_R_neg->SetFillColor(0); h_R_neg->SetMarkerColor(color);
   h_P_neg->SetLineColor(color); h_P_neg->SetLineWidth(1); h_P_neg->SetFillColor(0); h_P_neg->SetMarkerColor(color);
   h_Z_neg->SetLineColor(color); h_Z_neg->SetLineWidth(1); h_Z_neg->SetFillColor(0); h_Z_neg->SetMarkerColor(color);
