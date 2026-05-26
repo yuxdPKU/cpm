@@ -419,26 +419,36 @@ int PHCPMTpcCalibration::writeOutput() const
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
-  std::unique_ptr<TTree> records;
-  std::unique_ptr<CPMRecordTreeFields> fields;
+  std::cout << "PHCPMTpcCalibration::writeOutput - writing "
+            << m_outputfile
+            << " records: " << m_voxelContainer.record_count()
+            << " qa_records: " << m_writeQARecords
+            << std::endl;
+
+  output->cd();
   if (m_writeRecords)
   {
-    records = std::make_unique<TTree>("cpm_records", "CPM ACTS-ready voxel records");
-    fields = std::make_unique<CPMRecordTreeFields>();
-    book_cpm_record_tree(*records, *fields);
+    CPMRecordTreeFields fields;
+    TTree records("cpm_records", "CPM ACTS-ready voxel records");
+    records.SetDirectory(nullptr);
+    book_cpm_record_tree(records, fields);
 
     for (const auto& [voxel, voxelRecords] : m_voxelContainer)
     {
       (void) voxel;
       for (const auto& record : voxelRecords)
       {
-        fields->copy_from(record);
-        records->Fill();
+        fields.copy_from(record);
+        records.Fill();
       }
     }
+
+    output->cd();
+    records.Write();
   }
 
   TTree metadata("cpm_metadata", "CPM Job A metadata");
+  metadata.SetDirectory(nullptr);
   int phiBins = m_phiBins;
   int rBins = m_rBins;
   int zBins = m_zBins;
@@ -471,16 +481,15 @@ int PHCPMTpcCalibration::writeOutput() const
   metadata.Fill();
 
   output->cd();
-  if (records)
-  {
-    records->Write();
-  }
   if (m_writeQARecords)
   {
     PHCPMTpcCalibrationQA::write_records(*output, m_voxelContainer);
   }
   metadata.Write();
   output->Close();
+
+  std::cout << "PHCPMTpcCalibration::writeOutput - done "
+            << m_outputfile << std::endl;
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
