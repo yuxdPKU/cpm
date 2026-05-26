@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(ROOT REQUIRED COMPONENTS Core Hist Physics RIO Tree)
+
 add_library(cpm_core
   CPMAverageCorrectionReconstruction.cc
   CPMReconstructionHelper.cc
@@ -15,6 +17,15 @@ add_library(cpm_core
 target_include_directories(cpm_core
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(cpm_core
+  PUBLIC
+    ROOT::Core
+    ROOT::Hist
+    ROOT::Physics
+    ROOT::RIO
+    ROOT::Tree
 )
 
 add_executable(test_local_line_poca

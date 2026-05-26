@@ -26,6 +26,7 @@ libcpm_la_LIBADD = \
   -lffaobjects \
   -lHist \
   -lphool \
+  -lPhysics \
   -lRIO \
   -lSubsysReco \
   -lTree \
@@ -80,7 +81,8 @@ test_local_line_poca_SOURCES = \
   test_local_line_poca.cc
 
 test_local_line_poca_LDADD = \
-  libcpm.la
+  libcpm.la \
+  -lPhysics
 
 # Rule for generating table CINT dictionaries.
 %_Dict.cc: %.h %LinkDef.h
