@@ -11,7 +11,7 @@
 #include "CPM_QA_B1_ComputePoCA.C"
 #include "CPM_QA_B2_AccumulateVoxelCorrections.C"
 #include "CPM_QA_B3_WriteAverageCorrectionHistograms.C"
-#include "CPM_B3_CheckAverageCorrectionHistograms.C"
+#include "CPM_QA_B3_CheckAverageCorrectionHistograms.C"
 
 #include <TSystem.h>
 
@@ -127,7 +127,7 @@ bool CPM_QA_RunOfflineDiagnostics(
       b3_output,
       resolved_metadata,
       b3_min_entries_per_voxel);
-  ok = CPM_B3_CheckAverageCorrectionHistograms(b3_output) && ok;
+  ok = CPM_QA_B3_CheckAverageCorrectionHistograms(b3_output) && ok;
 
   std::cout << "CPM_QA_RunOfflineDiagnostics - B1 output: " << b1_output << std::endl;
   std::cout << "CPM_QA_RunOfflineDiagnostics - B2 output: " << b2_output << std::endl;

@@ -57,7 +57,7 @@ calculation macro:
 ```text
 Job A CPMVoxelContainer
   -> CPM_ComputeAverageCorrection.C
-  -> CPM_B3_CheckAverageCorrectionHistograms.C
+  -> CPM_QA_B3_CheckAverageCorrectionHistograms.C
 ```
 
 `CPM_ComputeAverageCorrection.C` is the production calculation macro. It reads
@@ -98,9 +98,14 @@ average-correction histograms consumed by the distortion correction loader. It
 writes the guarded half-TPC histograms
 `hIntDistortion{R,P,Z}_{negz,posz}` and `hentries_{negz,posz}`.
 
-`CPM_B3_CheckAverageCorrectionHistograms.C` is the final lightweight QA check.
+`CPM_QA_B3_CheckAverageCorrectionHistograms.C` is the final lightweight QA check.
 It verifies that the required B3 histograms exist and have valid dimensions, so
 batch output failures can be caught before the correction map is used downstream.
+
+`jobB/plot/qa/CPM_QA_DrawIntermediateDistributions.C` reads the QA stage ROOT
+files and draws one-dimensional distributions from the B0 event index, B1 pair
+and batch trees, B2 voxel correction tree, and B3 histogram contents. The
+`run_cpm_qa_chain.sh` script runs it by default after the QA chain.
 
 `jobB/CPM_QA_B0_BuildEventIndex.C` reads one or more Job A output files and
 builds:
@@ -168,7 +173,7 @@ default.
 ```sh
 root -l -b -q 'jobB/CPM_ComputeAverageCorrection.C("jobA_CPMVoxelContainer.root","CPM_B3_average_correction_histograms.root",false,false)'
 root -l -b -q 'jobB/CPM_ComputeAverageCorrection.C("cpm_filelist.txt","CPM_B3_average_correction_histograms.root",true,false)'
-root -l -b -q 'jobB/CPM_B3_CheckAverageCorrectionHistograms.C("CPM_B3_average_correction_histograms.root")'
+root -l -b -q 'jobB/CPM_QA_B3_CheckAverageCorrectionHistograms.C("CPM_B3_average_correction_histograms.root")'
 ```
 
 Example QA/debug path:
@@ -184,7 +189,8 @@ root -l -b -q 'jobB/CPM_QA_B0_CheckEventIndex.C("CPM_QA_B0_event_index.root")'
 root -l -b -q 'jobB/CPM_QA_B1_ComputePoCA.C("jobA_CPMVoxelContainer.root","CPM_QA_B1_poca.root")'
 root -l -b -q 'jobB/CPM_QA_B2_AccumulateVoxelCorrections.C("CPM_QA_B1_poca.root","CPM_QA_B2_voxel_corrections.root")'
 root -l -b -q 'jobB/CPM_QA_B3_WriteAverageCorrectionHistograms.C("CPM_QA_B2_voxel_corrections.root","CPM_B3_average_correction_histograms.root","jobA_CPMVoxelContainer.root")'
-root -l -b -q 'jobB/CPM_B3_CheckAverageCorrectionHistograms.C("CPM_B3_average_correction_histograms.root")'
+root -l -b -q 'jobB/CPM_QA_B3_CheckAverageCorrectionHistograms.C("CPM_B3_average_correction_histograms.root")'
+root -l -b -q 'jobB/plot/qa/CPM_QA_DrawIntermediateDistributions.C("qa_output","merged")'
 ```
 
 For Condor production, run Job A once per DST/segment and write one
@@ -220,6 +226,26 @@ jobB/run_cpm_b_chain.sh \
 The production driver writes only `OUT_DIR/PREFIX_B3_average_correction_histograms.root`
 and checks the required B3 histograms. Use `CPM_QA_RunOfflineDiagnostics.C` when
 the intermediate B0/B1/B2 QA ROOT files are needed.
+
+The QA chain can also be run with:
+
+```sh
+jobB/run_cpm_qa_chain.sh \
+  --input cpm_filelist.txt \
+  --input-is-list \
+  --out-dir output/jobB/run79516_qa \
+  --prefix merged \
+  --unweighted
+
+# Convenience wrappers for the local data/sim file lists:
+jobB/run_qa_data.sh
+jobB/run_qa_sim.sh
+```
+
+By default `run_cpm_qa_chain.sh` writes the QA stage files and then creates
+`OUT_DIR/qa_plots/PREFIX_QA_1d_distributions.root` plus PDF snapshots. Use
+`--no-plots` to skip plotting, or `--plot-dir DIR` to choose another plot
+directory.
 
 The recommended convention is to launch the script from the repository root
 instead of from `macro/`, and to write ROOT outputs into a dedicated output

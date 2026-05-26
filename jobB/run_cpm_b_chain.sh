@@ -256,7 +256,7 @@ echo "[run_cpm_b_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 
 run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q})"
 
-run_root_bool_check "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C" "CPM_B3_CheckAverageCorrectionHistograms(${B3_Q})"
+run_root_bool_check "${MACRO_DIR}/CPM_QA_B3_CheckAverageCorrectionHistograms.C" "CPM_QA_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 
 echo
 echo "[run_cpm_b_chain] done"

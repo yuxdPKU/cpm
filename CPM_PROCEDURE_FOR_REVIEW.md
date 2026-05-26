@@ -91,15 +91,19 @@ Macro responsibilities:
 - `CPM_QA_B3_WriteAverageCorrectionHistograms.C`: convert B2 voxel rows to the
   guarded half-TPC average-correction histograms expected by the correction
   loader.
-- `CPM_B3_CheckAverageCorrectionHistograms.C`: verify that the required B3
+- `CPM_QA_B3_CheckAverageCorrectionHistograms.C`: verify that the required B3
   histograms and summary outputs exist and have valid dimensions.
+- `plot/qa/CPM_QA_DrawIntermediateDistributions.C`: draw one-dimensional QA
+  distributions from the B0/B1/B2 intermediate ROOT trees and the B3 histogram
+  contents. `run_cpm_qa_chain.sh` runs this after the QA chain unless
+  `--no-plots` is requested.
 
 The current production sequence is:
 
 ```text
 Job A CPMVoxelContainer
   -> CPM_ComputeAverageCorrection.C
-  -> CPM_B3_CheckAverageCorrectionHistograms.C
+  -> CPM_QA_B3_CheckAverageCorrectionHistograms.C
 ```
 
 ## Pair Construction And Crossing Estimates
