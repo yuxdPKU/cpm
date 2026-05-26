@@ -307,7 +307,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     }
   }
 
-  Enable::QA = true;
+  Enable::QA = false;
   if (Enable::QA)
   {
     Distortions_QA();

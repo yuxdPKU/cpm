@@ -431,7 +431,7 @@ void Fun4All_CPMTrackAnalysis(
     }
   }
 
-  Enable::QA = true;
+  Enable::QA = false;
   if (Enable::QA)
   {
     Distortions_QA();
