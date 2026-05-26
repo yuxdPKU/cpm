@@ -1,5 +1,7 @@
 #include "PHCPMTpcCalibration.h"
 
+#include "PHCPMTpcCalibrationQA.h"
+
 #include <fun4all/Fun4AllReturnCodes.h>
 
 #include <ffaobjects/EventHeader.h>
@@ -164,6 +166,7 @@ int PHCPMTpcCalibration::Init(PHCompositeNode* /*topNode*/)
             << " trackmap: " << m_trackmapname
             << " grid: (" << m_phiBins << ", " << m_rBins << ", " << m_zBins << ")"
             << " write records: " << m_writeRecords
+            << " write QA records: " << m_writeQARecords
             << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -199,6 +202,7 @@ int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
             << " records: " << m_voxelContainer.record_count()
             << " voxels: " << m_voxelContainer.voxel_count()
             << " write_records: " << m_writeRecords
+            << " write_qa_records: " << m_writeQARecords
             << " outputfile: " << m_outputfile
             << std::endl;
 
@@ -325,7 +329,7 @@ int PHCPMTpcCalibration::processTracks()
 
 void PHCPMTpcCalibration::addRecord(TrackStateRecord record)
 {
-  if (m_writeRecords)
+  if (m_writeRecords || m_writeQARecords)
   {
     m_voxelContainer.add(std::move(record));
   }
@@ -448,6 +452,7 @@ int PHCPMTpcCalibration::writeOutput() const
   unsigned long long totalStates = m_total_states;
   unsigned long long acceptedStates = m_accepted_states;
   bool writeRecords = m_writeRecords;
+  bool writeQARecords = m_writeQARecords;
 
   metadata.Branch("phi_bins", &phiBins);
   metadata.Branch("r_bins", &rBins);
@@ -462,12 +467,17 @@ int PHCPMTpcCalibration::writeOutput() const
   metadata.Branch("total_states", &totalStates);
   metadata.Branch("accepted_states", &acceptedStates);
   metadata.Branch("write_records", &writeRecords);
+  metadata.Branch("write_qa_records", &writeQARecords);
   metadata.Fill();
 
   output->cd();
   if (records)
   {
     records->Write();
+  }
+  if (m_writeQARecords)
+  {
+    PHCPMTpcCalibrationQA::write_records(*output, m_voxelContainer);
   }
   metadata.Write();
   output->Close();

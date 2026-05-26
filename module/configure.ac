@@ -6,9 +6,6 @@ AM_INIT_AUTOMAKE
 AC_PROG_CXX(CC g++)
 LT_INIT([disable-static])
 
-CINTDEFS=" -noIncludePaths  -inlineInputHeader "
-AC_SUBST(CINTDEFS)
-
 if test $ac_cv_prog_gxx = yes; then
    CXXFLAGS="$CXXFLAGS -Wall -Wextra -Wshadow -Werror"
 fi

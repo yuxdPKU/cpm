@@ -32,7 +32,6 @@ class PHCPMTpcCalibration : public SubsysReco
   int End(PHCompositeNode* topNode) override;
 
   void setOutputfile(const std::string& outputfile) { m_outputfile = outputfile; }
-  void setOutputObjectName(const std::string& /*value*/) {}
   void setClusterSource(const std::string& value) { m_cluster_source = value; }
   void setTrackSource(const std::string& value) { m_track_source = value; }
   void setTrackMapName(const std::string& value) { m_trackmapname = value; }
@@ -45,6 +44,7 @@ class PHCPMTpcCalibration : public SubsysReco
   void requireCrossing(const bool value = true) { m_requireCrossing = value; }
   void requireTPOT(const bool value = true) { m_requireTPOT = value; }
   void setWriteRecords(const bool value = true) { m_writeRecords = value; }
+  void setWriteQARecords(const bool value = true) { m_writeQARecords = value; }
 
   void setGridDimensions(int phiBins, int rBins, int zBins);
 
@@ -128,6 +128,7 @@ class PHCPMTpcCalibration : public SubsysReco
   bool m_requireCrossing = false;
   bool m_requireTPOT = true;
   bool m_writeRecords = true;
+  bool m_writeQARecords = false;
 
   std::uint64_t m_event = 0;
 

@@ -46,20 +46,21 @@ stores the compact ACTS-ready record needed for offline crossing calculations:
 The Job A output is segment-friendly: each Condor job writes one compact CPM
 ROOT file, and Job B can read either a single file or a file list.
 
-The default Job A outputs are `cpm_records` and `cpm_metadata`. Extra per-record
-debugging payloads such as track quality, detector cluster/state counters,
-corrected cluster coordinates, local state parameters, covariance, and selection
-flags are separated into the `PHCPMTpcCalibrationQA` helper rather than the
-compact production tree.
+The standard Job A outputs are `cpm_records`, `cpm_metadata`, and
+`cpm_qa_records`. Extra per-record debugging payloads such as track quality,
+detector cluster/state counters, corrected cluster coordinates, local state
+parameters, covariance, and selection flags are written to `cpm_qa_records`
+through the `PHCPMTpcCalibrationQA` helper. They stay out of the compact
+production tree.
 
 ## Job B: Macro Roles
 
-The Job B macros now use the record-based route as the main CPM workflow. B1
-loads the compact Job A `cpm_records` from many segments, computes crossing
-points offline, B2 accumulates voxel averages, and B3 writes the final
-average-correction histograms. `CPM_ReconstructAverageCorrection.C` and the
-container B2 macro remain available only for older files that still contain
-`CPMCorrectionContainer` objects.
+The Job B macros use the record-based route as the main CPM workflow. The
+production path is now concentrated in one macro:
+`CPM_ComputeAverageCorrection.C`. It loads compact Job A `cpm_records` from many
+segments, computes crossing points offline, accumulates voxel averages, and
+writes the final average-correction histograms. The `CPM_QA_*` macros own the
+extra diagnostic products.
 
 Macro responsibilities:
 
@@ -68,6 +69,10 @@ Macro responsibilities:
   mini-DST rehydration studies.
 - `CPM_QA_B0_CheckEventIndex.C`: validate the B0 event/object request index before
   any sequential readback is attempted.
+- `CPM_ComputeAverageCorrection.C`: production Job B calculation. It reads Job A
+  records, checks metadata consistency, forms opposite-charge pairs, accumulates
+  plain or weighted voxel averages directly, and writes the final B3 histograms
+  plus a compact summary tree.
 - `CPM_QA_RunOfflineDiagnostics.C`: record-based diagnostic driver. It can run
   optional B0 QA and then writes the B1 PoCA, B2 voxel-correction, and B3
   histogram stage outputs from one macro call.
@@ -78,11 +83,7 @@ Macro responsibilities:
 - `CPM_QA_B2_AccumulateVoxelCorrections.C`: diagnostic B2 for B1 outputs. It
   accumulates B1 pair rows or B1 batch sums into one `cpm_voxel_corrections`
   row per voxel.
-- `CPM_ReconstructAverageCorrection.C`: legacy macro for old
-  `CPMCorrectionContainer` outputs.
-- `CPM_B2_MergeCorrectionContainers.C`: lower-level legacy container debug
-  macro. Its main product is the `cpm_voxel_corrections` TTree consumed by B3.
-- `CPM_B3_WriteAverageCorrectionHistograms.C`: convert B2 voxel rows to the
+- `CPM_QA_B3_WriteAverageCorrectionHistograms.C`: convert B2 voxel rows to the
   guarded half-TPC average-correction histograms expected by the correction
   loader.
 - `CPM_B3_CheckAverageCorrectionHistograms.C`: verify that the required B3
@@ -92,15 +93,14 @@ The current production sequence is:
 
 ```text
 Job A cpm_records
-  -> CPM_QA_B1_ComputePoCA.C
-  -> CPM_QA_B2_AccumulateVoxelCorrections.C
-  -> CPM_B3_WriteAverageCorrectionHistograms.C
+  -> CPM_ComputeAverageCorrection.C
   -> CPM_B3_CheckAverageCorrectionHistograms.C
 ```
 
-## Job B1: Pair Construction And Crossing Estimates
+## Pair Construction And Crossing Estimates
 
-B1 reads one or more Job A outputs and groups records by voxel.
+The production macro and QA B1 use the same selection and crossing logic. They
+read one or more Job A outputs and group records by voxel.
 
 Current implemented selection:
 
@@ -121,14 +121,16 @@ High-occupancy handling:
 - `--b1-max-pair-records N` means at most `N` selected positive records and
   `N` selected negative records per batch.
 - The current default is `N = 10`; `N = 0` means one unlimited full-voxel batch.
-- B1 writes per-voxel QA including total selected records, selected positive and
-  negative records, batch count, batched positive/negative records, theoretical
-  opposite-charge pairs, batched opposite-charge pairs, candidate pairs, and
-  accepted pairs.
-- B1 also writes `cpm_b1_batch_corrections`, one row per accepted batch. Each
+- In production, accepted pairs are accumulated directly into the voxel
+  correction map.
+- QA B1 writes per-voxel QA including total selected records, selected positive
+  and negative records, batch count, batched positive/negative records,
+  theoretical opposite-charge pairs, batched opposite-charge pairs, candidate
+  pairs, and accepted pairs.
+- QA B1 also writes `cpm_b1_batch_corrections`, one row per accepted batch. Each
   row stores the accepted pair count, total pair weights, effective entries,
   unweighted sums and sum-of-squares, weighted sums and sum-of-squares, and DCA
-  QA. This is the persistent running-average input for B2.
+  QA.
 
 Default crossing solver:
 
@@ -138,7 +140,8 @@ Default crossing solver:
   default is `1.4 T`. This is an explicit approximation for early algorithm
   development, not a replacement for later field-map or ACTS-based validation.
 - The pair crossing estimate is the midpoint of the two closest points.
-- The pair DCA is stored as QA and can be cut in B1/B2.
+- The pair DCA is cut during production pair acceptance and stored by QA B1 for
+  diagnostic studies.
 - The previous framework-building local line-line PoCA solver remains available
   through `--b1-crossing-solver line` for comparison.
 
@@ -154,23 +157,20 @@ Target crossing solver:
   now the default B1 solver, while the local line-line solver remains available
   as a control option.
 
-## Job B2: Voxel Accumulation
+## Voxel Accumulation
 
-In the production route, voxel accumulation lives in
-`CPM_QA_B2_AccumulateVoxelCorrections.C`. It reads B1 batch-level correction
-sums and accumulates one correction row per voxel. It can also read pair-level
-rows for backwards compatibility and detailed QA studies.
-
-The split-stage `CPM_B2_MergeCorrectionContainers.C` and
-`CPM_ReconstructAverageCorrection.C` macros remain available only for older
-outputs that still contain `CPMCorrectionContainer` objects.
+In the production route, voxel accumulation lives inside
+`CPM_ComputeAverageCorrection.C` and no B1/B2 intermediate file is required.
+The QA route keeps `CPM_QA_B2_AccumulateVoxelCorrections.C`, which reads B1
+batch-level correction sums or pair-level rows and writes one
+`cpm_voxel_corrections` row per voxel for offline inspection.
 
 Implemented averaging modes:
 
 - weighted mode: use the curvature-proxy pair weight `1/(pt_a * pt_b)`;
 - unweighted mode: use unit weights for a simple arithmetic mean.
 
-The voxel TTree stores per-voxel QA including entries, sum of weights,
+The QA voxel TTree stores per-voxel QA including entries, sum of weights,
 effective weighted entries, means, and RMS values for `delta_r`, `delta_phi`,
 `delta_rphi`, `delta_z`, and DCA. Batch input is pair-equivalent: unweighted
 mode combines batch sums with accepted-pair counts, while weighted mode combines
@@ -179,10 +179,10 @@ batch means equally unless the batch sizes and weights happen to match.
 
 ## Job B3: Average-Correction Histograms
 
-B3 converts voxel correction rows into average-correction histograms. In the
-production route this happens inside `CPMAverageCorrectionReconstruction`; the
-split-stage `CPM_B3_WriteAverageCorrectionHistograms.C` macro is retained for
-QA and compatibility. Both paths fill reconstructed QA histograms, split
+B3 converts voxel correction values into average-correction histograms. In
+production this is the final step inside `CPM_ComputeAverageCorrection.C`; in
+the QA split-stage route, `CPM_QA_B3_WriteAverageCorrectionHistograms.C` performs
+the same histogram writing from `cpm_voxel_corrections`. Both paths split
 negative and positive z, apply the existing guard-bin style, and write the
 histogram names expected by the average correction loader.
 

@@ -47,8 +47,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     const int stepsize = 10,
     const int segment = 0,
     const bool writeMiniDst = true,
-    const bool writePrunedSeedsToMiniDst = false,
-    const bool writeCpmRecords = true)
+    const bool writePrunedSeedsToMiniDst = false)
 {
   // print inputs
   std::cout << "Fun4All_G4_sPHENIX_reco_hp - nEvents: " << nEvents << std::endl;
@@ -278,7 +277,8 @@ int Fun4All_G4_sPHENIX_reco_hp(
     cpmreco->setTrackSource(writeMiniDst ? cpmmindstfinalstring : "");
     cpmreco->setRunSegment(runnumber, segment);
     cpmreco->setTrackMapName("SvtxSiliconMMTrackMap");
-    cpmreco->setWriteRecords(writeCpmRecords);
+    cpmreco->setWriteRecords(true);
+    cpmreco->setWriteQARecords(true);
     cpmreco->setMinPt(0.5);
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
@@ -291,12 +291,6 @@ int Fun4All_G4_sPHENIX_reco_hp(
     {
       std::cout << "Fun4All_G4_sPHENIX_reco_hp - writeMiniDst is false. "
                 << "CPM snapshots remain usable, but SvtxTrack object rehydration is disabled."
-                << std::endl;
-    }
-    if (!writeCpmRecords)
-    {
-      std::cout << "Fun4All_G4_sPHENIX_reco_hp - writeCpmRecords is false. "
-                << "Only cpm_metadata will be written, so offline CPM reconstruction is disabled."
                 << std::endl;
     }
     if (writeMiniDst)

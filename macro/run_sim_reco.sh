@@ -34,7 +34,6 @@ OutPrefix=$4
 Index=$5
 StepSize=$6
 Segment=$7
-WriteCpmRecords=${8:-true}
 
 #getinputfiles.pl $InDst $InSeedDst
 getinputfiles.pl --filelist $InDstList
@@ -42,7 +41,5 @@ getinputfiles.pl --filelist $InDstList
 # print the environment - needed for debugging
 printenv
 
-echo "CPM options: WriteCpmRecords=$WriteCpmRecords"
-
-root.exe -q -b Fun4All_G4_sPHENIX_reco_hp.C\($nEvents,\"${InDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize,$Segment,true,false,$WriteCpmRecords\)
+root.exe -q -b Fun4All_G4_sPHENIX_reco_hp.C\($nEvents,\"${InDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize,$Segment,true,false\)
 echo Script done

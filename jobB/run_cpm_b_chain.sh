@@ -12,12 +12,15 @@ Usage:
   jobB/run_cpm_b_chain.sh --input JOB_A.root [options]
   jobB/run_cpm_b_chain.sh --input cpm_filelist.txt --input-is-list [options]
 
-Runs the CPM Job B macro chain:
-  optional QA B0 build/check event index QA
-  B1 crossing-point PoCA plus B2 voxel accumulator from Job A cpm_records
-  B3 average-correction histogram output
+Runs the CPM production Job B calculation:
+  Job A cpm_records
+  -> opposite-charge crossing-point PoCA
+  -> voxel averaging
+  -> B3 average-correction histogram output
   B3 histogram check
-  combined Job B ROOT file
+
+For pair trees, batch trees, voxel summaries, or B0 event-index diagnostics,
+run jobB/CPM_QA_RunOfflineDiagnostics.C instead.
 
 Options:
   --input PATH                  Job A CPMVoxelContainer ROOT file, or file list.
@@ -27,44 +30,25 @@ Options:
   --metadata PATH               Job A file used for B3 cpm_metadata. Default:
                                 --input for single-file mode, first list entry
                                 for --input-is-list mode.
-  --run-b0-qa                   Run QA B0 event-index QA. Default: disabled.
-  --combined-output PATH        Combined B1/B2/B3 ROOT output. Default:
-                                OUT_DIR/PREFIX_B.root
-  --no-combined-output          Do not write the combined Job B ROOT file.
-  --keep-intermediates          Keep B1/B2 intermediate ROOT files. Default.
-  --no-keep-intermediates       Remove B1/B2 after successful B3 and optional
-                                combined output.
-  --b1-max-pair-dca VALUE       B1 max pair DCA. Default: 2.0
-  --b1-min-sin-angle VALUE      B1 minimum sin(opening angle). Default: 1.0e-4
-  --b1-max-records VALUE        B1 max raw records per voxel before skipping.
+  --max-pair-dca VALUE          Max pair DCA. Default: 2.0
+  --min-sin-angle VALUE         Minimum sin(opening angle) for line solver.
+                                Default: 1.0e-4
+  --max-records VALUE           Max raw records per voxel before skipping.
                                 0 disables this safety skip. Default: 0
-  --b1-min-records-per-charge VALUE
-                                B1 minimum records per charge sign. Default: 2
-  --b1-min-pair-pt VALUE        B1 minimum pT for records entering pair loops.
+  --min-records-per-charge VALUE
+                                Minimum records per charge sign. Default: 2
+  --min-pair-pt VALUE           Minimum pT for records entering pair loops.
                                 Default: 0.5
-  --b1-max-pair-records VALUE   B1 max selected records per charge sign in each
+  --max-pair-records VALUE      Max selected records per charge sign in each
                                 opposite-charge pair batch after keeping the
                                 closest record per unique track. 0 means one
                                 unlimited full-voxel batch.
                                 Default: 10
-  --b1-crossing-solver VALUE     B1 crossing solver: helix or line. Default: helix
-  --b1-magnetic-field-z VALUE    B1 helix-solver Bz field in tesla. Default: 1.4
-  --b1-write-pairs               Write B1 pair-level QA tree. Default.
-  --no-b1-write-pairs            Skip B1 pair rows and keep batch-level sums.
-  --b1-print-voxel-summary      Print one B1 diagnostic line per voxel. Default.
-  --no-b1-print-voxel-summary   Disable per-voxel B1 diagnostic lines.
-  --b2-min-entries VALUE        B2 minimum accepted pairs per voxel. Default: 1
-  --b2-max-pair-dca VALUE       Optional B2 max pair DCA. Default: -1.0
-  --b2-input-mode VALUE          B2 input source: auto, batches, or pairs.
-                                Default: auto. Auto prefers B1 batch sums.
-  --b2-containers                Legacy path: directly merge old Job A
-                                CPMCorrectionContainer objects and write the
-                                final average-correction output in one
-                                module-backed step.
-  --b2-object-name NAME          Container object name for --b2-containers.
-                                Default: CPMCorrectionContainer
-  --b2-weighted                 Use B1 pair weights in B2 averaging. Default.
-  --b2-unweighted               Use a simple unweighted average in B2.
+  --crossing-solver VALUE        Crossing solver: helix or line. Default: helix
+  --magnetic-field-z VALUE       Helix-solver Bz field in tesla. Default: 1.4
+  --min-entries VALUE           Minimum accepted pairs per voxel. Default: 1
+  --weighted                    Use pair weights in voxel averaging. Default.
+  --unweighted                  Use a simple unweighted average.
   --help                        Show this message.
 
 Example:
@@ -76,7 +60,7 @@ Example:
   jobB/run_cpm_b_chain.sh \
     --input cpm_filelist.txt --input-is-list \
     --out-dir merged --prefix run79516 \
-    --run-b0-qa --no-keep-intermediates
+    --unweighted
 EOF
 }
 
@@ -102,13 +86,6 @@ first_list_entry() {
     return 0
   done < "$list_file"
   return 1
-}
-
-run_root() {
-  local macro_call=$1
-  echo
-  echo "[run_cpm_b_chain] root -l -b -q ${macro_call}"
-  root -l -b -q "$macro_call"
 }
 
 run_root_bool_check() {
@@ -138,18 +115,8 @@ B1_MIN_PAIR_PT="0.5"
 B1_MAX_PAIR_RECORDS="10"
 B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
-B1_WRITE_PAIR_TREE=1
-B1_PRINT_VOXEL_SUMMARY=1
 B2_MIN_ENTRIES="1"
-B2_MAX_PAIR_DCA="-1.0"
-B2_INPUT_MODE="auto"
-B2_SOURCE="b1"
-B2_OBJECT_NAME="CPMCorrectionContainer"
 B2_USE_PAIR_WEIGHTS=1
-RUN_B0_QA=0
-WRITE_COMBINED=1
-COMBINED_OUTPUT=""
-KEEP_INTERMEDIATES=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -173,100 +140,47 @@ while [[ $# -gt 0 ]]; do
       METADATA=${2:-}
       shift 2
       ;;
-    --run-b0-qa|--enable-b0-qa)
-      RUN_B0_QA=1
-      shift
-      ;;
-    --combined-output)
-      COMBINED_OUTPUT=${2:-}
-      WRITE_COMBINED=1
-      shift 2
-      ;;
-    --no-combined-output)
-      WRITE_COMBINED=0
-      shift
-      ;;
-    --keep-intermediates)
-      KEEP_INTERMEDIATES=1
-      shift
-      ;;
-    --no-keep-intermediates)
-      KEEP_INTERMEDIATES=0
-      shift
-      ;;
-    --b1-max-pair-dca)
+    --max-pair-dca|--b1-max-pair-dca)
       B1_MAX_PAIR_DCA=${2:-}
       shift 2
       ;;
-    --b1-min-sin-angle)
+    --min-sin-angle|--b1-min-sin-angle)
       B1_MIN_SIN_ANGLE=${2:-}
       shift 2
       ;;
-    --b1-max-records)
+    --max-records|--b1-max-records)
       B1_MAX_RECORDS=${2:-}
       shift 2
       ;;
-    --b1-min-records-per-charge)
+    --min-records-per-charge|--b1-min-records-per-charge)
       B1_MIN_RECORDS_PER_CHARGE=${2:-}
       shift 2
       ;;
-    --b1-min-pair-pt)
+    --min-pair-pt|--b1-min-pair-pt)
       B1_MIN_PAIR_PT=${2:-}
       shift 2
       ;;
-    --b1-max-pair-records)
+    --max-pair-records|--b1-max-pair-records)
       B1_MAX_PAIR_RECORDS=${2:-}
       shift 2
       ;;
-    --b1-crossing-solver)
+    --crossing-solver|--b1-crossing-solver)
       B1_CROSSING_SOLVER=${2:-}
       shift 2
       ;;
-    --b1-magnetic-field-z)
+    --magnetic-field-z|--b1-magnetic-field-z)
       B1_MAGNETIC_FIELD_Z=${2:-}
       shift 2
       ;;
-    --b1-write-pairs)
-      B1_WRITE_PAIR_TREE=1
-      shift
-      ;;
-    --no-b1-write-pairs)
-      B1_WRITE_PAIR_TREE=0
-      shift
-      ;;
-    --b1-print-voxel-summary)
-      B1_PRINT_VOXEL_SUMMARY=1
-      shift
-      ;;
-    --no-b1-print-voxel-summary)
-      B1_PRINT_VOXEL_SUMMARY=0
-      shift
-      ;;
-    --b2-min-entries)
+    --min-entries|--b2-min-entries)
       B2_MIN_ENTRIES=${2:-}
       shift 2
       ;;
-    --b2-max-pair-dca)
-      B2_MAX_PAIR_DCA=${2:-}
-      shift 2
-      ;;
-    --b2-input-mode)
-      B2_INPUT_MODE=${2:-}
-      shift 2
-      ;;
-    --b2-containers|--container-b2)
-      B2_SOURCE="containers"
-      shift
-      ;;
-    --b2-object-name)
-      B2_OBJECT_NAME=${2:-}
-      shift 2
-      ;;
-    --b2-weighted)
+    --weighted|--b2-weighted)
       B2_USE_PAIR_WEIGHTS=1
       shift
       ;;
-    --b2-unweighted)
+    --unweighted|--b2-unweighted)
       B2_USE_PAIR_WEIGHTS=0
       shift
       ;;
@@ -299,12 +213,7 @@ if [[ ! -e "$INPUT" ]]; then
 fi
 
 if [[ "$B1_CROSSING_SOLVER" != "line" && "$B1_CROSSING_SOLVER" != "helix" ]]; then
-  echo "Invalid --b1-crossing-solver: $B1_CROSSING_SOLVER (expected line or helix)" >&2
-  exit 2
-fi
-
-if [[ "$B2_INPUT_MODE" != "auto" && "$B2_INPUT_MODE" != "batches" && "$B2_INPUT_MODE" != "pairs" ]]; then
-  echo "Invalid --b2-input-mode: $B2_INPUT_MODE (expected auto, batches, or pairs)" >&2
+  echo "Invalid --crossing-solver: $B1_CROSSING_SOLVER (expected line or helix)" >&2
   exit 2
 fi
 
@@ -326,131 +235,29 @@ if [[ ! -e "$METADATA" ]]; then
   exit 1
 fi
 
-B0_EVENT_INDEX="${OUT_DIR}/${PREFIX}_QA_B0_event_index.root"
-B1_POCA="${OUT_DIR}/${PREFIX}_QA_B1_poca.root"
-if [[ "$B2_SOURCE" == "containers" ]]; then
-  B2_CORRECTIONS="${OUT_DIR}/${PREFIX}_B2_voxel_corrections.root"
-else
-  B2_CORRECTIONS="${OUT_DIR}/${PREFIX}_QA_B2_voxel_corrections.root"
-fi
 B3_HISTOGRAMS="${OUT_DIR}/${PREFIX}_B3_average_correction_histograms.root"
-if [[ -z "$COMBINED_OUTPUT" ]]; then
-  COMBINED_OUTPUT="${OUT_DIR}/${PREFIX}_B.root"
-fi
-if [[ "$WRITE_COMBINED" -eq 1 ]]; then
-  mkdir -p "$(dirname "$COMBINED_OUTPUT")"
-fi
 
 INPUT_Q=$(root_string "$INPUT")
-B0_Q=$(root_string "$B0_EVENT_INDEX")
-B1_Q=$(root_string "$B1_POCA")
-B2_Q=$(root_string "$B2_CORRECTIONS")
 B3_Q=$(root_string "$B3_HISTOGRAMS")
 METADATA_Q=$(root_string "$METADATA")
 B1_CROSSING_SOLVER_Q=$(root_std_string "$B1_CROSSING_SOLVER")
-B2_INPUT_MODE_Q=$(root_std_string "$B2_INPUT_MODE")
-B2_OBJECT_NAME_Q=$(root_string "$B2_OBJECT_NAME")
-B3_METADATA_Q=$METADATA_Q
-if [[ "$B2_SOURCE" == "containers" ]]; then
-  B3_METADATA_Q=$B2_Q
-fi
 
 echo "[run_cpm_b_chain] input: $INPUT"
 echo "[run_cpm_b_chain] input_is_list: $INPUT_IS_LIST"
 echo "[run_cpm_b_chain] metadata: $METADATA"
 echo "[run_cpm_b_chain] output directory: $OUT_DIR"
 echo "[run_cpm_b_chain] prefix: $PREFIX"
-echo "[run_cpm_b_chain] run_b0_qa: $RUN_B0_QA"
-echo "[run_cpm_b_chain] write_combined: $WRITE_COMBINED"
-echo "[run_cpm_b_chain] keep_intermediates: $KEEP_INTERMEDIATES"
-echo "[run_cpm_b_chain] b1_print_voxel_summary: $B1_PRINT_VOXEL_SUMMARY"
-echo "[run_cpm_b_chain] b1_min_pair_pt: $B1_MIN_PAIR_PT"
-echo "[run_cpm_b_chain] b1_max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
-echo "[run_cpm_b_chain] b1_crossing_solver: $B1_CROSSING_SOLVER"
-echo "[run_cpm_b_chain] b1_magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
-echo "[run_cpm_b_chain] b1_write_pair_tree: $B1_WRITE_PAIR_TREE"
-echo "[run_cpm_b_chain] b2_source: $B2_SOURCE"
-echo "[run_cpm_b_chain] b2_input_mode: $B2_INPUT_MODE"
-echo "[run_cpm_b_chain] b2_object_name: $B2_OBJECT_NAME"
-echo "[run_cpm_b_chain] b2_use_pair_weights: $B2_USE_PAIR_WEIGHTS"
+echo "[run_cpm_b_chain] min_pair_pt: $B1_MIN_PAIR_PT"
+echo "[run_cpm_b_chain] max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
+echo "[run_cpm_b_chain] crossing_solver: $B1_CROSSING_SOLVER"
+echo "[run_cpm_b_chain] magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
+echo "[run_cpm_b_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
+echo "[run_cpm_b_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 
-if [[ "$RUN_B0_QA" -eq 1 ]]; then
-  if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-    run_root "${MACRO_DIR}/CPM_QA_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q},true)"
-  else
-    run_root "${MACRO_DIR}/CPM_QA_B0_BuildEventIndex.C(${INPUT_Q},${B0_Q})"
-  fi
-
-  run_root_bool_check "${MACRO_DIR}/CPM_QA_B0_CheckEventIndex.C" "CPM_QA_B0_CheckEventIndex(${B0_Q})"
-fi
-
-if [[ "$B2_SOURCE" == "containers" ]]; then
-  if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-    run_root "${MACRO_DIR}/CPM_ReconstructAverageCorrection.C(${INPUT_Q},${B3_Q},${B2_OBJECT_NAME_Q},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},true)"
-  else
-    run_root "${MACRO_DIR}/CPM_ReconstructAverageCorrection.C(${INPUT_Q},${B3_Q},${B2_OBJECT_NAME_Q},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES})"
-  fi
-else
-  if [[ "$INPUT_IS_LIST" -eq 1 ]]; then
-    run_root "${MACRO_DIR}/CPM_QA_B1_ComputePoCA.C(${INPUT_Q},${B1_Q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE})"
-  else
-    run_root "${MACRO_DIR}/CPM_QA_B1_ComputePoCA.C(${INPUT_Q},${B1_Q},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARY},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE})"
-  fi
-
-  run_root "${MACRO_DIR}/CPM_QA_B2_AccumulateVoxelCorrections.C(${B1_Q},${B2_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q})"
-  run_root "${MACRO_DIR}/CPM_B3_WriteAverageCorrectionHistograms.C(${B2_Q},${B3_Q},${B3_METADATA_Q})"
-fi
+run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q})"
 
 run_root_bool_check "${MACRO_DIR}/CPM_B3_CheckAverageCorrectionHistograms.C" "CPM_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 
-if [[ "$WRITE_COMBINED" -eq 1 ]]; then
-  if ! command -v hadd >/dev/null 2>&1; then
-    echo "hadd is required for --combined-output, but it was not found in PATH" >&2
-    exit 1
-  fi
-
-  combined_inputs=()
-  if [[ "$RUN_B0_QA" -eq 1 ]]; then
-    combined_inputs+=("$B0_EVENT_INDEX")
-  fi
-  if [[ "$B2_SOURCE" == "containers" ]]; then
-    combined_inputs+=("$B3_HISTOGRAMS")
-  else
-    combined_inputs+=("$B1_POCA" "$B2_CORRECTIONS" "$B3_HISTOGRAMS")
-  fi
-
-  echo
-  echo "[run_cpm_b_chain] hadd -f ${COMBINED_OUTPUT} ${combined_inputs[*]}"
-  hadd -f "$COMBINED_OUTPUT" "${combined_inputs[@]}"
-fi
-
-if [[ "$KEEP_INTERMEDIATES" -eq 0 ]]; then
-  echo
-  echo "[run_cpm_b_chain] removing intermediate B1/B2 files"
-  if [[ "$B2_SOURCE" == "containers" ]]; then
-    echo "[run_cpm_b_chain] container path has no separate B2 intermediate"
-  else
-    rm -f "$B1_POCA" "$B2_CORRECTIONS"
-    if [[ -e "$B1_POCA" || -e "$B2_CORRECTIONS" ]]; then
-      echo "[run_cpm_b_chain] warning: failed to remove one or more QA intermediate files" >&2
-    fi
-  fi
-fi
-
 echo
 echo "[run_cpm_b_chain] done"
-if [[ "$RUN_B0_QA" -eq 1 ]]; then
-  echo "[run_cpm_b_chain] QA B0: $B0_EVENT_INDEX"
-fi
-if [[ "$KEEP_INTERMEDIATES" -eq 1 ]]; then
-  if [[ "$B2_SOURCE" != "containers" ]]; then
-    echo "[run_cpm_b_chain] QA B1: $B1_POCA"
-    echo "[run_cpm_b_chain] QA B2: $B2_CORRECTIONS"
-  fi
-else
-  echo "[run_cpm_b_chain] B1/B2 intermediates: removed"
-fi
 echo "[run_cpm_b_chain] B3: $B3_HISTOGRAMS"
-if [[ "$WRITE_COMBINED" -eq 1 ]]; then
-  echo "[run_cpm_b_chain] combined: $COMBINED_OUTPUT"
-fi

@@ -3,6 +3,4 @@
   --input-is-list \
   --out-dir output/run79516 \
   --prefix run79516 \
-  --b2-unweighted \
-  --no-combined-output \
-  --no-keep-intermediates
+  --unweighted
