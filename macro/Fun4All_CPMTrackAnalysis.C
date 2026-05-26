@@ -407,9 +407,6 @@ void Fun4All_CPMTrackAnalysis(
     cpmreco->setMinPt(0.5);
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
-    cpmreco->setRunningBatchSize(10);
-    cpmreco->setMaxPairDca(2.0);
-    cpmreco->setMagneticFieldZ(1.4);
     cpmreco->disableAverageCorr();
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
@@ -423,7 +420,7 @@ void Fun4All_CPMTrackAnalysis(
     if (!writeCpmRecords)
     {
       std::cout << "Fun4All_CPMTrackAnalysis - writeCpmRecords is false. "
-                << "Only CPMCorrectionContainer and cpm_metadata will be written."
+                << "Only cpm_metadata will be written, so offline CPM reconstruction is disabled."
                 << std::endl;
     }
 

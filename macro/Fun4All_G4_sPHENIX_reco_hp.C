@@ -282,9 +282,6 @@ int Fun4All_G4_sPHENIX_reco_hp(
     cpmreco->setMinPt(0.5);
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
-    cpmreco->setRunningBatchSize(10);
-    cpmreco->setMaxPairDca(2.0);
-    cpmreco->setMagneticFieldZ(1.4);
     // CPM does not apply the legacy PHTpcResiduals central-membrane requirement.
     cpmreco->disableAverageCorr();
     cpmreco->setGridDimensions(36, 16, 80);
@@ -299,7 +296,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     if (!writeCpmRecords)
     {
       std::cout << "Fun4All_G4_sPHENIX_reco_hp - writeCpmRecords is false. "
-                << "Only CPMCorrectionContainer and cpm_metadata will be written."
+                << "Only cpm_metadata will be written, so offline CPM reconstruction is disabled."
                 << std::endl;
     }
     if (writeMiniDst)

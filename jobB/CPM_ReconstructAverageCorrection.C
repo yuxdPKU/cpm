@@ -1,10 +1,9 @@
 /*
  * CPM production average-correction reconstruction.
  *
- * This is the matrix-inversion-style entry point for the CPM production path:
- * it loads Job A CPMCorrectionContainer objects, merges them, converts the
- * merged sums into voxel corrections, and writes the final average-correction
- * histograms plus intermediate QA objects to one output ROOT file.
+ * Legacy container entry point for CPM Job A files that still contain
+ * CPMCorrectionContainer objects. New CPM production uses the record-based
+ * B1/B2/B3 path from cpm_records.
  */
 
 #include <CPMAverageCorrectionReconstruction.h>

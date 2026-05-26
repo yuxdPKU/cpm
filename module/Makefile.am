@@ -47,7 +47,8 @@ pkginclude_HEADERS = \
   CPMRecord.h \
   CPMTypes.h \
   CPMVoxelContainer.h \
-  PHCPMTpcCalibration.h
+  PHCPMTpcCalibration.h \
+  PHCPMTpcCalibrationQA.h
 
 ROOTDICTS = \
   CPMCorrectionContainer_Dict.cc
@@ -63,7 +64,8 @@ libcpm_la_SOURCES = \
   CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
   CPMPairUtils.cc \
-  PHCPMTpcCalibration.cc
+  PHCPMTpcCalibration.cc \
+  PHCPMTpcCalibrationQA.cc
 
 %_Dict.cc: %.h %LinkDef.h
 	rootcint -f $@ @CINTDEFS@ $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $^

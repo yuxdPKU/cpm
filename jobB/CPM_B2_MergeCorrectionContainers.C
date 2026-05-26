@@ -1,9 +1,10 @@
 /*
  * CPM Job B2 container merger.
  *
- * This is the matrix-inversion-aligned CPM path: Job A writes one
- * CPMCorrectionContainer per segment, this macro merges those containers and
+ * Legacy CPM container path. Older Job A files may contain one
+ * CPMCorrectionContainer per segment; this macro merges those containers and
  * writes a cpm_voxel_corrections tree for the existing B3 histogram writer.
+ * New CPM production uses the record-based B1/B2/B3 path from cpm_records.
  */
 
 #include <CPMCorrectionContainer.h>

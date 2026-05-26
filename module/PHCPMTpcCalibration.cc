@@ -1,7 +1,5 @@
 #include "PHCPMTpcCalibration.h"
 
-#include "CPMPairUtils.h"
-
 #include <fun4all/Fun4AllReturnCodes.h>
 
 #include <ffaobjects/EventHeader.h>
@@ -51,29 +49,15 @@ namespace
     unsigned int track_id = InvalidTrackId;
     int charge = 0;
     float pt = std::numeric_limits<float>::quiet_NaN();
-    float quality = std::numeric_limits<float>::quiet_NaN();
-    unsigned short n_mvtx = 0;
-    unsigned short n_intt = 0;
-    unsigned short n_tpc = 0;
-    unsigned short n_tpot = 0;
-    unsigned short n_mvtx_states = 0;
-    unsigned short n_intt_states = 0;
-    unsigned short n_tpc_states = 0;
-    unsigned short n_tpot_states = 0;
 
     unsigned long long cluskey = InvalidClusterKey;
     unsigned long long hitsetkey = InvalidHitSetKey;
     unsigned int subsurfkey = InvalidSubSurfKey;
-    unsigned short layer = 0;
-    unsigned short side = 0;
 
     int iphi = -1;
     int ir = -1;
     int iz = -1;
 
-    double cluster_x = std::numeric_limits<double>::quiet_NaN();
-    double cluster_y = std::numeric_limits<double>::quiet_NaN();
-    double cluster_z = std::numeric_limits<double>::quiet_NaN();
     double voxel_x = std::numeric_limits<double>::quiet_NaN();
     double voxel_y = std::numeric_limits<double>::quiet_NaN();
     double voxel_z = std::numeric_limits<double>::quiet_NaN();
@@ -81,21 +65,12 @@ namespace
     double offset_y = std::numeric_limits<double>::quiet_NaN();
     double offset_z = std::numeric_limits<double>::quiet_NaN();
 
-    double state_pathlength = std::numeric_limits<double>::quiet_NaN();
-    double state_local_x = std::numeric_limits<double>::quiet_NaN();
-    double state_local_y = std::numeric_limits<double>::quiet_NaN();
     double state_x = std::numeric_limits<double>::quiet_NaN();
     double state_y = std::numeric_limits<double>::quiet_NaN();
     double state_z = std::numeric_limits<double>::quiet_NaN();
     double state_px = std::numeric_limits<double>::quiet_NaN();
     double state_py = std::numeric_limits<double>::quiet_NaN();
     double state_pz = std::numeric_limits<double>::quiet_NaN();
-    double state_covariance[36] = {};
-
-    bool has_crossing = false;
-    bool passes_tpot = false;
-    bool passes_track_quality = false;
-    bool passes_geometry = false;
 
     void copy_from(const TrackStateRecord& record)
     {
@@ -112,29 +87,15 @@ namespace
       track_id = record.track_ref.track_id;
       charge = record.track.charge;
       pt = record.track.pt;
-      quality = record.track.quality;
-      n_mvtx = record.track.n_mvtx;
-      n_intt = record.track.n_intt;
-      n_tpc = record.track.n_tpc;
-      n_tpot = record.track.n_tpot;
-      n_mvtx_states = record.track.n_mvtx_states;
-      n_intt_states = record.track.n_intt_states;
-      n_tpc_states = record.track.n_tpc_states;
-      n_tpot_states = record.track.n_tpot_states;
 
       cluskey = record.cluster_ref.cluskey;
       hitsetkey = record.cluster_ref.hitsetkey;
       subsurfkey = record.cluster_ref.subsurfkey;
-      layer = record.cluster_ref.layer;
-      side = record.cluster_ref.side;
 
       iphi = record.voxel.iphi;
       ir = record.voxel.ir;
       iz = record.voxel.iz;
 
-      cluster_x = record.cluster.corrected_position.x;
-      cluster_y = record.cluster.corrected_position.y;
-      cluster_z = record.cluster.corrected_position.z;
       voxel_x = record.cluster.voxel_center.x;
       voxel_y = record.cluster.voxel_center.y;
       voxel_z = record.cluster.voxel_center.z;
@@ -142,24 +103,12 @@ namespace
       offset_y = record.cluster.cluster_minus_voxel_center.y;
       offset_z = record.cluster.cluster_minus_voxel_center.z;
 
-      state_pathlength = record.state.pathlength;
-      state_local_x = record.state.local_x;
-      state_local_y = record.state.local_y;
       state_x = record.state.position.x;
       state_y = record.state.position.y;
       state_z = record.state.position.z;
       state_px = record.state.momentum.x;
       state_py = record.state.momentum.y;
       state_pz = record.state.momentum.z;
-      for (std::size_t i = 0; i < 36; ++i)
-      {
-        state_covariance[i] = record.state.covariance[i];
-      }
-
-      has_crossing = record.selection.has_crossing;
-      passes_tpot = record.selection.passes_tpot;
-      passes_track_quality = record.selection.passes_track_quality;
-      passes_geometry = record.selection.passes_geometry;
     }
   };
 
@@ -178,29 +127,15 @@ namespace
     tree.Branch("track_id", &fields.track_id);
     tree.Branch("charge", &fields.charge);
     tree.Branch("pt", &fields.pt);
-    tree.Branch("quality", &fields.quality);
-    tree.Branch("n_mvtx", &fields.n_mvtx);
-    tree.Branch("n_intt", &fields.n_intt);
-    tree.Branch("n_tpc", &fields.n_tpc);
-    tree.Branch("n_tpot", &fields.n_tpot);
-    tree.Branch("n_mvtx_states", &fields.n_mvtx_states);
-    tree.Branch("n_intt_states", &fields.n_intt_states);
-    tree.Branch("n_tpc_states", &fields.n_tpc_states);
-    tree.Branch("n_tpot_states", &fields.n_tpot_states);
 
     tree.Branch("cluskey", &fields.cluskey);
     tree.Branch("hitsetkey", &fields.hitsetkey);
     tree.Branch("subsurfkey", &fields.subsurfkey);
-    tree.Branch("layer", &fields.layer);
-    tree.Branch("side", &fields.side);
 
     tree.Branch("iphi", &fields.iphi);
     tree.Branch("ir", &fields.ir);
     tree.Branch("iz", &fields.iz);
 
-    tree.Branch("cluster_x", &fields.cluster_x);
-    tree.Branch("cluster_y", &fields.cluster_y);
-    tree.Branch("cluster_z", &fields.cluster_z);
     tree.Branch("voxel_x", &fields.voxel_x);
     tree.Branch("voxel_y", &fields.voxel_y);
     tree.Branch("voxel_z", &fields.voxel_z);
@@ -208,21 +143,12 @@ namespace
     tree.Branch("offset_y", &fields.offset_y);
     tree.Branch("offset_z", &fields.offset_z);
 
-    tree.Branch("state_pathlength", &fields.state_pathlength);
-    tree.Branch("state_local_x", &fields.state_local_x);
-    tree.Branch("state_local_y", &fields.state_local_y);
     tree.Branch("state_x", &fields.state_x);
     tree.Branch("state_y", &fields.state_y);
     tree.Branch("state_z", &fields.state_z);
     tree.Branch("state_px", &fields.state_px);
     tree.Branch("state_py", &fields.state_py);
     tree.Branch("state_pz", &fields.state_pz);
-    tree.Branch("state_covariance", fields.state_covariance, "state_covariance[36]/D");
-
-    tree.Branch("has_crossing", &fields.has_crossing);
-    tree.Branch("passes_tpot", &fields.passes_tpot);
-    tree.Branch("passes_track_quality", &fields.passes_track_quality);
-    tree.Branch("passes_geometry", &fields.passes_geometry);
   }
 }
 
@@ -235,10 +161,8 @@ int PHCPMTpcCalibration::Init(PHCompositeNode* /*topNode*/)
 {
   std::cout << "PHCPMTpcCalibration::Init"
             << " outputfile: " << m_outputfile
-            << " output object: " << m_outputObjectName
             << " trackmap: " << m_trackmapname
             << " grid: (" << m_phiBins << ", " << m_rBins << ", " << m_zBins << ")"
-            << " running batch size: " << m_runningBatchSize
             << " write records: " << m_writeRecords
             << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
@@ -253,8 +177,6 @@ int PHCPMTpcCalibration::InitRun(PHCompositeNode* topNode)
 
   m_zMax = m_tGeometry->get_max_driftlength() + m_tGeometry->get_CM_halfwidth();
   m_zMin = -m_zMax;
-  m_correctionContainer.set_grid_dimensions(m_phiBins, m_rBins, m_zBins);
-  m_correctionContainer.set_grid_range(m_rMin, m_rMax, m_zMin, m_zMax);
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -273,16 +195,10 @@ int PHCPMTpcCalibration::process_event(PHCompositeNode* topNode)
 
 int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
 {
-  flushPendingBatches();
-
   std::cout << "PHCPMTpcCalibration::End"
             << " records: " << m_voxelContainer.record_count()
             << " voxels: " << m_voxelContainer.voxel_count()
             << " write_records: " << m_writeRecords
-            << " batches: " << m_batches
-            << " candidate pairs: " << m_candidate_pairs
-            << " accepted pairs: " << m_accepted_pairs
-            << " final flush batches: " << m_final_flush_batches
             << " outputfile: " << m_outputfile
             << std::endl;
 
@@ -294,13 +210,6 @@ int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
   std::cout << "PHCPMTpcCalibration::End"
             << " state statistics total: " << m_total_states
             << " accepted: " << m_accepted_states
-            << std::endl;
-
-  std::cout << "PHCPMTpcCalibration::End"
-            << " final flush records positive: " << m_final_flush_positive_records
-            << " negative: " << m_final_flush_negative_records
-            << " unflushed single-charge positive: " << m_unflushed_positive_records
-            << " negative: " << m_unflushed_negative_records
             << std::endl;
 
   return writeOutput();
@@ -416,144 +325,9 @@ int PHCPMTpcCalibration::processTracks()
 
 void PHCPMTpcCalibration::addRecord(TrackStateRecord record)
 {
-  const auto voxel = record.voxel;
   if (m_writeRecords)
   {
-    m_voxelContainer.add(record);
-  }
-
-  if (record.track.charge > 0)
-  {
-    m_pendingRecords[voxel].positive.push_back(std::move(record));
-  }
-  else if (record.track.charge < 0)
-  {
-    m_pendingRecords[voxel].negative.push_back(std::move(record));
-  }
-  else
-  {
-    return;
-  }
-
-  processPendingBatches(voxel);
-}
-
-void PHCPMTpcCalibration::processPendingBatches(const VoxelId& voxel)
-{
-  if (m_runningBatchSize == 0)
-  {
-    return;
-  }
-
-  auto iter = m_pendingRecords.find(voxel);
-  if (iter == m_pendingRecords.end())
-  {
-    return;
-  }
-
-  auto& pending = iter->second;
-  if (pending.positive.size() < m_runningBatchSize ||
-      pending.negative.size() < m_runningBatchSize)
-  {
-    return;
-  }
-
-  processBatch(voxel);
-  pending.positive.clear();
-  pending.negative.clear();
-}
-
-void PHCPMTpcCalibration::flushPendingBatches()
-{
-  m_final_flush_batches = 0;
-  m_final_flush_positive_records = 0;
-  m_final_flush_negative_records = 0;
-  m_unflushed_positive_records = 0;
-  m_unflushed_negative_records = 0;
-
-  for (auto& [voxel, pending] : m_pendingRecords)
-  {
-    if (!pending.positive.empty() && !pending.negative.empty())
-    {
-      ++m_final_flush_batches;
-      m_final_flush_positive_records += pending.positive.size();
-      m_final_flush_negative_records += pending.negative.size();
-      processBatch(voxel);
-      pending.positive.clear();
-      pending.negative.clear();
-      continue;
-    }
-
-    m_unflushed_positive_records += pending.positive.size();
-    m_unflushed_negative_records += pending.negative.size();
-  }
-}
-
-void PHCPMTpcCalibration::processBatch(const VoxelId& voxel)
-{
-  auto iter = m_pendingRecords.find(voxel);
-  if (iter == m_pendingRecords.end())
-  {
-    return;
-  }
-
-  auto& pending = iter->second;
-  const int cellIndex = m_correctionContainer.get_cell_index(voxel.iphi, voxel.ir, voxel.iz);
-  if (cellIndex < 0)
-  {
-    return;
-  }
-
-  CPMPairOptions options;
-  options.solver = CPMPairSolver::Helix;
-  options.min_pt = m_minPt;
-  options.max_pair_dca = m_maxPairDca;
-  options.magnetic_field_z = m_magneticFieldZ;
-
-  const auto positiveRecords = pending.positive.size();
-  const auto negativeRecords = pending.negative.size();
-  const auto voxelCenter = getVoxelCenter(voxel);
-
-  ++m_batches;
-  for (std::size_t ipos = 0; ipos < positiveRecords; ++ipos)
-  {
-    const auto& positive = pending.positive[ipos];
-
-    for (std::size_t ineg = 0; ineg < negativeRecords; ++ineg)
-    {
-      const auto& negative = pending.negative[ineg];
-      if (sameTrack(positive, negative))
-      {
-        continue;
-      }
-
-      const auto result = computeCPMPair(
-          makeCPMPairInput(positive),
-          makeCPMPairInput(negative),
-          voxelCenter,
-          options);
-      if (result.status == CPMPairStatus::PtRejected ||
-          result.status == CPMPairStatus::InvalidWeight)
-      {
-        continue;
-      }
-
-      ++m_candidate_pairs;
-      if (!result.accepted())
-      {
-        continue;
-      }
-
-      m_correctionContainer.add_sample(
-          cellIndex,
-          result.delta_r,
-          result.delta_phi,
-          result.delta_rphi,
-          result.delta_z,
-          result.dca,
-          result.pair_weight);
-      ++m_accepted_pairs;
-    }
+    m_voxelContainer.add(std::move(record));
   }
 }
 
@@ -673,17 +447,6 @@ int PHCPMTpcCalibration::writeOutput() const
   unsigned long long acceptedTracks = m_accepted_tracks;
   unsigned long long totalStates = m_total_states;
   unsigned long long acceptedStates = m_accepted_states;
-  unsigned long long candidatePairs = m_candidate_pairs;
-  unsigned long long acceptedPairs = m_accepted_pairs;
-  unsigned long long batches = m_batches;
-  unsigned long long finalFlushBatches = m_final_flush_batches;
-  unsigned long long finalFlushPositiveRecords = m_final_flush_positive_records;
-  unsigned long long finalFlushNegativeRecords = m_final_flush_negative_records;
-  unsigned long long unflushedPositiveRecords = m_unflushed_positive_records;
-  unsigned long long unflushedNegativeRecords = m_unflushed_negative_records;
-  unsigned int runningBatchSize = m_runningBatchSize;
-  double maxPairDca = m_maxPairDca;
-  double magneticFieldZ = m_magneticFieldZ;
   bool writeRecords = m_writeRecords;
 
   metadata.Branch("phi_bins", &phiBins);
@@ -698,17 +461,6 @@ int PHCPMTpcCalibration::writeOutput() const
   metadata.Branch("accepted_tracks", &acceptedTracks);
   metadata.Branch("total_states", &totalStates);
   metadata.Branch("accepted_states", &acceptedStates);
-  metadata.Branch("candidate_pairs", &candidatePairs);
-  metadata.Branch("accepted_pairs", &acceptedPairs);
-  metadata.Branch("batches", &batches);
-  metadata.Branch("final_flush_batches", &finalFlushBatches);
-  metadata.Branch("final_flush_positive_records", &finalFlushPositiveRecords);
-  metadata.Branch("final_flush_negative_records", &finalFlushNegativeRecords);
-  metadata.Branch("unflushed_positive_records", &unflushedPositiveRecords);
-  metadata.Branch("unflushed_negative_records", &unflushedNegativeRecords);
-  metadata.Branch("running_batch_size", &runningBatchSize);
-  metadata.Branch("max_pair_dca", &maxPairDca);
-  metadata.Branch("magnetic_field_z", &magneticFieldZ);
   metadata.Branch("write_records", &writeRecords);
   metadata.Fill();
 
@@ -717,7 +469,6 @@ int PHCPMTpcCalibration::writeOutput() const
   {
     records->Write();
   }
-  m_correctionContainer.Write(m_outputObjectName.c_str());
   metadata.Write();
   output->Close();
 
@@ -862,20 +613,6 @@ unsigned int PHCPMTpcCalibration::countTrackClusters(const SvtxTrack* track, con
     }
   }
   return out;
-}
-
-bool PHCPMTpcCalibration::sameTrack(
-    const TrackStateRecord& lhs,
-    const TrackStateRecord& rhs)
-{
-  return lhs.event_ref.cluster_source == rhs.event_ref.cluster_source &&
-         lhs.event_ref.track_source == rhs.event_ref.track_source &&
-         lhs.event_ref.run == rhs.event_ref.run &&
-         lhs.event_ref.segment == rhs.event_ref.segment &&
-         lhs.event_ref.sync_event == rhs.event_ref.sync_event &&
-         lhs.event_ref.event_sequence == rhs.event_ref.event_sequence &&
-         lhs.event_ref.stream_event_ordinal == rhs.event_ref.stream_event_ordinal &&
-         lhs.track_ref.track_id == rhs.track_ref.track_id;
 }
 
 bool PHCPMTpcCalibration::isCloserToVoxelCenter(

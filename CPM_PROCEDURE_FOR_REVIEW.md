@@ -31,49 +31,35 @@ format consumed by `TpcLoadDistortionCorrection`.
 ## Job A: Record Production
 
 Job A runs inside the Fun4All reconstruction/calibration chain, immediately
-after the silicon-TPOT calibration fit. For each accepted TPC cluster associated
-with a silicon-TPOT reference track, it stores an ACTS-ready record containing:
+after the silicon-TPOT calibration fit. It does not compute CPM corrections.
+For each accepted TPC cluster associated with a silicon-TPOT reference track, it
+stores the compact ACTS-ready record needed for offline crossing calculations:
 
 - event identity: source file, run, segment, Sync event if available,
   EventHeader sequence if available, and stream ordinal;
-- track identity: track id, charge, pT, quality, and related counters when
-  available;
-- cluster identity: cluster key, hitset key, layer-like information, and
-  subsurface key when available;
+- track identity: track id, charge, and pT;
+- cluster identity: cluster key, hitset key, and subsurface key when available;
 - voxel identity: `(iphi, ir, iz)` in the 3D TPC correction grid;
-- cluster geometry: corrected cluster position, voxel center, and
-  `cluster - voxel center` offset;
-- reference state snapshot: state position, momentum, local parameters, path
-  length, and covariance.
+- cluster geometry: voxel center and `cluster - voxel center` offset;
+- reference state snapshot: state position and momentum.
 
 The Job A output is segment-friendly: each Condor job writes one compact CPM
 ROOT file, and Job B can read either a single file or a file list.
 
-Job A also fills a `CPMCorrectionContainer` during reconstruction. For each
-voxel, accepted records are kept in positive-charge and negative-charge FIFO
-queues. Whenever both queues reach the configured running threshold, CPM forms
-all opposite-charge pairs from the currently queued records in that voxel,
-accumulates the resulting distortion samples into the container, and clears the
-voxel queues before collecting the next group. This preserves event-order
-locality and avoids the large offline track reordering needed by the diagnostic
-B1 path.
-
-The mergeable `CPMCorrectionContainer` and `cpm_metadata` are the default Job A
-outputs. The flat `cpm_records` tree is a QA/diagnostic product, disabled by
-default, and should be enabled with `writeCpmRecords=true` only for B0/B1
-rehydration or offline-PoCA studies.
+The default Job A outputs are `cpm_records` and `cpm_metadata`. Extra per-record
+debugging payloads such as track quality, detector cluster/state counters,
+corrected cluster coordinates, local state parameters, covariance, and selection
+flags are separated into the `PHCPMTpcCalibrationQA` helper rather than the
+compact production tree.
 
 ## Job B: Macro Roles
 
-The Job B macros support two routes. The production route follows the
-matrix-inversion style: Job A writes additive `CPMCorrectionContainer` objects,
-and `CPM_ReconstructAverageCorrection.C` calls
-`CPMAverageCorrectionReconstruction` to merge them, calculate average voxel
-corrections, and write the final average-correction histograms plus QA objects
-in one ROOT file. The diagnostic route starts from the optional `cpm_records`
-tree produced with `writeCpmRecords=true` and uses
-`CPM_QA_RunOfflineDiagnostics.C` as the single user-facing macro; it still
-writes separate B0/B1/B2/B3 stage ROOT files for offline debugging.
+The Job B macros now use the record-based route as the main CPM workflow. B1
+loads the compact Job A `cpm_records` from many segments, computes crossing
+points offline, B2 accumulates voxel averages, and B3 writes the final
+average-correction histograms. `CPM_ReconstructAverageCorrection.C` and the
+container B2 macro remain available only for older files that still contain
+`CPMCorrectionContainer` objects.
 
 Macro responsibilities:
 
@@ -92,13 +78,9 @@ Macro responsibilities:
 - `CPM_QA_B2_AccumulateVoxelCorrections.C`: diagnostic B2 for B1 outputs. It
   accumulates B1 pair rows or B1 batch sums into one `cpm_voxel_corrections`
   row per voxel.
-- `CPM_ReconstructAverageCorrection.C`: recommended production macro. It uses
-  `CPMAverageCorrectionReconstruction` to merge Job A
-  `CPMCorrectionContainer` objects with grid/range guards, calculate weighted
-  or plain averages, and write the merged container, `cpm_voxel_corrections`,
-  `cpm_metadata`, reconstructed QA histograms, final guarded histograms, and
-  summary.
-- `CPM_B2_MergeCorrectionContainers.C`: lower-level split-stage container debug
+- `CPM_ReconstructAverageCorrection.C`: legacy macro for old
+  `CPMCorrectionContainer` outputs.
+- `CPM_B2_MergeCorrectionContainers.C`: lower-level legacy container debug
   macro. Its main product is the `cpm_voxel_corrections` TTree consumed by B3.
 - `CPM_B3_WriteAverageCorrectionHistograms.C`: convert B2 voxel rows to the
   guarded half-TPC average-correction histograms expected by the correction
@@ -106,19 +88,14 @@ Macro responsibilities:
 - `CPM_B3_CheckAverageCorrectionHistograms.C`: verify that the required B3
   histograms and summary outputs exist and have valid dimensions.
 
-The recommended production sequence is:
+The current production sequence is:
 
 ```text
-Job A output with CPMCorrectionContainer
-  -> CPM_ReconstructAverageCorrection.C
+Job A cpm_records
+  -> CPM_QA_B1_ComputePoCA.C
+  -> CPM_QA_B2_AccumulateVoxelCorrections.C
+  -> CPM_B3_WriteAverageCorrectionHistograms.C
   -> CPM_B3_CheckAverageCorrectionHistograms.C
-```
-
-The diagnostic/offline-PoCA sequence is:
-
-```text
-Job A cpm_records, with writeCpmRecords=true
-  -> CPM_QA_RunOfflineDiagnostics.C
 ```
 
 ## Job B1: Pair Construction And Crossing Estimates
@@ -179,17 +156,14 @@ Target crossing solver:
 
 ## Job B2: Voxel Accumulation
 
-In the production route, voxel accumulation now lives inside
-`CPMAverageCorrectionReconstruction`. It reads the `CPMCorrectionContainer`
-objects written by Job A, checks grid compatibility through the container merge
-guard, adds the stored per-voxel sums, and writes one `cpm_voxel_corrections`
-row per accepted voxel in the same ROOT file as the final histograms.
+In the production route, voxel accumulation lives in
+`CPM_QA_B2_AccumulateVoxelCorrections.C`. It reads B1 batch-level correction
+sums and accumulates one correction row per voxel. It can also read pair-level
+rows for backwards compatibility and detailed QA studies.
 
-The split-stage `CPM_B2_MergeCorrectionContainers.C` macro remains available
-when the intermediate voxel TTree should be produced separately. The diagnostic
-`CPM_QA_B2_AccumulateVoxelCorrections.C` can still read B1 batch-level
-correction sums and accumulate one correction row per voxel. It can also read
-pair-level rows for backwards compatibility and detailed QA studies.
+The split-stage `CPM_B2_MergeCorrectionContainers.C` and
+`CPM_ReconstructAverageCorrection.C` macros remain available only for older
+outputs that still contain `CPMCorrectionContainer` objects.
 
 Implemented averaging modes:
 

@@ -14,7 +14,7 @@ Usage:
 
 Runs the CPM Job B macro chain:
   optional QA B0 build/check event index QA
-  QA B1 crossing-point PoCA plus QA B2 voxel accumulator, or direct container average-correction reconstruction
+  B1 crossing-point PoCA plus B2 voxel accumulator from Job A cpm_records
   B3 average-correction histogram output
   B3 histogram check
   combined Job B ROOT file
@@ -57,10 +57,10 @@ Options:
   --b2-max-pair-dca VALUE       Optional B2 max pair DCA. Default: -1.0
   --b2-input-mode VALUE          B2 input source: auto, batches, or pairs.
                                 Default: auto. Auto prefers B1 batch sums.
-  --b2-containers                Directly merge Job A CPMCorrectionContainer
-                                objects and write the final average-correction
-                                output in one module-backed step. This is the
-                                matrix-inversion-aligned production path.
+  --b2-containers                Legacy path: directly merge old Job A
+                                CPMCorrectionContainer objects and write the
+                                final average-correction output in one
+                                module-backed step.
   --b2-object-name NAME          Container object name for --b2-containers.
                                 Default: CPMCorrectionContainer
   --b2-weighted                 Use B1 pair weights in B2 averaging. Default.
