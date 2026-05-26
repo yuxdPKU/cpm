@@ -43,15 +43,29 @@ pkginclude_HEADERS = \
   CPMLocalLinePoCA.h \
   CPMPairUtils.h \
   CPMRecord.h \
+  CPMRecordReader.h \
   CPMTypes.h \
   CPMVoxelContainer.h \
+  CPMVoxelContainerv1.h \
   PHCPMTpcCalibration.h \
   PHCPMTpcCalibrationQA.h
 
+ROOTDICTS = \
+  CPMVoxelContainer_Dict.cc \
+  CPMVoxelContainerv1_Dict.cc
+
+pcmdir = $(libdir)
+nobase_dist_pcm_DATA = \
+  CPMVoxelContainer_Dict_rdict.pcm \
+  CPMVoxelContainerv1_Dict_rdict.pcm
+
 libcpm_la_SOURCES = \
+  $(ROOTDICTS) \
   CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
   CPMPairUtils.cc \
+  CPMVoxelContainer.cc \
+  CPMVoxelContainerv1.cc \
   PHCPMTpcCalibration.cc \
   PHCPMTpcCalibrationQA.cc
 
@@ -73,6 +87,13 @@ test_local_line_poca_SOURCES = \
 
 test_local_line_poca_LDADD = \
   libcpm.la
+
+# Rule for generating table CINT dictionaries.
+%_Dict.cc: %.h %LinkDef.h
+	rootcint -f $@ @CINTDEFS@ $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $^
+
+# just to get the dependency
+%_Dict_rdict.pcm: %_Dict.cc ;
 
 testexternals.cc:
 	echo "//*** this is a generated file. Do not commit, do not edit" > $@

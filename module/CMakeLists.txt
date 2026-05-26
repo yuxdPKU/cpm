@@ -10,6 +10,8 @@ add_library(cpm_core
   CPMHelixPoCA.cc
   CPMLocalLinePoCA.cc
   CPMPairUtils.cc
+  CPMVoxelContainer.cc
+  CPMVoxelContainerv1.cc
 )
 
 target_include_directories(cpm_core

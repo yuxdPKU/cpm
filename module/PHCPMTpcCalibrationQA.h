@@ -1,7 +1,7 @@
 #ifndef CPM_PHCPMTPCCALIBRATIONQA_H
 #define CPM_PHCPMTPCCALIBRATIONQA_H
 
-#include "CPMVoxelContainer.h"
+#include "CPMVoxelContainerv1.h"
 
 #include <string>
 

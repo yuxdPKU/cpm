@@ -1,17 +1,20 @@
 /*
  * CPM QA Job B0 skeleton.
  *
- * This macro reads one or more Job A CPM flat ROOT files, scans cpm_records,
+ * This macro reads one or more Job A CPM ROOT files, scans cpm_records,
  * groups all referenced objects by event, and writes an event-ordered request
- * index. The next B0 step can use this index to read each mini-DST event once
- * and validate/rehydrate the requested SvtxTrack/SvtxTrackState/TrkrCluster
- * objects.
+ * index. It accepts both the current CPMVoxelContainer PHObject and older
+ * flat cpm_records trees. The next B0 step can use this index to read each
+ * mini-DST event once and validate/rehydrate the requested
+ * SvtxTrack/SvtxTrackState/TrkrCluster objects.
  *
  * Example:
  *
  *   root -l -b -q 'jobB/CPM_QA_B0_BuildEventIndex.C("jobA_CPMVoxelContainer.root",
  *                                                  "CPM_QA_B0_event_index.root")'
  */
+
+#include <CPMRecordReader.h>
 
 #include <TChain.h>
 #include <TFile.h>
@@ -24,6 +27,8 @@
 #include <string>
 #include <tuple>
 #include <vector>
+
+R__LOAD_LIBRARY(libcpm.so)
 
 namespace CPMB0
 {
@@ -69,68 +74,31 @@ void CPM_QA_B0_BuildEventIndex(
     const std::vector<std::string>& input_files,
     const std::string& output_file = "CPM_QA_B0_event_index.root")
 {
-  TChain chain("cpm_records");
-  for (const auto& file : input_files)
-  {
-    chain.Add(file.c_str());
-  }
-
-  std::string* cluster_source = nullptr;
-  std::string* track_source = nullptr;
-  int run = -1;
-  int segment = -1;
-  int sync_event = -1;
-  int event_sequence = -1;
-  unsigned long long stream_event_ordinal = 0;
-  unsigned int track_id = 0;
-  unsigned long long cluskey = 0;
-  unsigned long long hitsetkey = 0;
-  unsigned int subsurfkey = 0;
-  int iphi = -1;
-  int ir = -1;
-  int iz = -1;
-
-  chain.SetBranchAddress("cluster_source", &cluster_source);
-  chain.SetBranchAddress("track_source", &track_source);
-  chain.SetBranchAddress("run", &run);
-  chain.SetBranchAddress("segment", &segment);
-  chain.SetBranchAddress("sync_event", &sync_event);
-  chain.SetBranchAddress("event_sequence", &event_sequence);
-  chain.SetBranchAddress("stream_event_ordinal", &stream_event_ordinal);
-  chain.SetBranchAddress("track_id", &track_id);
-  chain.SetBranchAddress("cluskey", &cluskey);
-  chain.SetBranchAddress("hitsetkey", &hitsetkey);
-  chain.SetBranchAddress("subsurfkey", &subsurfkey);
-  chain.SetBranchAddress("iphi", &iphi);
-  chain.SetBranchAddress("ir", &ir);
-  chain.SetBranchAddress("iz", &iz);
-
   std::map<CPMB0::EventKey, std::set<CPMB0::ObjectRequest>> event_requests;
 
-  const auto entries = chain.GetEntries();
-  for (Long64_t entry = 0; entry < entries; ++entry)
-  {
-    chain.GetEntry(entry);
-
+  CPMRecordReader::read_records(
+      input_files,
+      [&](const CPMRecordReader::Record& input_record)
+      {
     CPMB0::EventKey event_key;
-    event_key.track_source = track_source ? *track_source : "";
-    event_key.cluster_source = cluster_source ? *cluster_source : "";
-    event_key.run = run;
-    event_key.segment = segment;
-    event_key.sync_event = sync_event;
-    event_key.event_sequence = event_sequence;
-    event_key.stream_event_ordinal = stream_event_ordinal;
+    event_key.track_source = input_record.track_source;
+    event_key.cluster_source = input_record.cluster_source;
+    event_key.run = input_record.run;
+    event_key.segment = input_record.segment;
+    event_key.sync_event = input_record.sync_event;
+    event_key.event_sequence = input_record.event_sequence;
+    event_key.stream_event_ordinal = input_record.stream_event_ordinal;
 
     CPMB0::ObjectRequest request;
-    request.track_id = track_id;
-    request.cluskey = cluskey;
-    request.hitsetkey = hitsetkey;
-    request.subsurfkey = subsurfkey;
-    request.iphi = iphi;
-    request.ir = ir;
-    request.iz = iz;
+    request.track_id = input_record.track_id;
+    request.cluskey = input_record.cluskey;
+    request.hitsetkey = input_record.hitsetkey;
+    request.subsurfkey = input_record.subsurfkey;
+    request.iphi = input_record.iphi;
+    request.ir = input_record.ir;
+    request.iz = input_record.iz;
     event_requests[event_key].insert(request);
-  }
+      });
 
   TFile output(output_file.c_str(), "RECREATE");
 

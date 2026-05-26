@@ -10,6 +10,8 @@
  * needed.
  */
 
+#include <CPMRecordReader.h>
+
 #include <CPMCorrectionAccumulator.h>
 #include <CPMPairUtils.h>
 
@@ -408,102 +410,52 @@ bool CPM_ComputeAverageCorrection(
     }
   }
 
-  TChain chain("cpm_records");
-  for (const auto& file : input_files)
-  {
-    chain.Add(file.c_str());
-  }
-
-  std::string* cluster_source = nullptr;
-  std::string* track_source = nullptr;
-  int run = -1;
-  int segment = -1;
-  int sync_event = -1;
-  int event_sequence = -1;
-  unsigned long long stream_event_ordinal = 0;
-  unsigned int track_id = 0;
-  unsigned long long cluskey = 0;
-  int charge = 0;
-  float pt = std::numeric_limits<float>::quiet_NaN();
-  int iphi = -1;
-  int ir = -1;
-  int iz = -1;
-  double voxel_x = std::numeric_limits<double>::quiet_NaN();
-  double voxel_y = std::numeric_limits<double>::quiet_NaN();
-  double voxel_z = std::numeric_limits<double>::quiet_NaN();
-  double offset_x = std::numeric_limits<double>::quiet_NaN();
-  double offset_y = std::numeric_limits<double>::quiet_NaN();
-  double offset_z = std::numeric_limits<double>::quiet_NaN();
-  double state_x = std::numeric_limits<double>::quiet_NaN();
-  double state_y = std::numeric_limits<double>::quiet_NaN();
-  double state_z = std::numeric_limits<double>::quiet_NaN();
-  double state_px = std::numeric_limits<double>::quiet_NaN();
-  double state_py = std::numeric_limits<double>::quiet_NaN();
-  double state_pz = std::numeric_limits<double>::quiet_NaN();
-
-  chain.SetBranchAddress("cluster_source", &cluster_source);
-  chain.SetBranchAddress("track_source", &track_source);
-  chain.SetBranchAddress("run", &run);
-  chain.SetBranchAddress("segment", &segment);
-  chain.SetBranchAddress("sync_event", &sync_event);
-  chain.SetBranchAddress("event_sequence", &event_sequence);
-  chain.SetBranchAddress("stream_event_ordinal", &stream_event_ordinal);
-  chain.SetBranchAddress("track_id", &track_id);
-  chain.SetBranchAddress("cluskey", &cluskey);
-  chain.SetBranchAddress("charge", &charge);
-  chain.SetBranchAddress("pt", &pt);
-  chain.SetBranchAddress("iphi", &iphi);
-  chain.SetBranchAddress("ir", &ir);
-  chain.SetBranchAddress("iz", &iz);
-  chain.SetBranchAddress("voxel_x", &voxel_x);
-  chain.SetBranchAddress("voxel_y", &voxel_y);
-  chain.SetBranchAddress("voxel_z", &voxel_z);
-  chain.SetBranchAddress("offset_x", &offset_x);
-  chain.SetBranchAddress("offset_y", &offset_y);
-  chain.SetBranchAddress("offset_z", &offset_z);
-  chain.SetBranchAddress("state_x", &state_x);
-  chain.SetBranchAddress("state_y", &state_y);
-  chain.SetBranchAddress("state_z", &state_z);
-  chain.SetBranchAddress("state_px", &state_px);
-  chain.SetBranchAddress("state_py", &state_py);
-  chain.SetBranchAddress("state_pz", &state_pz);
-
   std::map<CPMProduction::VoxelKey, std::vector<CPMProduction::Record>> records_by_voxel;
 
   CPMProduction::CalculationSummary summary;
   summary.input_files = input_files.size();
-  const auto entries = chain.GetEntries();
-  summary.input_records = entries;
-  for (Long64_t entry = 0; entry < entries; ++entry)
-  {
-    chain.GetEntry(entry);
-
+  summary.input_records = CPMRecordReader::read_records(
+      input_files,
+      [&](const CPMRecordReader::Record& input_record)
+      {
     CPMProduction::Record record;
-    record.entry = entry;
-    record.event_track.cluster_source = cluster_source ? *cluster_source : "";
-    record.event_track.track_source = track_source ? *track_source : "";
-    record.event_track.run = run;
-    record.event_track.segment = segment;
-    record.event_track.sync_event = sync_event;
-    record.event_track.event_sequence = event_sequence;
-    record.event_track.stream_event_ordinal = stream_event_ordinal;
-    record.event_track.track_id = track_id;
-    record.cluskey = cluskey;
-    record.charge = charge;
-    record.pt = pt;
-    record.voxel = {iphi, ir, iz};
-    record.voxel_center = {voxel_x, voxel_y, voxel_z};
-    record.offset = {offset_x, offset_y, offset_z};
-    record.state_position = {state_x, state_y, state_z};
-    record.state_momentum = {state_px, state_py, state_pz};
+    record.entry = input_record.entry;
+    record.event_track.cluster_source = input_record.cluster_source;
+    record.event_track.track_source = input_record.track_source;
+    record.event_track.run = input_record.run;
+    record.event_track.segment = input_record.segment;
+    record.event_track.sync_event = input_record.sync_event;
+    record.event_track.event_sequence = input_record.event_sequence;
+    record.event_track.stream_event_ordinal = input_record.stream_event_ordinal;
+    record.event_track.track_id = input_record.track_id;
+    record.cluskey = input_record.cluskey;
+    record.charge = input_record.charge;
+    record.pt = input_record.pt;
+    record.voxel = {input_record.iphi, input_record.ir, input_record.iz};
+    record.voxel_center = {
+        input_record.voxel_center.x,
+        input_record.voxel_center.y,
+        input_record.voxel_center.z};
+    record.offset = {
+        input_record.offset.x,
+        input_record.offset.y,
+        input_record.offset.z};
+    record.state_position = {
+        input_record.state_position.x,
+        input_record.state_position.y,
+        input_record.state_position.z};
+    record.state_momentum = {
+        input_record.state_momentum.x,
+        input_record.state_momentum.y,
+        input_record.state_momentum.z};
 
     if (record.voxel.iphi < 0 || record.voxel.ir < 0 || record.voxel.iz < 0)
     {
-      continue;
+      return;
     }
 
     records_by_voxel[record.voxel].push_back(record);
-  }
+      });
   summary.input_voxels = records_by_voxel.size();
 
   CPMPairOptions pair_options;
