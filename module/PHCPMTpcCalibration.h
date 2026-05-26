@@ -1,7 +1,7 @@
 #ifndef CPM_PHCPMTPCCALIBRATION_H
 #define CPM_PHCPMTPCCALIBRATION_H
 
-#include "CPMVoxelContainer.h"
+#include "CPMVoxelContainerv1.h"
 
 #include <fun4all/SubsysReco.h>
 #include <tpc/TpcGlobalPositionWrapper.h>
@@ -71,7 +71,7 @@ class PHCPMTpcCalibration : public SubsysReco
  private:
   int getNodes(PHCompositeNode* topNode);
   int processTracks();
-  int writeOutput() const;
+  int writeOutput();
   void addRecord(TrackStateRecord record);
 
   bool checkTrack(const SvtxTrack* track) const;

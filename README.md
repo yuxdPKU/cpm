@@ -27,9 +27,9 @@ registration block after the second Si-TPOT fit with `PHCPMTpcCalibration`.
 
 Job A writes a ROOT file with:
 
-- `cpm_records`: one compact ACTS-ready TPC state/voxel record per row. This is
-  the production Job A product for offline CPM calculation and is written by
-  default.
+- `cpm_records`: compact `CPMVoxelContainerv1` PHObject. It is keyed by
+  `(iphi, ir, iz)` and each voxel owns a vector of the track-state records used
+  by the offline CPM calculation.
 - `cpm_metadata`: grid and counter metadata for the Job A segment.
 - `cpm_qa_records`: detailed QA tree written by the standard Job A macros
   through `PHCPMTpcCalibration::setWriteQARecords(true)`.
@@ -38,9 +38,9 @@ Job A writes a ROOT file with:
 Job A. A single DST/segment often does not contain enough tracks per voxel, so
 crossing-point pairing and averaging are done offline across the full file list.
 Extra per-record debugging payloads such as track quality, detector counters,
-cluster coordinates, covariance, and selection flags belong in the separate
+cluster coordinates, covariance, and selection flags belong in the flat
 `PHCPMTpcCalibrationQA` output tree and are not part of the compact production
-`cpm_records` tree by default.
+`cpm_records` container object by default.
 
 For the cluster-DST production mode, Job A stores `cluster_source` as the input
 cluster DST and `track_source` as the optional CPM mini-DST containing
@@ -61,10 +61,14 @@ Job A cpm_records
 ```
 
 `CPM_ComputeAverageCorrection.C` is the production calculation macro. It reads
-one Job A file or a file list, checks grid metadata consistency, forms
-opposite-charge crossing pairs, accumulates plain or weighted voxel averages,
-and writes the final guarded average-correction histograms. It intentionally
-does not write pair trees, batch trees, or per-voxel diagnostic trees.
+one Job A file or a file list, checks grid metadata consistency, loads the
+`cpm_records` `CPMVoxelContainer` object, forms opposite-charge crossing pairs,
+accumulates plain or weighted voxel averages, and writes the final guarded
+average-correction histograms. It intentionally does not write pair trees,
+batch trees, or per-voxel diagnostic trees.
+The ROOT-file compatibility and `cpm_records` decoding are handled by the
+module-level `CPMRecordReader` helper so the Job B macros only orchestrate the
+calculation.
 
 `CPM_QA_RunOfflineDiagnostics.C` is the single user-facing macro for the
 record-based offline diagnostic path. It can run optional B0 event-index QA,
@@ -78,10 +82,10 @@ index is self-consistent before any later mini-DST readback study. These macros
 require Job A to have written `cpm_records`.
 
 `CPM_QA_B1_ComputePoCA.C` is the offline PoCA diagnostic step. It reads
-`cpm_records`, groups records by voxel, applies the intra-voxel offset shift,
-forms opposite-charge pairs, and computes crossing points with either the
-default helix solver or the local line solver. It can write detailed pair rows
-and batch-level correction sums for solver comparisons and QA.
+`cpm_records`, applies the intra-voxel offset shift, forms opposite-charge
+pairs, and computes crossing points with either the default helix solver or the
+local line solver. It can write detailed pair rows and batch-level correction
+sums for solver comparisons and QA.
 It also requires `cpm_records` from Job A.
 
 `CPM_QA_B2_AccumulateVoxelCorrections.C` is the B2 stage paired with B1. It

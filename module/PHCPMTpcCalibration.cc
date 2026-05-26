@@ -34,126 +34,6 @@
 #include <string>
 #include <utility>
 
-namespace
-{
-  struct CPMRecordTreeFields
-  {
-    std::string cluster_source;
-    std::string track_source;
-    std::string track_map_name;
-
-    int run = -1;
-    int segment = -1;
-    int sync_event = -1;
-    int event_sequence = -1;
-    unsigned long long stream_event_ordinal = 0;
-
-    unsigned int track_id = InvalidTrackId;
-    int charge = 0;
-    float pt = std::numeric_limits<float>::quiet_NaN();
-
-    unsigned long long cluskey = InvalidClusterKey;
-    unsigned long long hitsetkey = InvalidHitSetKey;
-    unsigned int subsurfkey = InvalidSubSurfKey;
-
-    int iphi = -1;
-    int ir = -1;
-    int iz = -1;
-
-    double voxel_x = std::numeric_limits<double>::quiet_NaN();
-    double voxel_y = std::numeric_limits<double>::quiet_NaN();
-    double voxel_z = std::numeric_limits<double>::quiet_NaN();
-    double offset_x = std::numeric_limits<double>::quiet_NaN();
-    double offset_y = std::numeric_limits<double>::quiet_NaN();
-    double offset_z = std::numeric_limits<double>::quiet_NaN();
-
-    double state_x = std::numeric_limits<double>::quiet_NaN();
-    double state_y = std::numeric_limits<double>::quiet_NaN();
-    double state_z = std::numeric_limits<double>::quiet_NaN();
-    double state_px = std::numeric_limits<double>::quiet_NaN();
-    double state_py = std::numeric_limits<double>::quiet_NaN();
-    double state_pz = std::numeric_limits<double>::quiet_NaN();
-
-    void copy_from(const TrackStateRecord& record)
-    {
-      cluster_source = record.event_ref.cluster_source;
-      track_source = record.event_ref.track_source;
-      track_map_name = record.track_ref.track_map_name;
-
-      run = record.event_ref.run;
-      segment = record.event_ref.segment;
-      sync_event = record.event_ref.sync_event;
-      event_sequence = record.event_ref.event_sequence;
-      stream_event_ordinal = record.event_ref.stream_event_ordinal;
-
-      track_id = record.track_ref.track_id;
-      charge = record.track.charge;
-      pt = record.track.pt;
-
-      cluskey = record.cluster_ref.cluskey;
-      hitsetkey = record.cluster_ref.hitsetkey;
-      subsurfkey = record.cluster_ref.subsurfkey;
-
-      iphi = record.voxel.iphi;
-      ir = record.voxel.ir;
-      iz = record.voxel.iz;
-
-      voxel_x = record.cluster.voxel_center.x;
-      voxel_y = record.cluster.voxel_center.y;
-      voxel_z = record.cluster.voxel_center.z;
-      offset_x = record.cluster.cluster_minus_voxel_center.x;
-      offset_y = record.cluster.cluster_minus_voxel_center.y;
-      offset_z = record.cluster.cluster_minus_voxel_center.z;
-
-      state_x = record.state.position.x;
-      state_y = record.state.position.y;
-      state_z = record.state.position.z;
-      state_px = record.state.momentum.x;
-      state_py = record.state.momentum.y;
-      state_pz = record.state.momentum.z;
-    }
-  };
-
-  void book_cpm_record_tree(TTree& tree, CPMRecordTreeFields& fields)
-  {
-    tree.Branch("cluster_source", &fields.cluster_source);
-    tree.Branch("track_source", &fields.track_source);
-    tree.Branch("track_map_name", &fields.track_map_name);
-
-    tree.Branch("run", &fields.run);
-    tree.Branch("segment", &fields.segment);
-    tree.Branch("sync_event", &fields.sync_event);
-    tree.Branch("event_sequence", &fields.event_sequence);
-    tree.Branch("stream_event_ordinal", &fields.stream_event_ordinal);
-
-    tree.Branch("track_id", &fields.track_id);
-    tree.Branch("charge", &fields.charge);
-    tree.Branch("pt", &fields.pt);
-
-    tree.Branch("cluskey", &fields.cluskey);
-    tree.Branch("hitsetkey", &fields.hitsetkey);
-    tree.Branch("subsurfkey", &fields.subsurfkey);
-
-    tree.Branch("iphi", &fields.iphi);
-    tree.Branch("ir", &fields.ir);
-    tree.Branch("iz", &fields.iz);
-
-    tree.Branch("voxel_x", &fields.voxel_x);
-    tree.Branch("voxel_y", &fields.voxel_y);
-    tree.Branch("voxel_z", &fields.voxel_z);
-    tree.Branch("offset_x", &fields.offset_x);
-    tree.Branch("offset_y", &fields.offset_y);
-    tree.Branch("offset_z", &fields.offset_z);
-
-    tree.Branch("state_x", &fields.state_x);
-    tree.Branch("state_y", &fields.state_y);
-    tree.Branch("state_z", &fields.state_z);
-    tree.Branch("state_px", &fields.state_px);
-    tree.Branch("state_py", &fields.state_py);
-    tree.Branch("state_pz", &fields.state_pz);
-  }
-}
-
 PHCPMTpcCalibration::PHCPMTpcCalibration(const std::string& name)
   : SubsysReco(name)
 {
@@ -180,6 +60,11 @@ int PHCPMTpcCalibration::InitRun(PHCompositeNode* topNode)
 
   m_zMax = m_tGeometry->get_max_driftlength() + m_tGeometry->get_CM_halfwidth();
   m_zMin = -m_zMax;
+  m_voxelContainer.set_grid(
+      m_phiBins, m_rBins, m_zBins,
+      m_rMin, m_rMax,
+      m_zMin, m_zMax,
+      m_phiMin, m_phiMax);
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -224,6 +109,11 @@ void PHCPMTpcCalibration::setGridDimensions(const int phiBins, const int rBins, 
   m_phiBins = phiBins;
   m_rBins = rBins;
   m_zBins = zBins;
+  m_voxelContainer.set_grid(
+      m_phiBins, m_rBins, m_zBins,
+      m_rMin, m_rMax,
+      m_zMin, m_zMax,
+      m_phiMin, m_phiMax);
 }
 
 int PHCPMTpcCalibration::getNodes(PHCompositeNode* topNode)
@@ -409,7 +299,7 @@ bool PHCPMTpcCalibration::getVoxelId(const Vector3& position, VoxelId& voxel) co
   return voxel.valid();
 }
 
-int PHCPMTpcCalibration::writeOutput() const
+int PHCPMTpcCalibration::writeOutput()
 {
   auto output = std::unique_ptr<TFile>(TFile::Open(m_outputfile.c_str(), "RECREATE"));
   if (!output || output->IsZombie())
@@ -428,23 +318,9 @@ int PHCPMTpcCalibration::writeOutput() const
   output->cd();
   if (m_writeRecords)
   {
-    CPMRecordTreeFields fields;
-    TTree records("cpm_records", "CPM ACTS-ready voxel records");
-    records.SetDirectory(nullptr);
-    book_cpm_record_tree(records, fields);
-
-    for (const auto& [voxel, voxelRecords] : m_voxelContainer)
-    {
-      (void) voxel;
-      for (const auto& record : voxelRecords)
-      {
-        fields.copy_from(record);
-        records.Fill();
-      }
-    }
-
+    m_voxelContainer.sort_records();
     output->cd();
-    records.Write();
+    m_voxelContainer.Write("cpm_records");
   }
 
   TTree metadata("cpm_metadata", "CPM Job A metadata");
@@ -463,6 +339,9 @@ int PHCPMTpcCalibration::writeOutput() const
   unsigned long long acceptedStates = m_accepted_states;
   bool writeRecords = m_writeRecords;
   bool writeQARecords = m_writeQARecords;
+  bool cpmRecordsVoxelGrouped = true;
+  int cpmRecordsLayoutVersion = 3;
+  std::string cpmRecordsStorage = "CPMVoxelContainerv1";
 
   metadata.Branch("phi_bins", &phiBins);
   metadata.Branch("r_bins", &rBins);
@@ -478,6 +357,9 @@ int PHCPMTpcCalibration::writeOutput() const
   metadata.Branch("accepted_states", &acceptedStates);
   metadata.Branch("write_records", &writeRecords);
   metadata.Branch("write_qa_records", &writeQARecords);
+  metadata.Branch("cpm_records_voxel_grouped", &cpmRecordsVoxelGrouped);
+  metadata.Branch("cpm_records_layout_version", &cpmRecordsLayoutVersion);
+  metadata.Branch("cpm_records_storage", &cpmRecordsStorage);
   metadata.Fill();
 
   output->cd();

@@ -2,7 +2,7 @@
 #include "CPMHelixPoCA.h"
 #include "CPMLocalLinePoCA.h"
 #include "CPMPairUtils.h"
-#include "CPMVoxelContainer.h"
+#include "CPMVoxelContainerv1.h"
 
 #include <cassert>
 #include <cmath>
@@ -55,6 +55,7 @@ int main()
     second.cluster.cluster_minus_voxel_center = {0.1, 0.0, 0.0};
 
     VoxelContainer container;
+    container.set_grid(36, 16, 80, 20.0, 78.0, -105.5, 105.5);
     container.add(first);
     container.add(second);
 
@@ -64,12 +65,44 @@ int main()
     const auto records = container.find({1, 2, 3});
     assert(records != nullptr);
     assert(records->size() == 2);
+    assert(container.record_count({1, 2, 3}) == 2);
+    assert(container.find_by_index(1, 2, 3) == records);
 
     const auto result = computeVoxelCenterPoCA(records->at(0), records->at(1));
     assert(result.valid);
     assert(near(result.midpoint.x, 0.0));
     assert(near(result.midpoint.y, 0.0));
     assert(near(result.midpoint.z, 0.0));
+  }
+
+  {
+    TrackStateRecord first;
+    first.voxel = {0, 0, 0};
+    first.event_ref.run = 1;
+    first.event_ref.event_sequence = 5;
+    first.track_ref.track_id = 2;
+    first.cluster_ref.cluskey = 20;
+
+    TrackStateRecord second;
+    second.voxel = {0, 0, 0};
+    second.event_ref.run = 1;
+    second.event_ref.event_sequence = 3;
+    second.track_ref.track_id = 1;
+    second.cluster_ref.cluskey = 10;
+
+    VoxelContainer lhs;
+    lhs.set_grid(4, 4, 4, 0.0, 4.0, -2.0, 2.0);
+    lhs.add(first);
+
+    VoxelContainer rhs;
+    rhs.add(second);
+    lhs.add(rhs);
+
+    const auto records = lhs.find_by_position(0.1, 0.5, -1.5);
+    assert(records != nullptr);
+    assert(records->size() == 2);
+    assert(records->at(0).event_ref.event_sequence == 3);
+    assert(records->at(1).event_ref.event_sequence == 5);
   }
 
   {

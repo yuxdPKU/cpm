@@ -47,20 +47,23 @@ The Job A output is segment-friendly: each Condor job writes one compact CPM
 ROOT file, and Job B can read either a single file or a file list.
 
 The standard Job A outputs are `cpm_records`, `cpm_metadata`, and
-`cpm_qa_records`. Extra per-record debugging payloads such as track quality,
+`cpm_qa_records`. The production `cpm_records` object is a
+`CPMVoxelContainerv1` PHObject: it is keyed by `(iphi, ir, iz)` voxel and each
+voxel owns the compact track-state records used by CPM. Extra per-record
+debugging payloads such as track quality,
 detector cluster/state counters, corrected cluster coordinates, local state
-parameters, covariance, and selection flags are written to `cpm_qa_records`
-through the `PHCPMTpcCalibrationQA` helper. They stay out of the compact
-production tree.
+parameters, covariance, and selection flags are written to the flat
+`cpm_qa_records` tree through the `PHCPMTpcCalibrationQA` helper. They stay out
+of the compact production object.
 
 ## Job B: Macro Roles
 
 The Job B macros use the record-based route as the main CPM workflow. The
 production path is now concentrated in one macro:
-`CPM_ComputeAverageCorrection.C`. It loads compact Job A `cpm_records` from many
-segments, computes crossing points offline, accumulates voxel averages, and
-writes the final average-correction histograms. The `CPM_QA_*` macros own the
-extra diagnostic products.
+`CPM_ComputeAverageCorrection.C`. It loads compact Job A `cpm_records`
+containers from many segments, computes crossing points offline, accumulates
+voxel averages, and writes the final average-correction histograms. The
+`CPM_QA_*` macros own the extra diagnostic products.
 
 Macro responsibilities:
 
@@ -70,9 +73,9 @@ Macro responsibilities:
 - `CPM_QA_B0_CheckEventIndex.C`: validate the B0 event/object request index before
   any sequential readback is attempted.
 - `CPM_ComputeAverageCorrection.C`: production Job B calculation. It reads Job A
-  records, checks metadata consistency, forms opposite-charge pairs, accumulates
-  plain or weighted voxel averages directly, and writes the final B3 histograms
-  plus a compact summary tree.
+  voxel containers, checks metadata consistency, forms opposite-charge pairs,
+  accumulates plain or weighted voxel averages directly, and writes the final B3
+  histograms plus a compact summary tree.
 - `CPM_QA_RunOfflineDiagnostics.C`: record-based diagnostic driver. It can run
   optional B0 QA and then writes the B1 PoCA, B2 voxel-correction, and B3
   histogram stage outputs from one macro call.
