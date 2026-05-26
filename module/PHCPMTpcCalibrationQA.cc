@@ -197,8 +197,9 @@ void PHCPMTpcCalibrationQA::write_records(
     const std::string& tree_name)
 {
   output.cd();
-  TTree tree(tree_name.c_str(), "CPM detailed track-state QA records");
   CPMQARecordTreeFields fields;
+  TTree tree(tree_name.c_str(), "CPM detailed track-state QA records");
+  tree.SetDirectory(nullptr);
   book_tree(tree, fields);
 
   for (const auto& [voxel, voxel_records] : records)
