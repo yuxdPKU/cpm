@@ -64,7 +64,6 @@ libcpm_la_SOURCES = \
   CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
   CPMPairUtils.cc \
-  CPMVoxelContainer.cc \
   CPMVoxelContainerv1.cc \
   PHCPMTpcCalibration.cc \
   PHCPMTpcCalibrationQA.cc

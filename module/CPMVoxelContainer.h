@@ -3,39 +3,10 @@
 
 #include "CPMRecord.h"
 
-#include <iostream>
-
-#if __has_include(<phool/PHObject.h>)
 #include <phool/PHObject.h>
-#elif __has_include(<TObject.h>)
-#include <TObject.h>
-#define CPM_FALLBACK_PHOBJECT_WITH_ROOT 1
-class PHObject : public TObject
-{
- public:
-  ~PHObject() override = default;
-  virtual void identify(std::ostream& = std::cout) const {}
-  virtual void Reset() {}
-  virtual int isValid() const { return 0; }
-
- private:
-  ClassDefOverride(PHObject, 0)
-};
-#else
-#ifndef ClassDefOverride
-#define ClassDefOverride(name, version)
-#endif
-class PHObject
-{
- public:
-  virtual ~PHObject() = default;
-  virtual void identify(std::ostream& = std::cout) const {}
-  virtual void Reset() {}
-  virtual int isValid() const { return 0; }
-};
-#endif
 
 #include <cstddef>
+#include <iostream>
 #include <map>
 #include <vector>
 

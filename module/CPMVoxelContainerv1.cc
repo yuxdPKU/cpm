@@ -1,13 +1,7 @@
 #include "CPMVoxelContainerv1.h"
 
-#ifndef ClassImp
-#define ClassImp(name)
-#endif
-
 #include <iostream>
 #include <utility>
-
-ClassImp(CPMVoxelContainerv1)
 
 void CPMVoxelContainerv1::identify(std::ostream& out) const
 {
