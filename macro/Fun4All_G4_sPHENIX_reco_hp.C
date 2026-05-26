@@ -37,16 +37,22 @@ R__LOAD_LIBRARY(libfun4all.so)
 //R__LOAD_LIBRARY(libg4eval_hp.so)
 R__LOAD_LIBRARY(libcpm.so)
 
+//#define USE_ACTS
+
 //____________________________________________________________________
 int Fun4All_G4_sPHENIX_reco_hp(
     const int nEvents = 10,
     const std::string inputFile = "~/hftg01/DST_FOR_DISTORTION/SimulationDST/G4Hits-00000.root",
     const std::string outdir = "root/",
+#ifdef USE_ACTS
     const std::string outfilename = "dst_sim_acts",
+#else
+    const std::string outfilename = "dst_sim_genfit",
+#endif
     const int index = 0,
     const int stepsize = 10,
     const int segment = 0,
-    const bool writeMiniDst = true,
+    const bool writeMiniDst = false,
     const bool writePrunedSeedsToMiniDst = false)
 {
   // print inputs
@@ -112,7 +118,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
 
   // server
   auto se = Fun4AllServer::instance();
-  // se->Verbosity(2);
+  se->Verbosity(1);
 
   // input manager
   auto in = new Fun4AllDstInputManager("DSTin");
@@ -210,6 +216,8 @@ int Fun4All_G4_sPHENIX_reco_hp(
   // track fit
   se->registerSubsystem(new PHTpcDeltaZCorrection);
 
+  #ifdef USE_ACTS
+  std::cout<<"Using ACTS fit"<<std::endl;
   // perform final track fit with ACTS
   auto actsFit = new PHActsTrkFitter;
   actsFit->Verbosity(0);
@@ -306,6 +314,63 @@ int Fun4All_G4_sPHENIX_reco_hp(
       se->registerOutputManager(out);
     }
   }
+  #else
+
+  std::cout<<"Using Genfit"<<std::endl;
+  // perform final track fit with GENFIT
+  auto genfitFit = new PHGenFitTrkFitter;
+  genfitFit->set_fit_silicon_mms(G4TRACKING::SC_CALIBMODE);
+  genfitFit->set_svtx_track_map_name("SvtxSiliconMMTrackMap");
+  se->registerSubsystem(genfitFit);
+
+  std::string cpmstring;
+  std::string cpmmindststring;
+  std::string cpmmindstfinalstring;
+  if (G4TRACKING::SC_CALIBMODE)
+  {
+    auto cpmreco = new PHCPMTpcCalibration;
+    const TString cpmoutfile = theOutfile + "_CPMVoxelContainer.root";
+    cpmstring = cpmoutfile.Data();
+    cpmmindststring = theOutfile + "_cpm_mini_dst.root";
+    cpmmindstfinalstring = outputDirMove + outputBase + "_cpm_mini_dst.root";
+
+    cpmreco->setOutputfile(cpmstring);
+    //cpmreco->setClusterSource(inputclusterFile);//cluster is generated on the fly
+    cpmreco->setTrackSource(writeMiniDst ? cpmmindstfinalstring : "");
+    cpmreco->setRunSegment(runnumber, segment);
+    cpmreco->setTrackMapName("SvtxSiliconMMTrackMap");
+    cpmreco->setWriteRecords(true);
+    cpmreco->setWriteQARecords(true);
+    cpmreco->setMinPt(0.5);
+    cpmreco->requireCrossing(false);
+    cpmreco->requireTPOT(true);
+    // CPM does not apply the legacy PHTpcResiduals central-membrane requirement.
+    cpmreco->disableAverageCorr();
+    cpmreco->setGridDimensions(36, 16, 80);
+    se->registerSubsystem(cpmreco);
+
+    if (!writeMiniDst)
+    {
+      std::cout << "Fun4All_G4_sPHENIX_reco_hp - writeMiniDst is false. "
+                << "CPM snapshots remain usable, but SvtxTrack object rehydration is disabled."
+                << std::endl;
+    }
+    if (writeMiniDst)
+    {
+      auto out = new Fun4AllDstOutputManager("CPMMiniDstOutput", cpmmindststring);
+      out->AddNode("Sync");
+      out->AddNode("EventHeader");
+      out->AddNode("SvtxSiliconMMTrackMap");
+      if (writePrunedSeedsToMiniDst)
+      {
+        out->AddNode("PrunedSvtxTrackSeedContainer");
+      }
+      se->registerOutputManager(out);
+    }
+  }
+
+  #endif
+
 
   Enable::QA = false;
   if (Enable::QA)

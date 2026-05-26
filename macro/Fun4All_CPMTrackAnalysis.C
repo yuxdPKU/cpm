@@ -71,7 +71,7 @@ void Fun4All_CPMTrackAnalysis(
     const int index = 0,
     const int stepsize = 10,
     const bool convertSeeds = false,
-    const bool writeMiniDst = true,
+    const bool writeMiniDst = false,
     const bool writePrunedSeedsToMiniDst = false)
 {
   std::string inputclusterFile = clusterfilename;
