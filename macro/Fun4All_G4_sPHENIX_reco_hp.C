@@ -13,6 +13,11 @@
 #include <trackreco/PHTrackPruner.h>
 #include <PHCPMTpcCalibration.h>
 
+#include <algorithm>
+#include <cctype>
+#include <iostream>
+#include <string>
+
 /*
 // own modules
 #include <g4eval_hp/EventCounter_hp.h>
@@ -37,27 +42,99 @@ R__LOAD_LIBRARY(libfun4all.so)
 //R__LOAD_LIBRARY(libg4eval_hp.so)
 R__LOAD_LIBRARY(libcpm.so)
 
-//#define USE_ACTS
+namespace CPMRecoFitMode
+{
+  std::string normalize(std::string value)
+  {
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](const unsigned char character)
+        {
+          return static_cast<char>(std::tolower(character));
+        });
+    value.erase(
+        std::remove_if(
+            value.begin(),
+            value.end(),
+            [](const unsigned char character)
+            {
+              return character == '_' || character == '-' || std::isspace(character);
+            }),
+        value.end());
+    return value;
+  }
+
+  bool resolve_use_acts(
+      const std::string& requested_mode,
+      const std::string& output_prefix,
+      bool& valid)
+  {
+    valid = true;
+    const std::string mode = normalize(requested_mode);
+    if (mode == "acts" || mode == "actsfit")
+    {
+      return true;
+    }
+    if (mode == "genfit" || mode == "gen")
+    {
+      return false;
+    }
+    if (mode != "auto" && !mode.empty())
+    {
+      valid = false;
+      return false;
+    }
+
+    const std::string normalized_prefix = normalize(output_prefix);
+    if (normalized_prefix.find("acts") != std::string::npos)
+    {
+      return true;
+    }
+    if (normalized_prefix.find("genfit") != std::string::npos ||
+        normalized_prefix.find("gen") != std::string::npos)
+    {
+      return false;
+    }
+    return false;
+  }
+}
 
 //____________________________________________________________________
 int Fun4All_G4_sPHENIX_reco_hp(
     const int nEvents = 10,
     const std::string inputFile = "~/hftg01/DST_FOR_DISTORTION/SimulationDST/G4Hits-00000.root",
     const std::string outdir = "root/",
-#ifdef USE_ACTS
-    const std::string outfilename = "dst_sim_acts",
-#else
-    const std::string outfilename = "dst_sim_genfit",
-#endif
+    const std::string outfilename = "",
     const int index = 0,
     const int stepsize = 10,
     const int segment = 0,
     const bool writeMiniDst = false,
-    const bool writePrunedSeedsToMiniDst = false)
+    const bool writePrunedSeedsToMiniDst = false,
+    const std::string fitMode = "auto")
 {
+  bool validFitMode = false;
+  const bool useActsFit = CPMRecoFitMode::resolve_use_acts(
+      fitMode,
+      outfilename,
+      validFitMode);
+  if (!validFitMode)
+  {
+    std::cout << "Fun4All_G4_sPHENIX_reco_hp - invalid fitMode: " << fitMode
+              << " (expected auto, acts, actsfit, genfit, or gen)" << std::endl;
+    return 1;
+  }
+  const std::string resolvedOutfilename = !outfilename.empty() ?
+      outfilename :
+      (useActsFit ? "dst_sim_acts" : "dst_sim_genfit");
+
   // print inputs
   std::cout << "Fun4All_G4_sPHENIX_reco_hp - nEvents: " << nEvents << std::endl;
   std::cout << "Fun4All_G4_sPHENIX_reco_hp - inputFile: " << inputFile << std::endl;
+  std::cout << "Fun4All_G4_sPHENIX_reco_hp - output prefix: " << resolvedOutfilename << std::endl;
+  std::cout << "Fun4All_G4_sPHENIX_reco_hp - fit mode: "
+            << (useActsFit ? "actsfit" : "genfit") << std::endl;
 
   // options
   Enable::PIPE = true;
@@ -106,7 +183,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
   std::cout<< "Fun4All_CombinedDataReconstruction - tpc_drift_velocity_reco: " << G4TPC::tpc_drift_velocity_reco << std::endl;
 
   int runnumber=0;
-  const std::string outputBase = outfilename + "_" + std::to_string(runnumber) + "-" + std::to_string(segment) + ".root";
+  const std::string outputBase = resolvedOutfilename + "_" + std::to_string(runnumber) + "-" + std::to_string(segment) + ".root";
   const std::string outDir = outdir + "/inReconstruction/" + std::to_string(runnumber) + "/";
   const std::string outputDirMove = outdir + "/Reconstructed/" + std::to_string(runnumber) + "/";
   const std::string makeDirectoryMove = "mkdir -p " + outputDirMove;
@@ -216,7 +293,12 @@ int Fun4All_G4_sPHENIX_reco_hp(
   // track fit
   se->registerSubsystem(new PHTpcDeltaZCorrection);
 
-  #ifdef USE_ACTS
+  std::string cpmstring;
+  std::string cpmmindststring;
+  std::string cpmmindstfinalstring;
+
+  if (useActsFit)
+  {
   std::cout<<"Using ACTS fit"<<std::endl;
   // perform final track fit with ACTS
   auto actsFit = new PHActsTrkFitter;
@@ -269,9 +351,6 @@ int Fun4All_G4_sPHENIX_reco_hp(
   actsFit_SiTpotFit->setFieldMap(G4MAGNET::magfield_tracking);
   se->registerSubsystem(actsFit_SiTpotFit);
 
-  std::string cpmstring;
-  std::string cpmmindststring;
-  std::string cpmmindstfinalstring;
   if (G4TRACKING::SC_CALIBMODE)
   {
     auto cpmreco = new PHCPMTpcCalibration;
@@ -314,7 +393,9 @@ int Fun4All_G4_sPHENIX_reco_hp(
       se->registerOutputManager(out);
     }
   }
-  #else
+  }
+  else
+  {
 
   std::cout<<"Using Genfit"<<std::endl;
   // perform final track fit with GENFIT
@@ -323,9 +404,6 @@ int Fun4All_G4_sPHENIX_reco_hp(
   genfitFit->set_svtx_track_map_name("SvtxSiliconMMTrackMap");
   se->registerSubsystem(genfitFit);
 
-  std::string cpmstring;
-  std::string cpmmindststring;
-  std::string cpmmindstfinalstring;
   if (G4TRACKING::SC_CALIBMODE)
   {
     auto cpmreco = new PHCPMTpcCalibration;
@@ -369,7 +447,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     }
   }
 
-  #endif
+  }
 
 
   Enable::QA = false;

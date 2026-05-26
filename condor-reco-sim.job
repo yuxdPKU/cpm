@@ -49,12 +49,15 @@ Segment        = $(Process)
 InFileName     = /sphenix/u/xyu3/hftg01/DST_FOR_DISTORTION/SimulationDST/G4Hits-$INT(Segment,%05d).root
 OutDir         = $(Initialdir)/root/
 OutFileName    = dst_sim_acts
+# FitMode can be auto, actsfit, or genfit. In auto mode the macro chooses
+# ACTS when OutFileName contains "acts" and GenFit when it contains "genfit".
+FitMode        = auto
 Index          = 0
 StepSize       = 0
 
 # The argument to pass to the executable.
 #tracking firt then calo, only one tracking file
-Arguments      = "$(Nevent) $(InFileName) $(OutDir) $(OutFileName) $(Index) $(StepSize) $(Segment)"
+Arguments      = "$(Nevent) $(InFileName) $(OutDir) $(OutFileName) $(Index) $(StepSize) $(Segment) $(FitMode)"
 
 # The job's stdout is sent to this file.
 Output         = $(Initialdir)/log/job-Reco-Sim-$(Process).out
