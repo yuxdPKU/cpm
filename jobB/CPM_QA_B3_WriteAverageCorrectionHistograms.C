@@ -1,5 +1,5 @@
 /*
- * CPM Job B3 average-correction histogram writer.
+ * CPM QA Job B3 average-correction histogram writer.
  *
  * This macro converts B2 voxel correction rows into the histogram names and
  * half-TPC/guard-bin layout consumed by TpcDistortionCorrectionContainer.
@@ -53,7 +53,7 @@ namespace CPMB3
     std::unique_ptr<TFile> input(TFile::Open(metadata_file.c_str(), "READ"));
     if (!input || input->IsZombie())
     {
-      std::cout << "CPM_B3_WriteAverageCorrectionHistograms - could not open metadata file: "
+      std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - could not open metadata file: "
                 << metadata_file << std::endl;
       return false;
     }
@@ -61,7 +61,7 @@ namespace CPMB3
     auto* metadata = dynamic_cast<TTree*>(input->Get("cpm_metadata"));
     if (!metadata || metadata->GetEntries() <= 0)
     {
-      std::cout << "CPM_B3_WriteAverageCorrectionHistograms - no cpm_metadata tree in: "
+      std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - no cpm_metadata tree in: "
                 << metadata_file << std::endl;
       return false;
     }
@@ -101,8 +101,8 @@ namespace CPMB3
   }
 }
 
-void CPM_B3_WriteAverageCorrectionHistograms(
-    const std::string& input_file = "CPM_B2_voxel_corrections.root",
+void CPM_QA_B3_WriteAverageCorrectionHistograms(
+    const std::string& input_file = "CPM_QA_B2_voxel_corrections.root",
     const std::string& output_file = "CPM_B3_average_correction_histograms.root",
     const std::string& metadata_file = "",
     const unsigned int min_entries_per_voxel = 1)
@@ -111,21 +111,21 @@ void CPM_B3_WriteAverageCorrectionHistograms(
   const bool loaded_metadata = CPMB3::load_grid_metadata(metadata_file, grid);
   if (!metadata_file.empty() && !loaded_metadata)
   {
-    std::cout << "CPM_B3_WriteAverageCorrectionHistograms - metadata file was provided but could not be loaded; aborting" << std::endl;
+    std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - metadata file was provided but could not be loaded; aborting" << std::endl;
     return;
   }
 
   if (grid.phi_bins <= 0 || grid.r_bins <= 0 || grid.z_bins <= 0 ||
       grid.phi_min >= grid.phi_max || grid.r_min >= grid.r_max || grid.z_min >= grid.z_max)
   {
-    std::cout << "CPM_B3_WriteAverageCorrectionHistograms - invalid grid configuration" << std::endl;
+    std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - invalid grid configuration" << std::endl;
     return;
   }
 
   std::unique_ptr<TFile> input(TFile::Open(input_file.c_str(), "READ"));
   if (!input || input->IsZombie())
   {
-    std::cout << "CPM_B3_WriteAverageCorrectionHistograms - could not open input: "
+    std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - could not open input: "
               << input_file << std::endl;
     return;
   }
@@ -133,7 +133,7 @@ void CPM_B3_WriteAverageCorrectionHistograms(
   auto* tree = dynamic_cast<TTree*>(input->Get("cpm_voxel_corrections"));
   if (!tree)
   {
-    std::cout << "CPM_B3_WriteAverageCorrectionHistograms - missing cpm_voxel_corrections in: "
+    std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - missing cpm_voxel_corrections in: "
               << input_file << std::endl;
     return;
   }
@@ -214,7 +214,7 @@ void CPM_B3_WriteAverageCorrectionHistograms(
   TFile output(output_file.c_str(), "RECREATE");
   if (output.IsZombie())
   {
-    std::cout << "CPM_B3_WriteAverageCorrectionHistograms - could not create output: "
+    std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - could not create output: "
               << output_file << std::endl;
     return;
   }
@@ -262,17 +262,17 @@ void CPM_B3_WriteAverageCorrectionHistograms(
 
   output.Close();
 
-  std::cout << "CPM_B3_WriteAverageCorrectionHistograms - input voxels: " << input_voxels << std::endl;
-  std::cout << "CPM_B3_WriteAverageCorrectionHistograms - filled voxels: " << filled_voxels << std::endl;
-  std::cout << "CPM_B3_WriteAverageCorrectionHistograms - skipped low-entry voxels: "
+  std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - input voxels: " << input_voxels << std::endl;
+  std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - filled voxels: " << filled_voxels << std::endl;
+  std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - skipped low-entry voxels: "
             << skipped_low_entry_voxels << std::endl;
-  std::cout << "CPM_B3_WriteAverageCorrectionHistograms - skipped invalid voxels: "
+  std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - skipped invalid voxels: "
             << skipped_invalid_voxels << std::endl;
-  std::cout << "CPM_B3_WriteAverageCorrectionHistograms - grid: ("
+  std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - grid: ("
             << grid.phi_bins << ", " << grid.r_bins << ", " << grid.z_bins << ")"
             << " r=[" << grid.r_min << ", " << grid.r_max << "]"
             << " z=[" << grid.z_min << ", " << grid.z_max << "]"
             << (grid.from_metadata ? " from metadata" : " default")
             << std::endl;
-  std::cout << "CPM_B3_WriteAverageCorrectionHistograms - output: " << output_file << std::endl;
+  std::cout << "CPM_QA_B3_WriteAverageCorrectionHistograms - output: " << output_file << std::endl;
 }

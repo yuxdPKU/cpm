@@ -10,7 +10,7 @@
 #include "CPM_QA_B0_CheckEventIndex.C"
 #include "CPM_QA_B1_ComputePoCA.C"
 #include "CPM_QA_B2_AccumulateVoxelCorrections.C"
-#include "CPM_B3_WriteAverageCorrectionHistograms.C"
+#include "CPM_QA_B3_WriteAverageCorrectionHistograms.C"
 #include "CPM_B3_CheckAverageCorrectionHistograms.C"
 
 #include <TSystem.h>
@@ -122,7 +122,7 @@ bool CPM_QA_RunOfflineDiagnostics(
       use_pair_weights,
       b2_input_mode);
 
-  CPM_B3_WriteAverageCorrectionHistograms(
+  CPM_QA_B3_WriteAverageCorrectionHistograms(
       b2_output,
       b3_output,
       resolved_metadata,

@@ -38,37 +38,22 @@ libcpm_la_LIBADD = \
   -ltpccalib
 
 pkginclude_HEADERS = \
-  CPMAverageCorrectionReconstruction.h \
   CPMCorrectionAccumulator.h \
-  CPMCorrectionContainer.h \
   CPMHelixPoCA.h \
   CPMLocalLinePoCA.h \
   CPMPairUtils.h \
   CPMRecord.h \
   CPMTypes.h \
   CPMVoxelContainer.h \
-  PHCPMTpcCalibration.h
-
-ROOTDICTS = \
-  CPMCorrectionContainer_Dict.cc
-
-pcmdir = $(libdir)
-nobase_dist_pcm_DATA = \
-  CPMCorrectionContainer_Dict_rdict.pcm
+  PHCPMTpcCalibration.h \
+  PHCPMTpcCalibrationQA.h
 
 libcpm_la_SOURCES = \
-  $(ROOTDICTS) \
-  CPMAverageCorrectionReconstruction.cc \
-  CPMCorrectionContainer.cc \
   CPMHelixPoCA.cc \
   CPMLocalLinePoCA.cc \
   CPMPairUtils.cc \
-  PHCPMTpcCalibration.cc
-
-%_Dict.cc: %.h %LinkDef.h
-	rootcint -f $@ @CINTDEFS@ $(DEFAULT_INCLUDES) $(AM_CPPFLAGS) $^
-
-%_Dict_rdict.pcm: %_Dict.cc ;
+  PHCPMTpcCalibration.cc \
+  PHCPMTpcCalibrationQA.cc
 
 noinst_PROGRAMS = \
   testexternals_cpm \
