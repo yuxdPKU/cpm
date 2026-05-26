@@ -1,6 +1,6 @@
 #include "PHCPMTpcCalibration.h"
 
-#include "CPMHelixPoCA.h"
+#include "CPMPairUtils.h"
 
 #include <fun4all/Fun4AllReturnCodes.h>
 
@@ -273,6 +273,8 @@ int PHCPMTpcCalibration::process_event(PHCompositeNode* topNode)
 
 int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
 {
+  flushPendingBatches();
+
   std::cout << "PHCPMTpcCalibration::End"
             << " records: " << m_voxelContainer.record_count()
             << " voxels: " << m_voxelContainer.voxel_count()
@@ -280,6 +282,7 @@ int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
             << " batches: " << m_batches
             << " candidate pairs: " << m_candidate_pairs
             << " accepted pairs: " << m_accepted_pairs
+            << " final flush batches: " << m_final_flush_batches
             << " outputfile: " << m_outputfile
             << std::endl;
 
@@ -291,6 +294,13 @@ int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
   std::cout << "PHCPMTpcCalibration::End"
             << " state statistics total: " << m_total_states
             << " accepted: " << m_accepted_states
+            << std::endl;
+
+  std::cout << "PHCPMTpcCalibration::End"
+            << " final flush records positive: " << m_final_flush_positive_records
+            << " negative: " << m_final_flush_negative_records
+            << " unflushed single-charge positive: " << m_unflushed_positive_records
+            << " negative: " << m_unflushed_negative_records
             << std::endl;
 
   return writeOutput();
@@ -453,6 +463,32 @@ void PHCPMTpcCalibration::processPendingBatches(const VoxelId& voxel)
   pending.negative.clear();
 }
 
+void PHCPMTpcCalibration::flushPendingBatches()
+{
+  m_final_flush_batches = 0;
+  m_final_flush_positive_records = 0;
+  m_final_flush_negative_records = 0;
+  m_unflushed_positive_records = 0;
+  m_unflushed_negative_records = 0;
+
+  for (auto& [voxel, pending] : m_pendingRecords)
+  {
+    if (!pending.positive.empty() && !pending.negative.empty())
+    {
+      ++m_final_flush_batches;
+      m_final_flush_positive_records += pending.positive.size();
+      m_final_flush_negative_records += pending.negative.size();
+      processBatch(voxel);
+      pending.positive.clear();
+      pending.negative.clear();
+      continue;
+    }
+
+    m_unflushed_positive_records += pending.positive.size();
+    m_unflushed_negative_records += pending.negative.size();
+  }
+}
+
 void PHCPMTpcCalibration::processBatch(const VoxelId& voxel)
 {
   auto iter = m_pendingRecords.find(voxel);
@@ -468,69 +504,54 @@ void PHCPMTpcCalibration::processBatch(const VoxelId& voxel)
     return;
   }
 
-  HelixPoCAOptions options;
+  CPMPairOptions options;
+  options.solver = CPMPairSolver::Helix;
+  options.min_pt = m_minPt;
+  options.max_pair_dca = m_maxPairDca;
   options.magnetic_field_z = m_magneticFieldZ;
 
   const auto positiveRecords = pending.positive.size();
   const auto negativeRecords = pending.negative.size();
+  const auto voxelCenter = getVoxelCenter(voxel);
 
   ++m_batches;
   for (std::size_t ipos = 0; ipos < positiveRecords; ++ipos)
   {
     const auto& positive = pending.positive[ipos];
-    if (!(std::isfinite(positive.track.pt) && positive.track.pt >= m_minPt))
-    {
-      continue;
-    }
 
     for (std::size_t ineg = 0; ineg < negativeRecords; ++ineg)
     {
       const auto& negative = pending.negative[ineg];
-      if (sameTrack(positive, negative) ||
-          !(std::isfinite(negative.track.pt) && negative.track.pt >= m_minPt))
+      if (sameTrack(positive, negative))
       {
         continue;
       }
 
-      const double weight = 1.0 / (positive.track.pt * negative.track.pt);
-      if (!(std::isfinite(weight) && weight > 0.0))
+      const auto result = computeCPMPair(
+          makeCPMPairInput(positive),
+          makeCPMPairInput(negative),
+          voxelCenter,
+          options);
+      if (result.status == CPMPairStatus::PtRejected ||
+          result.status == CPMPairStatus::InvalidWeight)
       {
         continue;
       }
 
       ++m_candidate_pairs;
-      const Vector3 pointPositive =
-          positive.state.position - positive.cluster.cluster_minus_voxel_center;
-      const Vector3 pointNegative =
-          negative.state.position - negative.cluster.cluster_minus_voxel_center;
-      const auto result = computeHelixPoCA(
-          {pointPositive, positive.state.momentum, positive.track.charge},
-          {pointNegative, negative.state.momentum, negative.track.charge},
-          options);
-
-      if (!result.valid || !(result.dca <= m_maxPairDca))
+      if (!result.accepted())
       {
         continue;
       }
 
-      const auto voxelCenter = getVoxelCenter(voxel);
-      const double voxelR = std::hypot(voxelCenter.x, voxelCenter.y);
-      const double midpointR = std::hypot(result.midpoint.x, result.midpoint.y);
-      const double voxelPhi = std::atan2(voxelCenter.y, voxelCenter.x);
-      const double midpointPhi = std::atan2(result.midpoint.y, result.midpoint.x);
-      const double deltaPhi = wrapDeltaPhi(voxelPhi - midpointPhi);
-      const double deltaR = voxelR - midpointR;
-      const double deltaRPhi = voxelR * deltaPhi;
-      const double deltaZ = voxelCenter.z - result.midpoint.z;
-
       m_correctionContainer.add_sample(
           cellIndex,
-          deltaR,
-          deltaPhi,
-          deltaRPhi,
-          deltaZ,
+          result.delta_r,
+          result.delta_phi,
+          result.delta_rphi,
+          result.delta_z,
           result.dca,
-          weight);
+          result.pair_weight);
       ++m_accepted_pairs;
     }
   }
@@ -655,6 +676,11 @@ int PHCPMTpcCalibration::writeOutput() const
   unsigned long long candidatePairs = m_candidate_pairs;
   unsigned long long acceptedPairs = m_accepted_pairs;
   unsigned long long batches = m_batches;
+  unsigned long long finalFlushBatches = m_final_flush_batches;
+  unsigned long long finalFlushPositiveRecords = m_final_flush_positive_records;
+  unsigned long long finalFlushNegativeRecords = m_final_flush_negative_records;
+  unsigned long long unflushedPositiveRecords = m_unflushed_positive_records;
+  unsigned long long unflushedNegativeRecords = m_unflushed_negative_records;
   unsigned int runningBatchSize = m_runningBatchSize;
   double maxPairDca = m_maxPairDca;
   double magneticFieldZ = m_magneticFieldZ;
@@ -675,6 +701,11 @@ int PHCPMTpcCalibration::writeOutput() const
   metadata.Branch("candidate_pairs", &candidatePairs);
   metadata.Branch("accepted_pairs", &acceptedPairs);
   metadata.Branch("batches", &batches);
+  metadata.Branch("final_flush_batches", &finalFlushBatches);
+  metadata.Branch("final_flush_positive_records", &finalFlushPositiveRecords);
+  metadata.Branch("final_flush_negative_records", &finalFlushNegativeRecords);
+  metadata.Branch("unflushed_positive_records", &unflushedPositiveRecords);
+  metadata.Branch("unflushed_negative_records", &unflushedNegativeRecords);
   metadata.Branch("running_batch_size", &runningBatchSize);
   metadata.Branch("max_pair_dca", &maxPairDca);
   metadata.Branch("magnetic_field_z", &magneticFieldZ);
@@ -870,18 +901,4 @@ double PHCPMTpcCalibration::offsetMagnitude2(const TrackStateRecord& record)
 {
   const auto& offset = record.cluster.cluster_minus_voxel_center;
   return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
-}
-
-double PHCPMTpcCalibration::wrapDeltaPhi(double value)
-{
-  constexpr double pi = 3.141592653589793238462643383279502884;
-  while (value > pi)
-  {
-    value -= 2.0 * pi;
-  }
-  while (value <= -pi)
-  {
-    value += 2.0 * pi;
-  }
-  return value;
 }

@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(cpm_core
   CPMHelixPoCA.cc
   CPMLocalLinePoCA.cc
+  CPMPairUtils.cc
 )
 
 target_include_directories(cpm_core
