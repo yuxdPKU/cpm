@@ -6,6 +6,7 @@
 #include <fun4all/SubsysReco.h>
 #include <tpc/TpcGlobalPositionWrapper.h>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -32,6 +33,13 @@ class PHCPMTpcCalibration : public SubsysReco
   int End(PHCompositeNode* topNode) override;
 
   void setOutputfile(const std::string& outputfile) { m_outputfile = outputfile; }
+  void setOutputContainerName(const std::string& value)
+  {
+    if (!value.empty())
+    {
+      m_outputContainerName = value;
+    }
+  }
   void setClusterSource(const std::string& value) { m_cluster_source = value; }
   void setTrackSource(const std::string& value) { m_track_source = value; }
   void setTrackMapName(const std::string& value) { m_trackmapname = value; }
@@ -76,21 +84,21 @@ class PHCPMTpcCalibration : public SubsysReco
 
   bool checkTrack(const SvtxTrack* track) const;
   bool checkState(const SvtxTrackState* state) const;
-  bool getVoxelId(const Vector3& position, VoxelId& voxel) const;
+  bool getVoxelId(const TVector3& position, VoxelId& voxel) const;
 
   TrackStateRecord makeRecord(
       unsigned int trackKey,
       const SvtxTrack* track,
       const SvtxTrackState* state,
       const TrkrCluster* cluster,
-      const Vector3& clusterPosition,
+      const TVector3& clusterPosition,
       const VoxelId& voxel) const;
 
   EventReference makeEventReference() const;
   TrackSummary makeTrackSummary(const SvtxTrack* track) const;
 
-  Vector3 getVoxelCenter(const VoxelId& voxel) const;
-  static Matrix6 copyCovariance(const SvtxTrackState* state);
+  TVector3 getVoxelCenter(const VoxelId& voxel) const;
+  static std::array<double, 36> copyCovariance(const SvtxTrackState* state);
   static unsigned int countTrackStates(const SvtxTrack* track, unsigned int trkrId);
   static unsigned int countTrackClusters(const SvtxTrack* track, unsigned int trkrId);
   static bool isCloserToVoxelCenter(const TrackStateRecord& candidate, const TrackStateRecord& current);
@@ -98,6 +106,7 @@ class PHCPMTpcCalibration : public SubsysReco
 
   std::string m_trackmapname = "SvtxSiliconMMTrackMap";
   std::string m_outputfile = "CPMVoxelContainer.root";
+  std::string m_outputContainerName = "CPMVoxelContainer";
   std::string m_cluster_source;
   std::string m_track_source;
   int m_run = -1;

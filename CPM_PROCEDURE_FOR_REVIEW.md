@@ -46,8 +46,8 @@ stores the compact ACTS-ready record needed for offline crossing calculations:
 The Job A output is segment-friendly: each Condor job writes one compact CPM
 ROOT file, and Job B can read either a single file or a file list.
 
-The standard Job A outputs are `cpm_records`, `cpm_metadata`, and
-`cpm_qa_records`. The production `cpm_records` object is a
+The standard Job A outputs are `CPMVoxelContainer`, `cpm_metadata`, and
+`cpm_qa_records`. The production `CPMVoxelContainer` object is a
 `CPMVoxelContainerv1` PHObject: it is keyed by `(iphi, ir, iz)` voxel and each
 voxel owns the compact track-state records used by CPM. Extra per-record
 debugging payloads such as track quality,
@@ -60,22 +60,24 @@ of the compact production object.
 
 The Job B macros use the record-based route as the main CPM workflow. The
 production path is now concentrated in one macro:
-`CPM_ComputeAverageCorrection.C`. It loads compact Job A `cpm_records`
-containers from many segments, computes crossing points offline, accumulates
-voxel averages, and writes the final average-correction histograms. The
-`CPM_QA_*` macros own the extra diagnostic products.
+`CPM_ComputeAverageCorrection.C`. It configures the module-level
+`CPMAverageCorrectionReconstruction` driver, which loads compact Job A
+`CPMVoxelContainer` containers from many segments, computes crossing points
+offline, accumulates voxel averages, and writes the final average-correction
+histograms. The `CPM_QA_*` macros own the extra diagnostic products.
 
 Macro responsibilities:
 
-- `CPM_QA_B0_BuildEventIndex.C`: scan one or more Job A `cpm_records` files and
+- `CPM_QA_B0_BuildEventIndex.C`: scan one or more Job A `CPMVoxelContainer` files and
   write `cpm_event_requests` plus `cpm_object_requests` for optional event-wise
   mini-DST rehydration studies.
 - `CPM_QA_B0_CheckEventIndex.C`: validate the B0 event/object request index before
   any sequential readback is attempted.
-- `CPM_ComputeAverageCorrection.C`: production Job B calculation. It reads Job A
-  voxel containers, checks metadata consistency, forms opposite-charge pairs,
-  accumulates plain or weighted voxel averages directly, and writes the final B3
-  histograms plus a compact summary tree.
+- `CPM_ComputeAverageCorrection.C`: production Job B entry point. It reads Job A
+  voxel containers into `CPMAverageCorrectionReconstruction`, checks grid
+  consistency, forms opposite-charge pairs, accumulates plain or weighted voxel
+  averages directly, and writes the final B3 histograms plus a compact summary
+  tree.
 - `CPM_QA_RunOfflineDiagnostics.C`: record-based diagnostic driver. It can run
   optional B0 QA and then writes the B1 PoCA, B2 voxel-correction, and B3
   histogram stage outputs from one macro call.
@@ -95,7 +97,7 @@ Macro responsibilities:
 The current production sequence is:
 
 ```text
-Job A cpm_records
+Job A CPMVoxelContainer
   -> CPM_ComputeAverageCorrection.C
   -> CPM_B3_CheckAverageCorrectionHistograms.C
 ```
@@ -137,8 +139,8 @@ High-occupancy handling:
 
 Default crossing solver:
 
-- The current default solver is the CPM-local numerical ideal-helix PoCA helper,
-  `CPMHelixPoCA`.
+- The current default solver is the CPM-local numerical ideal-helix PoCA
+  implementation in `CPMReconstructionHelper`.
 - The first implementation uses a configurable uniform `Bz` estimate. The
   default is `1.4 T`. This is an explicit approximation for early algorithm
   development, not a replacement for later field-map or ACTS-based validation.
@@ -155,10 +157,10 @@ Target crossing solver:
   `TrackFitUtils` provides helix-to-point/surface helpers, while
   `KshortReconstruction` and `PHSimpleVertexFinder` provide line-line two-track
   PCA/DCA.
-- CPM now has an initial CPM-local numerical helix PoCA helper,
-  `CPMHelixPoCA`, with a narrow interface designed for later upstreaming. It is
-  now the default B1 solver, while the local line-line solver remains available
-  as a control option.
+- CPM now has an initial CPM-local numerical helix PoCA implementation in
+  `CPMReconstructionHelper`, with a narrow interface designed for later
+  upstreaming. It is now the default B1 solver, while the local line-line solver
+  remains available as a control option.
 
 ## Voxel Accumulation
 

@@ -27,7 +27,7 @@ registration block after the second Si-TPOT fit with `PHCPMTpcCalibration`.
 
 Job A writes a ROOT file with:
 
-- `cpm_records`: compact `CPMVoxelContainerv1` PHObject. It is keyed by
+- `CPMVoxelContainer`: compact `CPMVoxelContainerv1` PHObject. It is keyed by
   `(iphi, ir, iz)` and each voxel owns a vector of the track-state records used
   by the offline CPM calculation.
 - `cpm_metadata`: grid and counter metadata for the Job A segment.
@@ -40,7 +40,7 @@ crossing-point pairing and averaging are done offline across the full file list.
 Extra per-record debugging payloads such as track quality, detector counters,
 cluster coordinates, covariance, and selection flags belong in the flat
 `PHCPMTpcCalibrationQA` output tree and are not part of the compact production
-`cpm_records` container object by default.
+`CPMVoxelContainer` object by default.
 
 For the cluster-DST production mode, Job A stores `cluster_source` as the input
 cluster DST and `track_source` as the optional CPM mini-DST containing
@@ -55,20 +55,20 @@ post-processing tools. The production route is record based and uses one
 calculation macro:
 
 ```text
-Job A cpm_records
+Job A CPMVoxelContainer
   -> CPM_ComputeAverageCorrection.C
   -> CPM_B3_CheckAverageCorrectionHistograms.C
 ```
 
 `CPM_ComputeAverageCorrection.C` is the production calculation macro. It reads
-one Job A file or a file list, checks grid metadata consistency, loads the
-`cpm_records` `CPMVoxelContainer` object, forms opposite-charge crossing pairs,
-accumulates plain or weighted voxel averages, and writes the final guarded
-average-correction histograms. It intentionally does not write pair trees,
-batch trees, or per-voxel diagnostic trees.
-The ROOT-file compatibility and `cpm_records` decoding are handled by the
-module-level `CPMRecordReader` helper so the Job B macros only orchestrate the
-calculation.
+one Job A file or a file list and configures `CPMAverageCorrectionReconstruction`,
+the module-level driver that merges `CPMVoxelContainer` objects, checks grid
+consistency, forms opposite-charge crossing pairs, accumulates plain or
+weighted voxel averages, and writes the final guarded average-correction
+histograms. It intentionally does not write pair trees, batch trees, or
+per-voxel diagnostic trees. Shared histogram and selection utilities live in
+`CPMReconstructionHelper`; the Job B local `CPMVoxelContainerReader` is only
+used by QA macros that need flat event/object request views.
 
 `CPM_QA_RunOfflineDiagnostics.C` is the single user-facing macro for the
 record-based offline diagnostic path. It can run optional B0 event-index QA,
@@ -76,17 +76,17 @@ then writes separate stage files for B1 PoCA, B2 voxel accumulation, and B3
 histogram output so each stage can be inspected offline.
 
 `CPM_QA_B0_BuildEventIndex.C` and `CPM_QA_B0_CheckEventIndex.C` are optional
-rehydration QA tools. They scan `cpm_records`, build an event-ordered list of
+rehydration QA tools. They scan `CPMVoxelContainer`, build an event-ordered list of
 requested tracks/states/clusters, and check that the resulting event/object
 index is self-consistent before any later mini-DST readback study. These macros
-require Job A to have written `cpm_records`.
+require Job A to have written `CPMVoxelContainer`.
 
 `CPM_QA_B1_ComputePoCA.C` is the offline PoCA diagnostic step. It reads
-`cpm_records`, applies the intra-voxel offset shift, forms opposite-charge
+`CPMVoxelContainer`, applies the intra-voxel offset shift, forms opposite-charge
 pairs, and computes crossing points with either the default helix solver or the
 local line solver. It can write detailed pair rows and batch-level correction
 sums for solver comparisons and QA.
-It also requires `cpm_records` from Job A.
+It also requires `CPMVoxelContainer` from Job A.
 
 `CPM_QA_B2_AccumulateVoxelCorrections.C` is the B2 stage paired with B1. It
 reads B1 pair rows or B1 batch sums and produces one `cpm_voxel_corrections`
@@ -111,10 +111,10 @@ builds:
 `jobB/CPM_QA_B0_CheckEventIndex.C` performs a light QA pass on that index before
 mini-DST rehydration is attempted.
 
-`jobB/CPM_ComputeAverageCorrection.C` is the compact production macro. It uses
-the same crossing-pair selection and solver options as QA B1, but accumulates
-accepted pairs directly into voxel averages and writes only the final B3
-histograms plus a compact `cpm_b3_summary` tree.
+`jobB/CPM_ComputeAverageCorrection.C` is the compact production macro. It
+delegates the crossing-pair selection, solver choice, accumulation, and final
+histogram writing to `CPMAverageCorrectionReconstruction`, and writes only the
+final B3 histograms plus a compact `cpm_b3_summary` tree.
 
 `jobB/CPM_QA_B1_ComputePoCA.C` reads one or more Job A outputs, groups records
 by voxel, applies the intra-voxel offset shift, forms opposite-charge crossing
@@ -162,7 +162,7 @@ existing `PHTpcResiduals` convention `[0, 2pi]`.
 
 Example production CPM path:
 
-These commands require Job A output with `cpm_records`, which is now written by
+These commands require Job A output with `CPMVoxelContainer`, which is now written by
 default.
 
 ```sh

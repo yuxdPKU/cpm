@@ -187,7 +187,7 @@ int PHCPMTpcCalibration::processTracks()
       const auto actsPosition = m_globalPositionWrapper.getGlobalPositionDistortionCorrected(
           cluskey, cluster, crossing);
 
-      const Vector3 clusterPosition{
+      const TVector3 clusterPosition{
           actsPosition.x(),
           actsPosition.y(),
           actsPosition.z()};
@@ -260,7 +260,7 @@ bool PHCPMTpcCalibration::checkState(const SvtxTrackState* state) const
   }
 
   const auto cluskey = state->get_cluskey();
-  if (cluskey == InvalidClusterKey)
+  if (cluskey == TrkrDefs::CLUSKEYMAX)
   {
     return false;
   }
@@ -268,9 +268,9 @@ bool PHCPMTpcCalibration::checkState(const SvtxTrackState* state) const
   return TrkrDefs::getTrkrId(cluskey) == TrkrDefs::tpcId;
 }
 
-bool PHCPMTpcCalibration::getVoxelId(const Vector3& position, VoxelId& voxel) const
+bool PHCPMTpcCalibration::getVoxelId(const TVector3& position, VoxelId& voxel) const
 {
-  double phi = std::atan2(position.y, position.x);
+  double phi = std::atan2(position.Y(), position.X());
   if (phi < 0.0)
   {
     phi += m_phiMax;
@@ -281,20 +281,20 @@ bool PHCPMTpcCalibration::getVoxelId(const Vector3& position, VoxelId& voxel) co
     return false;
   }
 
-  const double radius = std::sqrt(position.x * position.x + position.y * position.y);
+  const double radius = std::sqrt(position.X() * position.X() + position.Y() * position.Y());
   if (radius < m_rMin || radius >= m_rMax)
   {
     return false;
   }
 
-  if (position.z < m_zMin || position.z >= m_zMax)
+  if (position.Z() < m_zMin || position.Z() >= m_zMax)
   {
     return false;
   }
 
   voxel.iphi = static_cast<int>(m_phiBins * (phi - m_phiMin) / (m_phiMax - m_phiMin));
   voxel.ir = static_cast<int>(m_rBins * (radius - m_rMin) / (m_rMax - m_rMin));
-  voxel.iz = static_cast<int>(m_zBins * (position.z - m_zMin) / (m_zMax - m_zMin));
+  voxel.iz = static_cast<int>(m_zBins * (position.Z() - m_zMin) / (m_zMax - m_zMin));
 
   return voxel.valid();
 }
@@ -320,7 +320,7 @@ int PHCPMTpcCalibration::writeOutput()
   {
     m_voxelContainer.sort_records();
     output->cd();
-    m_voxelContainer.Write("cpm_records");
+    m_voxelContainer.Write(m_outputContainerName.c_str());
   }
 
   TTree metadata("cpm_metadata", "CPM Job A metadata");
@@ -339,9 +339,10 @@ int PHCPMTpcCalibration::writeOutput()
   unsigned long long acceptedStates = m_accepted_states;
   bool writeRecords = m_writeRecords;
   bool writeQARecords = m_writeQARecords;
-  bool cpmRecordsVoxelGrouped = true;
-  int cpmRecordsLayoutVersion = 3;
-  std::string cpmRecordsStorage = "CPMVoxelContainerv1";
+  bool cpmVoxelContainerGrouped = true;
+  int cpmVoxelContainerLayoutVersion = 4;
+  std::string cpmVoxelContainerStorage = "CPMVoxelContainerv1";
+  std::string cpmVoxelContainerObjectName = m_outputContainerName;
 
   metadata.Branch("phi_bins", &phiBins);
   metadata.Branch("r_bins", &rBins);
@@ -357,9 +358,10 @@ int PHCPMTpcCalibration::writeOutput()
   metadata.Branch("accepted_states", &acceptedStates);
   metadata.Branch("write_records", &writeRecords);
   metadata.Branch("write_qa_records", &writeQARecords);
-  metadata.Branch("cpm_records_voxel_grouped", &cpmRecordsVoxelGrouped);
-  metadata.Branch("cpm_records_layout_version", &cpmRecordsLayoutVersion);
-  metadata.Branch("cpm_records_storage", &cpmRecordsStorage);
+  metadata.Branch("cpm_voxel_container_grouped", &cpmVoxelContainerGrouped);
+  metadata.Branch("cpm_voxel_container_layout_version", &cpmVoxelContainerLayoutVersion);
+  metadata.Branch("cpm_voxel_container_storage", &cpmVoxelContainerStorage);
+  metadata.Branch("cpm_voxel_container_object_name", &cpmVoxelContainerObjectName);
   metadata.Fill();
 
   output->cd();
@@ -381,7 +383,7 @@ TrackStateRecord PHCPMTpcCalibration::makeRecord(
     const SvtxTrack* track,
     const SvtxTrackState* state,
     const TrkrCluster* cluster,
-    const Vector3& clusterPosition,
+    const TVector3& clusterPosition,
     const VoxelId& voxel) const
 {
   TrackStateRecord record;
@@ -419,7 +421,7 @@ TrackStateRecord PHCPMTpcCalibration::makeRecord(
       countTrackClusters(track, TrkrDefs::micromegasId) > 0 ||
       countTrackStates(track, TrkrDefs::micromegasId) > 0;
   record.selection.passes_track_quality = true;
-  record.selection.passes_geometry = record.cluster_ref.subsurfkey != InvalidSubSurfKey;
+  record.selection.passes_geometry = record.cluster_ref.subsurfkey != TrkrDefs::SUBSURFKEYMAX;
 
   return record;
 }
@@ -467,7 +469,7 @@ TrackSummary PHCPMTpcCalibration::makeTrackSummary(const SvtxTrack* track) const
   return out;
 }
 
-Vector3 PHCPMTpcCalibration::getVoxelCenter(const VoxelId& voxel) const
+TVector3 PHCPMTpcCalibration::getVoxelCenter(const VoxelId& voxel) const
 {
   const double phi = m_phiMin + (voxel.iphi + 0.5) * (m_phiMax - m_phiMin) / m_phiBins;
   const double radius = m_rMin + (voxel.ir + 0.5) * (m_rMax - m_rMin) / m_rBins;
@@ -476,9 +478,9 @@ Vector3 PHCPMTpcCalibration::getVoxelCenter(const VoxelId& voxel) const
   return {radius * std::cos(phi), radius * std::sin(phi), z};
 }
 
-Matrix6 PHCPMTpcCalibration::copyCovariance(const SvtxTrackState* state)
+std::array<double, 36> PHCPMTpcCalibration::copyCovariance(const SvtxTrackState* state)
 {
-  Matrix6 out{};
+  std::array<double, 36> out{};
   for (int row = 0; row < 6; ++row)
   {
     for (int col = 0; col < 6; ++col)
@@ -538,5 +540,5 @@ bool PHCPMTpcCalibration::isCloserToVoxelCenter(
 double PHCPMTpcCalibration::offsetMagnitude2(const TrackStateRecord& record)
 {
   const auto& offset = record.cluster.cluster_minus_voxel_center;
-  return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
+  return offset.X() * offset.X() + offset.Y() * offset.Y() + offset.Z() * offset.Z();
 }

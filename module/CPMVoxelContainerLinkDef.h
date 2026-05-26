@@ -1,6 +1,5 @@
 #ifdef __CINT__
 
-#pragma link C++ class Vector3+;
 #pragma link C++ class EventReference+;
 #pragma link C++ class TrackReference+;
 #pragma link C++ class TrackSummary+;

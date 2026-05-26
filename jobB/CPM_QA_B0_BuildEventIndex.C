@@ -1,11 +1,10 @@
 /*
  * CPM QA Job B0 skeleton.
  *
- * This macro reads one or more Job A CPM ROOT files, scans cpm_records,
+ * This macro reads one or more Job A CPM ROOT files, scans CPMVoxelContainer,
  * groups all referenced objects by event, and writes an event-ordered request
- * index. It accepts both the current CPMVoxelContainer PHObject and older
- * flat cpm_records trees. The next B0 step can use this index to read each
- * mini-DST event once and validate/rehydrate the requested
+ * index. The next B0 step can use this index to read each mini-DST event once
+ * and validate/rehydrate the requested
  * SvtxTrack/SvtxTrackState/TrkrCluster objects.
  *
  * Example:
@@ -14,9 +13,8 @@
  *                                                  "CPM_QA_B0_event_index.root")'
  */
 
-#include <CPMRecordReader.h>
+#include "CPMVoxelContainerReader.h"
 
-#include <TChain.h>
 #include <TFile.h>
 #include <TTree.h>
 
@@ -76,9 +74,9 @@ void CPM_QA_B0_BuildEventIndex(
 {
   std::map<CPMB0::EventKey, std::set<CPMB0::ObjectRequest>> event_requests;
 
-  CPMRecordReader::read_records(
+  const auto records_read = CPMVoxelContainerReader::read_records(
       input_files,
-      [&](const CPMRecordReader::Record& input_record)
+      [&](const CPMVoxelContainerReader::Record& input_record)
       {
     CPMB0::EventKey event_key;
     event_key.track_source = input_record.track_source;
@@ -99,6 +97,10 @@ void CPM_QA_B0_BuildEventIndex(
     request.iz = input_record.iz;
     event_requests[event_key].insert(request);
       });
+  if (records_read < 0)
+  {
+    return;
+  }
 
   TFile output(output_file.c_str(), "RECREATE");
 
@@ -179,7 +181,7 @@ void CPM_QA_B0_BuildEventIndex(
   objects.Write();
   output.Close();
 
-  std::cout << "CPM_QA_B0_BuildEventIndex - input records: " << entries << std::endl;
+  std::cout << "CPM_QA_B0_BuildEventIndex - input records: " << records_read << std::endl;
   std::cout << "CPM_QA_B0_BuildEventIndex - unique events: " << event_requests.size() << std::endl;
   unsigned long long n_object_requests = 0;
   for (const auto& [key, requests] : event_requests)

@@ -13,7 +13,7 @@ Usage:
   jobB/run_cpm_b_chain.sh --input cpm_filelist.txt --input-is-list [options]
 
 Runs the CPM production Job B calculation:
-  Job A cpm_records
+  Job A CPMVoxelContainer
   -> opposite-charge crossing-point PoCA
   -> voxel averaging
   -> B3 average-correction histogram output

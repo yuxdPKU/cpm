@@ -1,7 +1,8 @@
 #ifndef CPM_CPMRECORD_H
 #define CPM_CPMRECORD_H
 
-#include "CPMTypes.h"
+#include <TVector3.h>
+#include <trackbase/TrkrDefs.h>
 
 #include <array>
 #include <cstdint>
@@ -22,8 +23,8 @@ struct EventReference
 struct TrackReference
 {
   std::string track_map_name = "SvtxSiliconMMTrackMap";
-  TrackId track_id = InvalidTrackId;
-  ClusterKey state_cluskey = InvalidClusterKey;
+  unsigned int track_id = std::numeric_limits<unsigned int>::max();
+  TrkrDefs::cluskey state_cluskey = TrkrDefs::CLUSKEYMAX;
 };
 
 struct TrackSummary
@@ -43,9 +44,9 @@ struct TrackSummary
 
 struct ClusterReference
 {
-  ClusterKey cluskey = InvalidClusterKey;
-  HitSetKey hitsetkey = InvalidHitSetKey;
-  SubSurfKey subsurfkey = InvalidSubSurfKey;
+  TrkrDefs::cluskey cluskey = TrkrDefs::CLUSKEYMAX;
+  TrkrDefs::hitsetkey hitsetkey = TrkrDefs::HITSETKEYMAX;
+  TrkrDefs::subsurfkey subsurfkey = TrkrDefs::SUBSURFKEYMAX;
   std::uint16_t layer = 0;
   std::uint16_t side = 0;
 };
@@ -76,9 +77,9 @@ struct VoxelId
 
 struct ClusterSnapshot
 {
-  Vector3 corrected_position;
-  Vector3 voxel_center;
-  Vector3 cluster_minus_voxel_center;
+  TVector3 corrected_position;
+  TVector3 voxel_center;
+  TVector3 cluster_minus_voxel_center;
 };
 
 struct TrackStateSnapshot
@@ -86,9 +87,9 @@ struct TrackStateSnapshot
   double pathlength = std::numeric_limits<double>::quiet_NaN();
   double local_x = std::numeric_limits<double>::quiet_NaN();
   double local_y = std::numeric_limits<double>::quiet_NaN();
-  Vector3 position;
-  Vector3 momentum;
-  Matrix6 covariance{};
+  TVector3 position;
+  TVector3 momentum;
+  std::array<double, 36> covariance{};
 };
 
 struct SelectionFlags

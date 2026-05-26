@@ -38,13 +38,9 @@ libcpm_la_LIBADD = \
   -ltpccalib
 
 pkginclude_HEADERS = \
-  CPMCorrectionAccumulator.h \
-  CPMHelixPoCA.h \
-  CPMLocalLinePoCA.h \
-  CPMPairUtils.h \
+  CPMAverageCorrectionReconstruction.h \
   CPMRecord.h \
-  CPMRecordReader.h \
-  CPMTypes.h \
+  CPMReconstructionHelper.h \
   CPMVoxelContainer.h \
   CPMVoxelContainerv1.h \
   PHCPMTpcCalibration.h \
@@ -61,9 +57,8 @@ nobase_dist_pcm_DATA = \
 
 libcpm_la_SOURCES = \
   $(ROOTDICTS) \
-  CPMHelixPoCA.cc \
-  CPMLocalLinePoCA.cc \
-  CPMPairUtils.cc \
+  CPMAverageCorrectionReconstruction.cc \
+  CPMReconstructionHelper.cc \
   CPMVoxelContainerv1.cc \
   PHCPMTpcCalibration.cc \
   PHCPMTpcCalibrationQA.cc

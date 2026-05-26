@@ -12,7 +12,8 @@
  * voxel center - crossing point.
  */
 
-#include <CPMCorrectionAccumulator.h>
+#include <CPMRecord.h>
+#include <CPMReconstructionHelper.h>
 
 #include <TChain.h>
 #include <TFile.h>
@@ -25,23 +26,10 @@
 #include <limits>
 #include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 
 namespace CPMB2
 {
-  struct VoxelKey
-  {
-    int iphi = -1;
-    int ir = -1;
-    int iz = -1;
-
-    bool operator<(const VoxelKey& rhs) const
-    {
-      return std::tie(iphi, ir, iz) < std::tie(rhs.iphi, rhs.ir, rhs.iz);
-    }
-  };
-
   std::vector<std::string> read_file_list(const std::string& input_list)
   {
     std::ifstream input(input_list);
@@ -114,7 +102,7 @@ void CPM_QA_B2_AccumulateVoxelCorrections(
               << "individual pairs in batch input mode" << std::endl;
   }
 
-  std::map<CPMB2::VoxelKey, CPMCorrectionAccumulator> accumulators;
+  std::map<VoxelId, CPMReconstructionHelper::CorrectionAccumulator> accumulators;
   unsigned long long accepted_pairs = 0;
   unsigned long long rejected_rows = 0;
   Long64_t input_rows = 0;
@@ -398,44 +386,44 @@ void CPM_QA_B2_AccumulateVoxelCorrections(
     out_ir = voxel.ir;
     out_iz = voxel.iz;
     entries = accumulator.entries;
-    voxel_x = cpmCorrectionMean(accumulator.sum_voxel_x, entries);
-    voxel_y = cpmCorrectionMean(accumulator.sum_voxel_y, entries);
-    voxel_z = cpmCorrectionMean(accumulator.sum_voxel_z, entries);
+    voxel_x = CPMReconstructionHelper::correction_mean(accumulator.sum_voxel_x, entries);
+    voxel_y = CPMReconstructionHelper::correction_mean(accumulator.sum_voxel_y, entries);
+    voxel_z = CPMReconstructionHelper::correction_mean(accumulator.sum_voxel_z, entries);
     sum_pair_weight = accumulator.sum_pair_weight;
-    mean_pair_weight = cpmCorrectionMean(accumulator.sum_pair_weight, entries);
-    effective_pair_entries = cpmCorrectionEffectiveEntries(
+    mean_pair_weight = CPMReconstructionHelper::correction_mean(accumulator.sum_pair_weight, entries);
+    effective_pair_entries = CPMReconstructionHelper::correction_effective_entries(
         accumulator.sum_pair_weight,
         accumulator.sum_pair_weight2);
-    mean_delta_r = cpmCorrectionWeightedMean(
+    mean_delta_r = CPMReconstructionHelper::correction_weighted_mean(
         accumulator.sum_weighted_delta_r,
         accumulator.sum_pair_weight);
-    rms_delta_r = cpmCorrectionWeightedRms(
+    rms_delta_r = CPMReconstructionHelper::correction_weighted_rms(
         accumulator.sum_weighted_delta_r,
         accumulator.sum_weighted_delta_r2,
         accumulator.sum_pair_weight);
-    mean_delta_rphi = cpmCorrectionWeightedMean(
+    mean_delta_rphi = CPMReconstructionHelper::correction_weighted_mean(
         accumulator.sum_weighted_delta_rphi,
         accumulator.sum_pair_weight);
-    rms_delta_rphi = cpmCorrectionWeightedRms(
+    rms_delta_rphi = CPMReconstructionHelper::correction_weighted_rms(
         accumulator.sum_weighted_delta_rphi,
         accumulator.sum_weighted_delta_rphi2,
         accumulator.sum_pair_weight);
-    mean_delta_phi = cpmCorrectionWeightedMean(
+    mean_delta_phi = CPMReconstructionHelper::correction_weighted_mean(
         accumulator.sum_weighted_delta_phi,
         accumulator.sum_pair_weight);
-    rms_delta_phi = cpmCorrectionWeightedRms(
+    rms_delta_phi = CPMReconstructionHelper::correction_weighted_rms(
         accumulator.sum_weighted_delta_phi,
         accumulator.sum_weighted_delta_phi2,
         accumulator.sum_pair_weight);
-    mean_delta_z = cpmCorrectionWeightedMean(
+    mean_delta_z = CPMReconstructionHelper::correction_weighted_mean(
         accumulator.sum_weighted_delta_z,
         accumulator.sum_pair_weight);
-    rms_delta_z = cpmCorrectionWeightedRms(
+    rms_delta_z = CPMReconstructionHelper::correction_weighted_rms(
         accumulator.sum_weighted_delta_z,
         accumulator.sum_weighted_delta_z2,
         accumulator.sum_pair_weight);
-    mean_dca = cpmCorrectionMean(accumulator.sum_dca, entries);
-    rms_dca = cpmCorrectionRms(accumulator.sum_dca, accumulator.sum_dca2, entries);
+    mean_dca = CPMReconstructionHelper::correction_mean(accumulator.sum_dca, entries);
+    rms_dca = CPMReconstructionHelper::correction_rms(accumulator.sum_dca, accumulator.sum_dca2, entries);
 
     voxels.Fill();
     ++filled_voxels;

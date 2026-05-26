@@ -11,8 +11,6 @@
 class CPMVoxelContainerv1 : public CPMVoxelContainer
 {
  public:
-  using const_iterator = Map::const_iterator;
-
   ~CPMVoxelContainerv1() override = default;
 
   void identify(std::ostream& out = std::cout) const override;
@@ -32,37 +30,37 @@ class CPMVoxelContainerv1 : public CPMVoxelContainer
 
   [[nodiscard]] const Grid& grid() const override { return m_grid; }
 
-  void add(Record record) override;
+  void add(TrackStateRecord record) override;
   bool add(const CPMVoxelContainer& other) override;
 
-  [[nodiscard]] const RecordVector* find(const VoxelId& voxel) const override;
-  [[nodiscard]] const RecordVector* find_by_index(int iphi, int ir, int iz) const override;
-  [[nodiscard]] const RecordVector* find_by_position(double phi, double radius, double z) const override;
-  [[nodiscard]] const RecordVector* find_by_cartesian(double x, double y, double z) const override;
+  [[nodiscard]] const std::vector<TrackStateRecord>* find(const VoxelId& voxel) const override;
+  [[nodiscard]] const std::vector<TrackStateRecord>* find_by_index(int iphi, int ir, int iz) const override;
+  [[nodiscard]] const std::vector<TrackStateRecord>* find_by_position(double phi, double radius, double z) const override;
+  [[nodiscard]] const std::vector<TrackStateRecord>* find_by_cartesian(double x, double y, double z) const override;
   [[nodiscard]] bool get_voxel_id(double phi, double radius, double z, VoxelId& voxel) const override;
 
   [[nodiscard]] std::size_t record_count(const VoxelId& voxel) const override;
   [[nodiscard]] std::size_t voxel_count() const override { return m_records.size(); }
   [[nodiscard]] std::size_t record_count() const override;
   [[nodiscard]] bool empty() const override { return m_records.empty(); }
-  [[nodiscard]] const Map& records() const override { return m_records; }
+  [[nodiscard]] const std::map<VoxelId, std::vector<TrackStateRecord>>& records() const override { return m_records; }
 
-  [[nodiscard]] const_iterator begin() const { return m_records.begin(); }
-  [[nodiscard]] const_iterator end() const { return m_records.end(); }
+  [[nodiscard]] std::map<VoxelId, std::vector<TrackStateRecord>>::const_iterator begin() const { return m_records.begin(); }
+  [[nodiscard]] std::map<VoxelId, std::vector<TrackStateRecord>>::const_iterator end() const { return m_records.end(); }
 
   void sort_records() override;
   void clear() override { m_records.clear(); }
 
  private:
-  static bool has_event_order(const Record& record);
-  static std::tuple<int, int, int, unsigned long long, int, TrackId, ClusterKey>
-  event_order_key(const Record& record);
-  static void stable_sort_records(RecordVector& records);
+  static bool has_event_order(const TrackStateRecord& record);
+  static std::tuple<int, int, int, unsigned long long, int, unsigned int, TrkrDefs::cluskey>
+  event_order_key(const TrackStateRecord& record);
+  static void stable_sort_records(std::vector<TrackStateRecord>& records);
 
   Grid m_grid;
-  Map m_records;
+  std::map<VoxelId, std::vector<TrackStateRecord>> m_records;
 
-  ClassDefOverride(CPMVoxelContainerv1, 1)
+  ClassDefOverride(CPMVoxelContainerv1, 2)
 };
 
 #endif

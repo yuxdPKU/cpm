@@ -13,11 +13,6 @@
 class CPMVoxelContainer : public PHObject
 {
  public:
-  using Record = TrackStateRecord;
-  using RecordVector = std::vector<Record>;
-  using Map = std::map<VoxelId, RecordVector>;
-  using const_iterator = Map::const_iterator;
-
   struct Grid
   {
     int phi_bins = 0;
@@ -66,15 +61,15 @@ class CPMVoxelContainer : public PHObject
     return empty_grid;
   }
 
-  virtual void add(Record /*record*/) {}
+  virtual void add(TrackStateRecord /*record*/) {}
   virtual bool add(const CPMVoxelContainer& /*other*/) { return false; }
 
-  [[nodiscard]] virtual const RecordVector* find(const VoxelId& /*voxel*/) const
+  [[nodiscard]] virtual const std::vector<TrackStateRecord>* find(const VoxelId& /*voxel*/) const
   {
     return nullptr;
   }
 
-  [[nodiscard]] virtual const RecordVector* find_by_index(
+  [[nodiscard]] virtual const std::vector<TrackStateRecord>* find_by_index(
       int iphi,
       int ir,
       int iz) const
@@ -82,7 +77,7 @@ class CPMVoxelContainer : public PHObject
     return find({iphi, ir, iz});
   }
 
-  [[nodiscard]] virtual const RecordVector* find_by_position(
+  [[nodiscard]] virtual const std::vector<TrackStateRecord>* find_by_position(
       double /*phi*/,
       double /*radius*/,
       double /*z*/) const
@@ -90,7 +85,7 @@ class CPMVoxelContainer : public PHObject
     return nullptr;
   }
 
-  [[nodiscard]] virtual const RecordVector* find_by_cartesian(
+  [[nodiscard]] virtual const std::vector<TrackStateRecord>* find_by_cartesian(
       double /*x*/,
       double /*y*/,
       double /*z*/) const
@@ -116,9 +111,9 @@ class CPMVoxelContainer : public PHObject
   [[nodiscard]] virtual std::size_t voxel_count() const { return 0; }
   [[nodiscard]] virtual std::size_t record_count() const { return 0; }
   [[nodiscard]] virtual bool empty() const { return true; }
-  [[nodiscard]] virtual const Map& records() const
+  [[nodiscard]] virtual const std::map<VoxelId, std::vector<TrackStateRecord>>& records() const
   {
-    static const Map empty_map;
+    static const std::map<VoxelId, std::vector<TrackStateRecord>> empty_map;
     return empty_map;
   }
 

@@ -41,7 +41,7 @@ void CPMVoxelContainerv1::set_grid(
   m_grid.z_max = z_max;
 }
 
-void CPMVoxelContainerv1::add(Record record)
+void CPMVoxelContainerv1::add(TrackStateRecord record)
 {
   m_records[record.voxel].push_back(std::move(record));
 }
@@ -77,13 +77,13 @@ bool CPMVoxelContainerv1::add(const CPMVoxelContainer& other)
   return true;
 }
 
-const CPMVoxelContainerv1::RecordVector* CPMVoxelContainerv1::find(const VoxelId& voxel) const
+const std::vector<TrackStateRecord>* CPMVoxelContainerv1::find(const VoxelId& voxel) const
 {
   const auto iter = m_records.find(voxel);
   return iter == m_records.end() ? nullptr : &iter->second;
 }
 
-const CPMVoxelContainerv1::RecordVector* CPMVoxelContainerv1::find_by_index(
+const std::vector<TrackStateRecord>* CPMVoxelContainerv1::find_by_index(
     const int iphi,
     const int ir,
     const int iz) const
@@ -91,7 +91,7 @@ const CPMVoxelContainerv1::RecordVector* CPMVoxelContainerv1::find_by_index(
   return find({iphi, ir, iz});
 }
 
-const CPMVoxelContainerv1::RecordVector* CPMVoxelContainerv1::find_by_position(
+const std::vector<TrackStateRecord>* CPMVoxelContainerv1::find_by_position(
     double phi,
     const double radius,
     const double z) const
@@ -100,7 +100,7 @@ const CPMVoxelContainerv1::RecordVector* CPMVoxelContainerv1::find_by_position(
   return get_voxel_id(phi, radius, z, voxel) ? find(voxel) : nullptr;
 }
 
-const CPMVoxelContainerv1::RecordVector* CPMVoxelContainerv1::find_by_cartesian(
+const std::vector<TrackStateRecord>* CPMVoxelContainerv1::find_by_cartesian(
     const double x,
     const double y,
     const double z) const
@@ -177,15 +177,15 @@ void CPMVoxelContainerv1::sort_records()
   }
 }
 
-bool CPMVoxelContainerv1::has_event_order(const Record& record)
+bool CPMVoxelContainerv1::has_event_order(const TrackStateRecord& record)
 {
   return record.event_ref.run >= 0 &&
          (record.event_ref.event_sequence >= 0 ||
           record.event_ref.sync_event >= 0);
 }
 
-std::tuple<int, int, int, unsigned long long, int, TrackId, ClusterKey>
-CPMVoxelContainerv1::event_order_key(const Record& record)
+std::tuple<int, int, int, unsigned long long, int, unsigned int, TrkrDefs::cluskey>
+CPMVoxelContainerv1::event_order_key(const TrackStateRecord& record)
 {
   const int event_sequence =
       record.event_ref.event_sequence >= 0 ?
@@ -205,12 +205,12 @@ CPMVoxelContainerv1::event_order_key(const Record& record)
       record.cluster_ref.cluskey};
 }
 
-void CPMVoxelContainerv1::stable_sort_records(RecordVector& records)
+void CPMVoxelContainerv1::stable_sort_records(std::vector<TrackStateRecord>& records)
 {
   std::stable_sort(
       records.begin(),
       records.end(),
-      [](const Record& lhs, const Record& rhs)
+      [](const TrackStateRecord& lhs, const TrackStateRecord& rhs)
       {
         const bool lhs_has_order = has_event_order(lhs);
         const bool rhs_has_order = has_event_order(rhs);

@@ -20,7 +20,7 @@ namespace
     int event_sequence = -1;
     unsigned long long stream_event_ordinal = 0;
 
-    unsigned int track_id = InvalidTrackId;
+    unsigned int track_id = std::numeric_limits<unsigned int>::max();
     int charge = 0;
     float pt = std::numeric_limits<float>::quiet_NaN();
     float quality = std::numeric_limits<float>::quiet_NaN();
@@ -33,9 +33,9 @@ namespace
     unsigned short n_tpc_states = 0;
     unsigned short n_tpot_states = 0;
 
-    unsigned long long cluskey = InvalidClusterKey;
-    unsigned long long hitsetkey = InvalidHitSetKey;
-    unsigned int subsurfkey = InvalidSubSurfKey;
+    TrkrDefs::cluskey cluskey = TrkrDefs::CLUSKEYMAX;
+    TrkrDefs::hitsetkey hitsetkey = TrkrDefs::HITSETKEYMAX;
+    TrkrDefs::subsurfkey subsurfkey = TrkrDefs::SUBSURFKEYMAX;
     unsigned short layer = 0;
     unsigned short side = 0;
 
@@ -104,25 +104,25 @@ namespace
       ir = record.voxel.ir;
       iz = record.voxel.iz;
 
-      cluster_x = record.cluster.corrected_position.x;
-      cluster_y = record.cluster.corrected_position.y;
-      cluster_z = record.cluster.corrected_position.z;
-      voxel_x = record.cluster.voxel_center.x;
-      voxel_y = record.cluster.voxel_center.y;
-      voxel_z = record.cluster.voxel_center.z;
-      offset_x = record.cluster.cluster_minus_voxel_center.x;
-      offset_y = record.cluster.cluster_minus_voxel_center.y;
-      offset_z = record.cluster.cluster_minus_voxel_center.z;
+      cluster_x = record.cluster.corrected_position.X();
+      cluster_y = record.cluster.corrected_position.Y();
+      cluster_z = record.cluster.corrected_position.Z();
+      voxel_x = record.cluster.voxel_center.X();
+      voxel_y = record.cluster.voxel_center.Y();
+      voxel_z = record.cluster.voxel_center.Z();
+      offset_x = record.cluster.cluster_minus_voxel_center.X();
+      offset_y = record.cluster.cluster_minus_voxel_center.Y();
+      offset_z = record.cluster.cluster_minus_voxel_center.Z();
 
       state_pathlength = record.state.pathlength;
       state_local_x = record.state.local_x;
       state_local_y = record.state.local_y;
-      state_x = record.state.position.x;
-      state_y = record.state.position.y;
-      state_z = record.state.position.z;
-      state_px = record.state.momentum.x;
-      state_py = record.state.momentum.y;
-      state_pz = record.state.momentum.z;
+      state_x = record.state.position.X();
+      state_y = record.state.position.Y();
+      state_z = record.state.position.Z();
+      state_px = record.state.momentum.X();
+      state_py = record.state.momentum.Y();
+      state_pz = record.state.momentum.Z();
       for (std::size_t i = 0; i < 36; ++i)
       {
         state_covariance[i] = record.state.covariance[i];

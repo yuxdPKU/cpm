@@ -1,7 +1,4 @@
-#include "CPMCorrectionAccumulator.h"
-#include "CPMHelixPoCA.h"
-#include "CPMLocalLinePoCA.h"
-#include "CPMPairUtils.h"
+#include "CPMReconstructionHelper.h"
 #include "CPMVoxelContainerv1.h"
 
 #include <cassert>
@@ -18,25 +15,27 @@ namespace
 int main()
 {
   {
-    const auto result = computeLocalLinePoCA(
+    const auto result = CPMReconstructionHelper::compute_local_line_poca(
         {-1.0, 0.0, 0.0},
         {1.0, 0.0, 0.0},
         {0.0, -1.0, 0.0},
-        {0.0, 1.0, 0.0});
+        {0.0, 1.0, 0.0},
+        CPMReconstructionHelper::LocalLinePoCAOptions{});
 
     assert(result.valid);
-    assert(near(result.midpoint.x, 0.0));
-    assert(near(result.midpoint.y, 0.0));
-    assert(near(result.midpoint.z, 0.0));
+    assert(near(result.midpoint.X(), 0.0));
+    assert(near(result.midpoint.Y(), 0.0));
+    assert(near(result.midpoint.Z(), 0.0));
     assert(near(result.dca, 0.0));
   }
 
   {
-    const auto result = computeLocalLinePoCA(
+    const auto result = CPMReconstructionHelper::compute_local_line_poca(
         {0.0, 0.0, 0.0},
         {1.0, 0.0, 0.0},
         {0.0, 1.0, 0.0},
-        {1.0, 0.0, 0.0});
+        {1.0, 0.0, 0.0},
+        CPMReconstructionHelper::LocalLinePoCAOptions{});
 
     assert(!result.valid);
   }
@@ -68,11 +67,14 @@ int main()
     assert(container.record_count({1, 2, 3}) == 2);
     assert(container.find_by_index(1, 2, 3) == records);
 
-    const auto result = computeVoxelCenterPoCA(records->at(0), records->at(1));
+    const auto result = CPMReconstructionHelper::compute_voxel_center_poca(
+        records->at(0),
+        records->at(1),
+        CPMReconstructionHelper::LocalLinePoCAOptions{});
     assert(result.valid);
-    assert(near(result.midpoint.x, 0.0));
-    assert(near(result.midpoint.y, 0.0));
-    assert(near(result.midpoint.z, 0.0));
+    assert(near(result.midpoint.X(), 0.0));
+    assert(near(result.midpoint.Y(), 0.0));
+    assert(near(result.midpoint.Z(), 0.0));
   }
 
   {
@@ -106,72 +108,73 @@ int main()
   }
 
   {
-    HelixPoCAOptions options;
+    CPMReconstructionHelper::HelixPoCAOptions options;
     options.magnetic_field_z = 0.0;
-    const auto result = computeHelixPoCA(
+    const auto result = CPMReconstructionHelper::compute_helix_poca(
         {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 1},
         {{0.0, -1.0, 0.0}, {0.0, 1.0, 0.0}, -1},
         options);
 
     assert(result.valid);
     assert(result.converged);
-    assert(near(result.midpoint.x, 0.0));
-    assert(near(result.midpoint.y, 0.0));
-    assert(near(result.midpoint.z, 0.0));
+    assert(near(result.midpoint.X(), 0.0));
+    assert(near(result.midpoint.Y(), 0.0));
+    assert(near(result.midpoint.Z(), 0.0));
     assert(near(result.dca, 0.0));
   }
 
   {
-    const auto result = computeHelixPoCA(
+    const auto result = CPMReconstructionHelper::compute_helix_poca(
         {{0.0, 0.0, 0.0}, {1.0, 0.2, 0.1}, 1},
-        {{0.0, 0.0, 0.0}, {-0.2, 1.0, 0.1}, -1});
+        {{0.0, 0.0, 0.0}, {-0.2, 1.0, 0.1}, -1},
+        CPMReconstructionHelper::HelixPoCAOptions{});
 
     assert(result.valid);
     assert(result.converged);
-    assert(near(result.midpoint.x, 0.0, 1.0e-8));
-    assert(near(result.midpoint.y, 0.0, 1.0e-8));
-    assert(near(result.midpoint.z, 0.0, 1.0e-8));
+    assert(near(result.midpoint.X(), 0.0, 1.0e-8));
+    assert(near(result.midpoint.Y(), 0.0, 1.0e-8));
+    assert(near(result.midpoint.Z(), 0.0, 1.0e-8));
     assert(near(result.dca, 0.0, 1.0e-8));
   }
 
   {
-    HelixPoCAOptions options;
+    CPMReconstructionHelper::HelixPoCAOptions options;
     options.magnetic_field_z = 0.0;
-    const HelixState state{{1.0, 2.0, 3.0}, {0.0, 3.0, 4.0}, 1};
-    const auto eval = evaluateHelix(state, 5.0, options);
+    const CPMReconstructionHelper::HelixState state{{1.0, 2.0, 3.0}, {0.0, 3.0, 4.0}, 1};
+    const auto eval = CPMReconstructionHelper::evaluate_helix(state, 5.0, options);
 
     assert(eval.valid);
-    assert(near(eval.position.x, 1.0));
-    assert(near(eval.position.y, 5.0));
-    assert(near(eval.position.z, 7.0));
-    assert(near(eval.tangent.x, 0.0));
-    assert(near(eval.tangent.y, 0.6));
-    assert(near(eval.tangent.z, 0.8));
+    assert(near(eval.position.X(), 1.0));
+    assert(near(eval.position.Y(), 5.0));
+    assert(near(eval.position.Z(), 7.0));
+    assert(near(eval.tangent.X(), 0.0));
+    assert(near(eval.tangent.Y(), 0.6));
+    assert(near(eval.tangent.Z(), 0.8));
   }
 
   {
-    CPMPairOptions options;
-    options.solver = CPMPairSolver::Line;
+    CPMReconstructionHelper::PairOptions options;
+    options.solver = CPMReconstructionHelper::PairSolver::Line;
     options.min_pt = 0.5;
-    const CPMPairInput first{
+    const CPMReconstructionHelper::PairInput first{
         1,
         2.0,
         {-1.0, 0.0, 0.0},
         {1.0, 0.0, 0.0},
         {0.0, 0.0, 0.0}};
-    const CPMPairInput second{
+    const CPMReconstructionHelper::PairInput second{
         -1,
         4.0,
         {0.0, -1.0, 0.0},
         {0.0, 1.0, 0.0},
         {0.0, 0.0, 0.0}};
-    const auto result = computeCPMPair(first, second, {0.0, 0.0, 1.0}, options);
+    const auto result = CPMReconstructionHelper::compute_pair(first, second, {0.0, 0.0, 1.0}, options);
 
     assert(result.accepted());
     assert(near(result.pair_weight, 0.125));
     assert(near(result.delta_z, 1.0));
 
-    CPMCorrectionAccumulator accumulator;
+    CPMReconstructionHelper::CorrectionAccumulator accumulator;
     accumulator.add(
         result.delta_r,
         result.delta_rphi,
@@ -183,7 +186,7 @@ int main()
         0.0,
         1.0);
     assert(accumulator.entries == 1);
-    assert(near(cpmCorrectionWeightedMean(accumulator.sum_weighted_delta_z, accumulator.sum_pair_weight), 1.0));
+    assert(near(CPMReconstructionHelper::correction_weighted_mean(accumulator.sum_weighted_delta_z, accumulator.sum_pair_weight), 1.0));
   }
 
   return 0;
