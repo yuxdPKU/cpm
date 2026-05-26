@@ -193,7 +193,7 @@ namespace
 
 void PHCPMTpcCalibrationQA::write_records(
     TFile& output,
-    const VoxelContainer& records,
+    const CPMVoxelContainer& records,
     const std::string& tree_name)
 {
   output.cd();
@@ -202,7 +202,7 @@ void PHCPMTpcCalibrationQA::write_records(
   tree.SetDirectory(nullptr);
   book_tree(tree, fields);
 
-  for (const auto& [voxel, voxel_records] : records)
+  for (const auto& [voxel, voxel_records] : records.records())
   {
     (void) voxel;
     for (const auto& record : voxel_records)

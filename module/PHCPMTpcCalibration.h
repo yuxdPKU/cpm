@@ -110,7 +110,7 @@ class PHCPMTpcCalibration : public SubsysReco
   EventHeader* m_eventHeader = nullptr;
 
   TpcGlobalPositionWrapper m_globalPositionWrapper;
-  VoxelContainer m_voxelContainer;
+  CPMVoxelContainerv1 m_voxelContainer;
 
   int m_phiBins = 36;
   int m_rBins = 16;

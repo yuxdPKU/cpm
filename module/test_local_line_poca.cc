@@ -54,7 +54,7 @@ int main()
     second.state.momentum = {0.0, 1.0, 0.0};
     second.cluster.cluster_minus_voxel_center = {0.1, 0.0, 0.0};
 
-    VoxelContainer container;
+    CPMVoxelContainerv1 container;
     container.set_grid(36, 16, 80, 20.0, 78.0, -105.5, 105.5);
     container.add(first);
     container.add(second);
@@ -90,11 +90,11 @@ int main()
     second.track_ref.track_id = 1;
     second.cluster_ref.cluskey = 10;
 
-    VoxelContainer lhs;
+    CPMVoxelContainerv1 lhs;
     lhs.set_grid(4, 4, 4, 0.0, 4.0, -2.0, 2.0);
     lhs.add(first);
 
-    VoxelContainer rhs;
+    CPMVoxelContainerv1 rhs;
     rhs.add(second);
     lhs.add(rhs);
 

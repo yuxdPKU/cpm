@@ -15,13 +15,6 @@
 class CPMRecordReader
 {
  public:
-  struct Vector3
-  {
-    double x = std::numeric_limits<double>::quiet_NaN();
-    double y = std::numeric_limits<double>::quiet_NaN();
-    double z = std::numeric_limits<double>::quiet_NaN();
-  };
-
   struct Record
   {
     Long64_t entry = -1;

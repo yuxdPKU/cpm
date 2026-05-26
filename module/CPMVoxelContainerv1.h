@@ -65,6 +65,4 @@ class CPMVoxelContainerv1 : public CPMVoxelContainer
   ClassDefOverride(CPMVoxelContainerv1, 1)
 };
 
-using VoxelContainer = CPMVoxelContainerv1;
-
 #endif
