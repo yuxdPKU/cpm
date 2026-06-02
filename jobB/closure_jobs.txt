@@ -1,0 +1,2 @@
+sim_acts_unweighted output/sim_acts_unweighted_qa sim_acts_unweighted output/sim_acts_unweighted_qa/closure_slice_phi4p70_z10
+sim_genfit_unweighted output/sim_genfit_unweighted_qa sim_genfit_unweighted output/sim_genfit_unweighted_qa/closure_slice_phi4p70_z10

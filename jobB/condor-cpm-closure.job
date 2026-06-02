@@ -1,0 +1,33 @@
+# CPM closure-slice QA jobs.
+# Submit from the sPHENIX checkout with:
+#   cd /sphenix/u/xyu3/workarea/cpm/jobB
+#   condor_submit condor-cpm-closure.job
+
+Universe       = vanilla
+Notification   = Never
+PeriodicHold   = (NumJobStarts>=1 && JobStatus == 1)
+
+request_memory = 8GB
+request_cpus   = 1
+
+Priority       = 20
+GetEnv         = True
+Requirements   = (CPU_Speed >= 1)
+Rank           = CPU_Speed
+
+Initialdir     = /sphenix/u/xyu3/workarea/cpm/jobB
+Executable     = $(Initialdir)/run_cpm_closure_slice.sh
+
+Phi            = 4.7
+SelectZ        = 10.0
+DcaThresholds  = 2.0,1.0,0.5,0.2
+
+Arguments      = --qa-dir $(QaDir) --prefix $(Prefix) --plot-dir $(PlotDir) --phi $(Phi) --z $(SelectZ) --dca-thresholds $(DcaThresholds)
+
+Output         = $(Initialdir)/condor_logs/jobB-Closure-$(Name).out
+Error          = $(Initialdir)/condor_logs/jobB-Closure-$(Name).err
+Log            = $(Initialdir)/condor_logs/jobB-Closure-$(Name).log
+
+on_exit_hold   = (ExitBySignal == True) || (ExitCode != 0)
+
+Queue Name,QaDir,Prefix,PlotDir from $(Initialdir)/closure_jobs.txt
