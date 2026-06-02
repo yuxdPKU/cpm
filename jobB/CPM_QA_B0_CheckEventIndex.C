@@ -12,6 +12,7 @@
 #include <TFile.h>
 #include <TTree.h>
 
+#include <cstddef>
 #include <iostream>
 #include <map>
 #include <set>
@@ -172,10 +173,24 @@ bool CPM_QA_B0_CheckEventIndex(
   std::cout << "CPM_QA_B0_CheckEventIndex - invalid object event links: " << invalid_object_event << std::endl;
   std::cout << "CPM_QA_B0_CheckEventIndex - invalid voxel indices: " << invalid_voxel << std::endl;
   std::cout << "CPM_QA_B0_CheckEventIndex - invalid keys: " << invalid_keys << std::endl;
-  std::cout << "CPM_QA_B0_CheckEventIndex - events by track_source:" << std::endl;
+  constexpr std::size_t max_sources_to_print = 20;
+  std::cout << "CPM_QA_B0_CheckEventIndex - events by track_source: "
+            << events_by_track_source.size() << " sources" << std::endl;
+  std::size_t printed_sources = 0;
   for (const auto& [source, count] : events_by_track_source)
   {
+    if (printed_sources >= max_sources_to_print)
+    {
+      break;
+    }
     std::cout << "  " << (source.empty() ? "<empty>" : source) << ": " << count << std::endl;
+    ++printed_sources;
+  }
+  if (events_by_track_source.size() > max_sources_to_print)
+  {
+    std::cout << "  ... "
+              << (events_by_track_source.size() - max_sources_to_print)
+              << " more sources omitted" << std::endl;
   }
   std::cout << "CPM_QA_B0_CheckEventIndex - status: " << (ok ? "OK" : "FAILED") << std::endl;
 

@@ -9,6 +9,7 @@
  */
 
 #include <TCanvas.h>
+#include <TChain.h>
 #include <TFile.h>
 #include <TH1D.h>
 #include <TH3.h>
@@ -18,6 +19,7 @@
 #include <TTree.h>
 
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -69,6 +71,22 @@ namespace CPMQAPlot
     return !filename.empty() && (!gSystem || !gSystem->AccessPathName(filename.c_str()));
   }
 
+  std::vector<std::string> read_file_list(const std::string& input_list)
+  {
+    std::ifstream input(input_list);
+    std::vector<std::string> files;
+    std::string line;
+    while (std::getline(input, line))
+    {
+      if (line.empty() || line[0] == '#')
+      {
+        continue;
+      }
+      files.push_back(line);
+    }
+    return files;
+  }
+
   void draw_histogram(
       TH1D& histogram,
       const std::string& plot_dir,
@@ -93,18 +111,13 @@ namespace CPMQAPlot
   }
 
   bool draw_tree_plot(
-      TFile& input,
+      TTree& tree,
       TFile& output,
       const TreePlot& plot,
       const std::string& plot_dir,
       const bool save_pdf)
   {
-    auto* tree = dynamic_cast<TTree*>(input.Get(plot.tree_name.c_str()));
-    if (!tree)
-    {
-      return false;
-    }
-    if (!tree->GetBranch(plot.branch_name.c_str()))
+    if (!tree.GetBranch(plot.branch_name.c_str()))
     {
       std::cout << "CPM_QA_DrawIntermediateDistributions - missing branch "
                 << plot.tree_name << "." << plot.branch_name << std::endl;
@@ -123,10 +136,25 @@ namespace CPMQAPlot
 
     const TString draw_expression =
         TString::Format("%s>>%s", plot.branch_name.c_str(), plot.hist_name.c_str());
-    tree->Draw(draw_expression, plot.selection.c_str(), "goff");
+    tree.Draw(draw_expression, plot.selection.c_str(), "goff");
     histogram.Write();
     draw_histogram(histogram, plot_dir, save_pdf, plot.logy);
     return true;
+  }
+
+  bool draw_tree_plot(
+      TFile& input,
+      TFile& output,
+      const TreePlot& plot,
+      const std::string& plot_dir,
+      const bool save_pdf)
+  {
+    auto* tree = dynamic_cast<TTree*>(input.Get(plot.tree_name.c_str()));
+    if (!tree)
+    {
+      return false;
+    }
+    return draw_tree_plot(*tree, output, plot, plot_dir, save_pdf);
   }
 
   bool draw_th3_distribution(
@@ -215,6 +243,41 @@ namespace CPMQAPlot
     return drawn;
   }
 
+  unsigned int draw_tree_plots(
+      const std::vector<std::string>& filenames,
+      TFile& output,
+      const std::vector<TreePlot>& plots,
+      const std::string& plot_dir,
+      const bool save_pdf)
+  {
+    if (filenames.empty())
+    {
+      return 0;
+    }
+
+    unsigned int drawn = 0;
+    for (const auto& plot : plots)
+    {
+      TChain chain(plot.tree_name.c_str());
+      for (const auto& filename : filenames)
+      {
+        if (file_exists(filename))
+        {
+          chain.Add(filename.c_str());
+        }
+      }
+      if (chain.GetEntries() <= 0)
+      {
+        continue;
+      }
+      if (draw_tree_plot(chain, output, plot, plot_dir, save_pdf))
+      {
+        ++drawn;
+      }
+    }
+    return drawn;
+  }
+
   unsigned int draw_hist3_plots(
       const std::string& filename,
       TFile& output,
@@ -282,6 +345,8 @@ bool CPM_QA_DrawIntermediateDistributions(
       CPMQAPlot::join_path(qa_output_dir, prefix + "_QA_B0_event_index.root");
   const std::string b1_file =
       CPMQAPlot::join_path(qa_output_dir, prefix + "_QA_B1_poca.root");
+  const std::string b1_chunk_list =
+      CPMQAPlot::join_path(qa_output_dir, prefix + "_QA_B1_chunks.txt");
   const std::string b2_file =
       CPMQAPlot::join_path(qa_output_dir, prefix + "_QA_B2_voxel_corrections.root");
   const std::string b3_file =
@@ -301,8 +366,23 @@ bool CPM_QA_DrawIntermediateDistributions(
       output_dir,
       save_pdf);
 
+  std::vector<std::string> b1_files;
+  if (CPMQAPlot::file_exists(b1_file))
+  {
+    b1_files.push_back(b1_file);
+  }
+  else if (CPMQAPlot::file_exists(b1_chunk_list))
+  {
+    b1_files = CPMQAPlot::read_file_list(b1_chunk_list);
+  }
+  if (b1_files.empty())
+  {
+    std::cout << "CPM_QA_DrawIntermediateDistributions - skipping missing B1 inputs: "
+              << b1_file << " or " << b1_chunk_list << std::endl;
+  }
+
   drawn += CPMQAPlot::draw_tree_plots(
-      b1_file,
+      b1_files,
       output,
       {
           {"cpm_poca_pairs", "dca", "h_b1_pair_dca", "B1 accepted pair DCA;DCA [cm];pairs", 100, 0.0, 5.0, "", true},

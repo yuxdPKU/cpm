@@ -15,4 +15,5 @@ echo run data qa unweighted
   --input-is-list \
   --out-dir output/run79516_unweighted_qa \
   --prefix run79516_unweighted \
-  --unweighted
+  --unweighted \
+  --write-pair-tree

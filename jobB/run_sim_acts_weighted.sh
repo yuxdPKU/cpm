@@ -15,4 +15,5 @@ echo run sim acts qa weighted
   --input-is-list \
   --out-dir output/sim_acts_weighted_qa \
   --prefix sim_acts_weighted \
-  --weighted
+  --weighted \
+  --write-pair-tree

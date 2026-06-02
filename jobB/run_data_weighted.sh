@@ -15,4 +15,5 @@ echo run data weighted
   --input-is-list \
   --out-dir output/run79516_weighted_qa \
   --prefix run79516_weighted \
-  --weighted
+  --weighted \
+  --write-pair-tree

@@ -17,6 +17,7 @@ echo run sim genfit qa unweighted
   --input-is-list \
   --out-dir output/sim_genfit_unweighted_qa \
   --prefix sim_genfit_unweighted \
-  --unweighted
+  --unweighted \
+  --write-pair-tree
 
 echo $?
