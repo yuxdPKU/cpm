@@ -102,6 +102,16 @@ run_root_bool_check() {
   root -l -b -q -e "gROOT->LoadMacro(${macro_file_q}); bool ok = ${function_call}; gSystem->Exit(ok ? 0 : 1);"
 }
 
+run_root_void() {
+  local macro_file=$1
+  local function_call=$2
+  local macro_file_q
+  macro_file_q=$(root_string "$macro_file")
+  echo
+  echo "[run_cpm_qa_chain] root run ${function_call}"
+  root -l -b -q -e "gROOT->LoadMacro(${macro_file_q}); ${function_call}; gSystem->Exit(0);"
+}
+
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
 MACRO_DIR="${REPO_DIR}/jobB"
@@ -289,6 +299,11 @@ if [[ "$B2_INPUT_MODE" != "auto" && "$B2_INPUT_MODE" != "pairs" && "$B2_INPUT_MO
   exit 2
 fi
 
+if [[ ! "$B1_FILES_PER_CHUNK" =~ ^[0-9]+$ ]]; then
+  echo "Invalid --b1-files-per-chunk: $B1_FILES_PER_CHUNK (expected a non-negative integer)" >&2
+  exit 2
+fi
+
 mkdir -p "$OUT_DIR"
 
 if [[ -z "$METADATA" ]]; then
@@ -319,6 +334,59 @@ B2_INPUT_MODE_Q=$(root_std_string "$B2_INPUT_MODE")
 METADATA_Q=$(root_string "$METADATA")
 PLOT_DIR_Q=$(root_string "$PLOT_DIR")
 
+B0_OUTPUT="${OUT_DIR}/${PREFIX}_QA_B0_event_index.root"
+B1_OUTPUT="${OUT_DIR}/${PREFIX}_QA_B1_poca.root"
+B1_CHUNK_DIR="${OUT_DIR}/${PREFIX}_QA_B1_chunks"
+B1_CHUNK_LIST="${OUT_DIR}/${PREFIX}_QA_B1_chunks.txt"
+B2_OUTPUT="${OUT_DIR}/${PREFIX}_QA_B2_voxel_corrections.root"
+B3_OUTPUT="${OUT_DIR}/${PREFIX}_B3_average_correction_histograms.root"
+B0_OUTPUT_Q=$(root_string "$B0_OUTPUT")
+B2_OUTPUT_Q=$(root_string "$B2_OUTPUT")
+B3_OUTPUT_Q=$(root_string "$B3_OUTPUT")
+B1_CHUNK_LIST_Q=$(root_string "$B1_CHUNK_LIST")
+
+B1_SEGMENT_LISTS=()
+B1_SEGMENT_OUTPUTS=()
+
+write_b1_segment_lists() {
+  local input_list=$1
+  local segment_dir=$2
+  local output_list=$3
+  local files_per_chunk=$4
+  local line
+  local chunk_index=-1
+  local chunk_count=0
+  local chunk_tag=""
+  local current_list=""
+  local current_output=""
+
+  mkdir -p "$segment_dir"
+  : > "$output_list"
+
+  while IFS= read -r line; do
+    if [[ -z "$line" || "${line:0:1}" == "#" ]]; then
+      continue
+    fi
+    if [[ "$chunk_count" -eq 0 ]]; then
+      chunk_index=$((chunk_index + 1))
+      printf -v chunk_tag "%04d" "$chunk_index"
+      current_list="${segment_dir}/${PREFIX}_QA_B1_input_chunk${chunk_tag}.list"
+      current_output="${segment_dir}/${PREFIX}_QA_B1_poca_chunk${chunk_tag}.root"
+      : > "$current_list"
+      printf '%s\n' "$current_output" >> "$output_list"
+      B1_SEGMENT_LISTS+=("$current_list")
+      B1_SEGMENT_OUTPUTS+=("$current_output")
+    fi
+    printf '%s\n' "$line" >> "$current_list"
+    chunk_count=$((chunk_count + 1))
+    if [[ "$chunk_count" -ge "$files_per_chunk" ]]; then
+      chunk_count=0
+    fi
+  done < "$input_list"
+
+  [[ "$chunk_index" -ge 0 ]]
+}
+
 echo "[run_cpm_qa_chain] input: $INPUT"
 echo "[run_cpm_qa_chain] input_is_list: $INPUT_IS_LIST"
 echo "[run_cpm_qa_chain] metadata: $METADATA"
@@ -337,7 +405,37 @@ echo "[run_cpm_qa_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 echo "[run_cpm_qa_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 echo "[run_cpm_qa_chain] make_plots: $MAKE_PLOTS"
 
-run_root_bool_check "${MACRO_DIR}/CPM_QA_RunOfflineDiagnostics.C" "CPM_QA_RunOfflineDiagnostics(${INPUT_Q},${OUT_DIR_Q},${PREFIX_Q},${INPUT_IS_LIST},${RUN_B0_QA},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARIES},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q},${B3_MIN_ENTRIES},${METADATA_Q},${B1_FILES_PER_CHUNK})"
+if [[ "$INPUT_IS_LIST" -eq 1 && "$B1_FILES_PER_CHUNK" != "0" ]]; then
+  if ! write_b1_segment_lists "$INPUT" "$B1_CHUNK_DIR" "$B1_CHUNK_LIST" "$B1_FILES_PER_CHUNK"; then
+    echo "Could not split B1 input list: $INPUT" >&2
+    exit 1
+  fi
+
+  echo "[run_cpm_qa_chain] process-level B1 chunks: ${#B1_SEGMENT_LISTS[@]}"
+  echo "[run_cpm_qa_chain] B1 chunk directory: $B1_CHUNK_DIR"
+  echo "[run_cpm_qa_chain] B1 chunk list: $B1_CHUNK_LIST"
+
+  if [[ "$RUN_B0_QA" -eq 1 ]]; then
+    run_root_void "${MACRO_DIR}/CPM_QA_B0_BuildEventIndex.C" "CPM_QA_B0_BuildEventIndex(${INPUT_Q},${B0_OUTPUT_Q},${INPUT_IS_LIST})"
+    run_root_bool_check "${MACRO_DIR}/CPM_QA_B0_CheckEventIndex.C" "CPM_QA_B0_CheckEventIndex(${B0_OUTPUT_Q})"
+  fi
+
+  for chunk_index in "${!B1_SEGMENT_LISTS[@]}"; do
+    chunk_list=${B1_SEGMENT_LISTS[$chunk_index]}
+    chunk_output=${B1_SEGMENT_OUTPUTS[$chunk_index]}
+    chunk_list_q=$(root_string "$chunk_list")
+    chunk_output_q=$(root_string "$chunk_output")
+    echo
+    echo "[run_cpm_qa_chain] running B1 chunk $((chunk_index + 1))/${#B1_SEGMENT_LISTS[@]}: $chunk_list"
+    run_root_void "${MACRO_DIR}/CPM_QA_B1_ComputePoCA.C" "CPM_QA_B1_ComputePoCA(${chunk_list_q},${chunk_output_q},true,${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARIES},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE})"
+  done
+
+  run_root_void "${MACRO_DIR}/CPM_QA_B2_AccumulateVoxelCorrections.C" "CPM_QA_B2_AccumulateVoxelCorrectionsFromList(${B1_CHUNK_LIST_Q},${B2_OUTPUT_Q},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q})"
+  run_root_void "${MACRO_DIR}/CPM_QA_B3_WriteAverageCorrectionHistograms.C" "CPM_QA_B3_WriteAverageCorrectionHistograms(${B2_OUTPUT_Q},${B3_OUTPUT_Q},${METADATA_Q},${B3_MIN_ENTRIES})"
+  run_root_bool_check "${MACRO_DIR}/CPM_QA_B3_CheckAverageCorrectionHistograms.C" "CPM_QA_B3_CheckAverageCorrectionHistograms(${B3_OUTPUT_Q})"
+else
+  run_root_bool_check "${MACRO_DIR}/CPM_QA_RunOfflineDiagnostics.C" "CPM_QA_RunOfflineDiagnostics(${INPUT_Q},${OUT_DIR_Q},${PREFIX_Q},${INPUT_IS_LIST},${RUN_B0_QA},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARIES},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q},${B3_MIN_ENTRIES},${METADATA_Q},${B1_FILES_PER_CHUNK})"
+fi
 
 if [[ "$MAKE_PLOTS" -eq 1 ]]; then
   run_root_bool_check "$PLOT_MACRO" "CPM_QA_DrawIntermediateDistributions(${OUT_DIR_Q},${PREFIX_Q},${PLOT_DIR_Q},true)"
