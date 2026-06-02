@@ -14,6 +14,20 @@
 #include <map>
 #include <vector>
 
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
+
+namespace
+{
+  void trim_heap_after_chunk()
+  {
+#if defined(__GLIBC__)
+    malloc_trim(0);
+#endif
+  }
+}
+
 CPMAverageCorrectionReconstruction::CPMAverageCorrectionReconstruction()
 {
 }
@@ -332,6 +346,7 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
 
   m_summary.accumulator_voxels = m_accumulators.size();
   m_records.Reset();
+  trim_heap_after_chunk();
   return true;
 }
 
