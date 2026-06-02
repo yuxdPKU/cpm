@@ -168,6 +168,19 @@ std::size_t CPMVoxelContainerv1::record_count() const
   return out;
 }
 
+std::vector<TrackStateRecord> CPMVoxelContainerv1::take_records(const VoxelId& voxel)
+{
+  const auto iter = m_records.find(voxel);
+  if (iter == m_records.end())
+  {
+    return {};
+  }
+
+  auto records = std::move(iter->second);
+  m_records.erase(iter);
+  return records;
+}
+
 void CPMVoxelContainerv1::sort_records()
 {
   for (auto& [voxel, records] : m_records)

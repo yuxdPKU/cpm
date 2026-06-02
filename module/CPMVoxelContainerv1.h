@@ -48,6 +48,7 @@ class CPMVoxelContainerv1 : public CPMVoxelContainer
   [[nodiscard]] std::map<VoxelId, std::vector<TrackStateRecord>>::const_iterator begin() const { return m_records.begin(); }
   [[nodiscard]] std::map<VoxelId, std::vector<TrackStateRecord>>::const_iterator end() const { return m_records.end(); }
 
+  std::vector<TrackStateRecord> take_records(const VoxelId& voxel);
   void sort_records() override;
   void clear() override { m_records.clear(); }
 

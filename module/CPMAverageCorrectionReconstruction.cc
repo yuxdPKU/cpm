@@ -12,6 +12,8 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <string_view>
+#include <tuple>
 #include <vector>
 
 #if defined(__GLIBC__)
@@ -25,6 +27,58 @@ namespace
 #if defined(__GLIBC__)
     malloc_trim(0);
 #endif
+  }
+
+  std::string_view view_string(const std::string& value)
+  {
+    return {value.data(), value.size()};
+  }
+
+  struct EventTrackKeyView
+  {
+    std::string_view cluster_source;
+    std::string_view track_source;
+    int run = -1;
+    int segment = -1;
+    int sync_event = -1;
+    int event_sequence = -1;
+    unsigned long long stream_event_ordinal = 0;
+    unsigned int track_id = 0;
+
+    friend bool operator<(const EventTrackKeyView& lhs, const EventTrackKeyView& rhs)
+    {
+      return std::tie(lhs.cluster_source, lhs.track_source, lhs.run, lhs.segment,
+                      lhs.sync_event, lhs.event_sequence, lhs.stream_event_ordinal,
+                      lhs.track_id) <
+             std::tie(rhs.cluster_source, rhs.track_source, rhs.run, rhs.segment,
+                      rhs.sync_event, rhs.event_sequence, rhs.stream_event_ordinal,
+                      rhs.track_id);
+    }
+  };
+
+  EventTrackKeyView event_track_key_view(const TrackStateRecord& record)
+  {
+    return {
+        view_string(record.event_ref.cluster_source),
+        view_string(record.event_ref.track_source),
+        record.event_ref.run,
+        record.event_ref.segment,
+        record.event_ref.sync_event,
+        record.event_ref.event_sequence,
+        record.event_ref.stream_event_ordinal,
+        record.track_ref.track_id};
+  }
+
+  bool same_event_track(const TrackStateRecord& lhs, const TrackStateRecord& rhs)
+  {
+    return lhs.event_ref.cluster_source == rhs.event_ref.cluster_source &&
+           lhs.event_ref.track_source == rhs.event_ref.track_source &&
+           lhs.event_ref.run == rhs.event_ref.run &&
+           lhs.event_ref.segment == rhs.event_ref.segment &&
+           lhs.event_ref.sync_event == rhs.event_ref.sync_event &&
+           lhs.event_ref.event_sequence == rhs.event_ref.event_sequence &&
+           lhs.event_ref.stream_event_ordinal == rhs.event_ref.stream_event_ordinal &&
+           lhs.track_ref.track_id == rhs.track_ref.track_id;
   }
 }
 
@@ -152,15 +206,30 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
     return true;
   }
 
+  std::vector<VoxelId> voxels;
+  voxels.reserve(m_records.voxel_count());
   for (const auto& [voxel, records] : m_records.records())
   {
+    (void) records;
+    voxels.push_back(voxel);
+  }
+
+  std::size_t processed_voxels_in_chunk = 0;
+  for (const auto& voxel : voxels)
+  {
+    const auto records = m_records.take_records(voxel);
+    ++processed_voxels_in_chunk;
     if (m_max_records_per_voxel > 0 && records.size() > m_max_records_per_voxel)
     {
       ++m_summary.skipped_large_voxels;
+      if (processed_voxels_in_chunk % 256 == 0)
+      {
+        trim_heap_after_chunk();
+      }
       continue;
     }
 
-    std::map<CPMReconstructionHelper::EventTrackKey, const TrackStateRecord*> closest_record_by_track;
+    std::map<EventTrackKeyView, const TrackStateRecord*> closest_record_by_track;
     unsigned long long good_records = 0;
     for (const auto& record : records)
     {
@@ -174,7 +243,7 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
       }
       ++good_records;
       auto [iter, inserted] = closest_record_by_track.emplace(
-          CPMReconstructionHelper::event_track_key(record),
+          event_track_key_view(record),
           &record);
       if (!inserted &&
           CPMReconstructionHelper::is_closer_to_voxel_center(record, *iter->second))
@@ -196,6 +265,10 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
     if (selected_records.size() < 2)
     {
       ++m_summary.skipped_low_selected_voxels;
+      if (processed_voxels_in_chunk % 256 == 0)
+      {
+        trim_heap_after_chunk();
+      }
       continue;
     }
 
@@ -237,6 +310,10 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
         negative_records.size() < m_min_records_per_charge)
     {
       ++m_summary.skipped_low_charge_voxels;
+      if (processed_voxels_in_chunk % 256 == 0)
+      {
+        trim_heap_after_chunk();
+      }
       continue;
     }
 
@@ -276,8 +353,7 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
         {
           const auto& a = *positive_records[positive_begin + ipos];
           const auto& b = *negative_records[negative_begin + ineg];
-          if (CPMReconstructionHelper::event_track_key(a) ==
-              CPMReconstructionHelper::event_track_key(b))
+          if (same_event_track(a, b))
           {
             ++m_summary.same_event_track_pairs;
             continue;
@@ -341,6 +417,11 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
     else
     {
       ++m_summary.skipped_low_batch_charge_voxels;
+    }
+
+    if (processed_voxels_in_chunk % 256 == 0)
+    {
+      trim_heap_after_chunk();
     }
   }
 
