@@ -12,6 +12,7 @@
 #include <TChain.h>
 #include <TFile.h>
 #include <TH1D.h>
+#include <TH2D.h>
 #include <TH3.h>
 #include <TString.h>
 #include <TStyle.h>
@@ -51,6 +52,23 @@ namespace CPMQAPlot
     double max = 1.0;
     bool require_entries = true;
     bool logy = false;
+  };
+
+  struct TreePlot2D
+  {
+    std::string tree_name;
+    std::string x_expression;
+    std::string y_expression;
+    std::string hist_name;
+    std::string title;
+    int xbins = 100;
+    double xmin = 0.0;
+    double xmax = 1.0;
+    int ybins = 100;
+    double ymin = 0.0;
+    double ymax = 1.0;
+    std::vector<std::string> required_branches;
+    std::string selection;
   };
 
   std::string join_path(const std::string& directory, const std::string& filename)
@@ -110,6 +128,40 @@ namespace CPMQAPlot
     }
   }
 
+  void draw_histogram2d(
+      TH2D& histogram,
+      const std::string& plot_dir,
+      const bool save_pdf)
+  {
+    TCanvas canvas(
+        TString::Format("c_%s", histogram.GetName()),
+        histogram.GetTitle(),
+        950,
+        760);
+    canvas.SetRightMargin(0.15);
+    histogram.Draw("colz");
+    if (save_pdf)
+    {
+      canvas.SaveAs(join_path(plot_dir, std::string(histogram.GetName()) + ".pdf").c_str());
+    }
+  }
+
+  bool has_required_branches(
+      TTree& tree,
+      const TreePlot2D& plot)
+  {
+    for (const auto& branch : plot.required_branches)
+    {
+      if (!tree.GetBranch(branch.c_str()))
+      {
+        std::cout << "CPM_QA_DrawIntermediateDistributions - missing branch "
+                  << plot.tree_name << "." << branch << std::endl;
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool draw_tree_plot(
       TTree& tree,
       TFile& output,
@@ -155,6 +207,47 @@ namespace CPMQAPlot
       return false;
     }
     return draw_tree_plot(*tree, output, plot, plot_dir, save_pdf);
+  }
+
+  bool draw_tree_plot2d(
+      TTree& tree,
+      TFile& output,
+      const TreePlot2D& plot,
+      const std::string& plot_dir,
+      const bool save_pdf)
+  {
+    if (!has_required_branches(tree, plot))
+    {
+      return false;
+    }
+
+    output.cd();
+    TH2D histogram(
+        plot.hist_name.c_str(),
+        plot.title.c_str(),
+        plot.xbins,
+        plot.xmin,
+        plot.xmax,
+        plot.ybins,
+        plot.ymin,
+        plot.ymax);
+    histogram.Sumw2();
+    histogram.SetDirectory(&output);
+
+    const TString draw_expression =
+        TString::Format("%s:%s>>%s",
+                        plot.y_expression.c_str(),
+                        plot.x_expression.c_str(),
+                        plot.hist_name.c_str());
+    const auto drawn = tree.Draw(draw_expression, plot.selection.c_str(), "goff");
+    if (drawn <= 0)
+    {
+      return false;
+    }
+
+    histogram.Write();
+    draw_histogram2d(histogram, plot_dir, save_pdf);
+    return true;
   }
 
   bool draw_th3_distribution(
@@ -278,6 +371,63 @@ namespace CPMQAPlot
     return drawn;
   }
 
+  unsigned int draw_tree_plots2d(
+      const std::vector<std::string>& filenames,
+      TFile& output,
+      const std::vector<TreePlot2D>& plots,
+      const std::string& plot_dir,
+      const bool save_pdf)
+  {
+    if (filenames.empty())
+    {
+      return 0;
+    }
+
+    unsigned int drawn = 0;
+    for (const auto& plot : plots)
+    {
+      TChain chain(plot.tree_name.c_str());
+      for (const auto& filename : filenames)
+      {
+        if (file_exists(filename))
+        {
+          chain.Add(filename.c_str());
+        }
+      }
+      if (chain.GetEntries() <= 0)
+      {
+        continue;
+      }
+      if (draw_tree_plot2d(chain, output, plot, plot_dir, save_pdf))
+      {
+        ++drawn;
+      }
+    }
+    return drawn;
+  }
+
+  unsigned int draw_tree_plots2d(
+      const std::string& filename,
+      TFile& output,
+      const std::vector<TreePlot2D>& plots,
+      const std::string& plot_dir,
+      const bool save_pdf)
+  {
+    if (!file_exists(filename))
+    {
+      std::cout << "CPM_QA_DrawIntermediateDistributions - skipping missing file: "
+                << filename << std::endl;
+      return 0;
+    }
+
+    return draw_tree_plots2d(
+        std::vector<std::string>{filename},
+        output,
+        plots,
+        plot_dir,
+        save_pdf);
+  }
+
   unsigned int draw_hist3_plots(
       const std::string& filename,
       TFile& output,
@@ -381,6 +531,13 @@ bool CPM_QA_DrawIntermediateDistributions(
               << b1_file << " or " << b1_chunk_list << std::endl;
   }
 
+  const std::string b1_phi_expression =
+      "atan2(voxel_center_y,voxel_center_x)+(atan2(voxel_center_y,voxel_center_x)<0)*6.283185307179586";
+  const std::string b1_r_expression =
+      "sqrt(voxel_center_x*voxel_center_x+voxel_center_y*voxel_center_y)";
+  const std::string b1_rphi_expression =
+      "(" + b1_r_expression + ")*(" + b1_phi_expression + ")";
+
   drawn += CPMQAPlot::draw_tree_plots(
       b1_files,
       output,
@@ -417,6 +574,33 @@ bool CPM_QA_DrawIntermediateDistributions(
       output_dir,
       save_pdf);
 
+  drawn += CPMQAPlot::draw_tree_plots2d(
+      b1_files,
+      output,
+      {
+          {"cpm_poca_pairs", b1_r_expression, "delta_r", "h_b1_pair_delta_r_vs_r", "B1 pair #Deltar vs voxel r;r [cm];#Deltar [cm]", 80, 20.0, 78.0, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_r"}},
+          {"cpm_poca_pairs", b1_phi_expression, "delta_r", "h_b1_pair_delta_r_vs_phi", "B1 pair #Deltar vs voxel #phi;#phi [rad];#Deltar [cm]", 72, 0.0, 6.283185307179586, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_r"}},
+          {"cpm_poca_pairs", b1_rphi_expression, "delta_r", "h_b1_pair_delta_r_vs_rphi", "B1 pair #Deltar vs voxel r#phi;r#phi [cm];#Deltar [cm]", 120, 0.0, 500.0, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_r"}},
+          {"cpm_poca_pairs", "voxel_center_z", "delta_r", "h_b1_pair_delta_r_vs_z", "B1 pair #Deltar vs voxel z;z [cm];#Deltar [cm]", 120, -110.0, 110.0, 120, -5.0, 5.0, {"voxel_center_z", "delta_r"}},
+          {"cpm_poca_pairs", b1_r_expression, "delta_rphi", "h_b1_pair_delta_rphi_vs_r", "B1 pair r#Delta#phi vs voxel r;r [cm];r#Delta#phi [cm]", 80, 20.0, 78.0, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_rphi"}},
+          {"cpm_poca_pairs", b1_phi_expression, "delta_rphi", "h_b1_pair_delta_rphi_vs_phi", "B1 pair r#Delta#phi vs voxel #phi;#phi [rad];r#Delta#phi [cm]", 72, 0.0, 6.283185307179586, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_rphi"}},
+          {"cpm_poca_pairs", b1_rphi_expression, "delta_rphi", "h_b1_pair_delta_rphi_vs_rphi", "B1 pair r#Delta#phi vs voxel r#phi;r#phi [cm];r#Delta#phi [cm]", 120, 0.0, 500.0, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_rphi"}},
+          {"cpm_poca_pairs", "voxel_center_z", "delta_rphi", "h_b1_pair_delta_rphi_vs_z", "B1 pair r#Delta#phi vs voxel z;z [cm];r#Delta#phi [cm]", 120, -110.0, 110.0, 120, -5.0, 5.0, {"voxel_center_z", "delta_rphi"}},
+          {"cpm_poca_pairs", b1_r_expression, "delta_z", "h_b1_pair_delta_z_vs_r", "B1 pair #Deltaz vs voxel r;r [cm];#Deltaz [cm]", 80, 20.0, 78.0, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_z"}},
+          {"cpm_poca_pairs", b1_phi_expression, "delta_z", "h_b1_pair_delta_z_vs_phi", "B1 pair #Deltaz vs voxel #phi;#phi [rad];#Deltaz [cm]", 72, 0.0, 6.283185307179586, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_z"}},
+          {"cpm_poca_pairs", b1_rphi_expression, "delta_z", "h_b1_pair_delta_z_vs_rphi", "B1 pair #Deltaz vs voxel r#phi;r#phi [cm];#Deltaz [cm]", 120, 0.0, 500.0, 120, -5.0, 5.0, {"voxel_center_x", "voxel_center_y", "delta_z"}},
+          {"cpm_poca_pairs", "voxel_center_z", "delta_z", "h_b1_pair_delta_z_vs_z", "B1 pair #Deltaz vs voxel z;z [cm];#Deltaz [cm]", 120, -110.0, 110.0, 120, -5.0, 5.0, {"voxel_center_z", "delta_z"}},
+      },
+      output_dir,
+      save_pdf);
+
+  const std::string b2_phi_expression =
+      "atan2(voxel_y,voxel_x)+(atan2(voxel_y,voxel_x)<0)*6.283185307179586";
+  const std::string b2_r_expression =
+      "sqrt(voxel_x*voxel_x+voxel_y*voxel_y)";
+  const std::string b2_rphi_expression =
+      "(" + b2_r_expression + ")*(" + b2_phi_expression + ")";
+
   drawn += CPMQAPlot::draw_tree_plots(
       b2_file,
       output,
@@ -433,6 +617,26 @@ bool CPM_QA_DrawIntermediateDistributions(
           {"cpm_voxel_corrections", "rms_delta_z", "h_b2_voxel_rms_delta_z", "B2 RMS #Deltaz;RMS [cm];voxels", 100, 0.0, 5.0, "", false},
           {"cpm_voxel_corrections", "mean_dca", "h_b2_voxel_mean_dca", "B2 mean DCA;DCA [cm];voxels", 100, 0.0, 5.0, "", false},
           {"cpm_voxel_corrections", "rms_dca", "h_b2_voxel_rms_dca", "B2 RMS DCA;DCA [cm];voxels", 100, 0.0, 5.0, "", false},
+      },
+      output_dir,
+      save_pdf);
+
+  drawn += CPMQAPlot::draw_tree_plots2d(
+      b2_file,
+      output,
+      {
+          {"cpm_voxel_corrections", b2_r_expression, "mean_delta_r", "h_b2_voxel_mean_delta_r_vs_r", "B2 mean #Deltar vs voxel r;r [cm];mean #Deltar [cm]", 80, 20.0, 78.0, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_r"}},
+          {"cpm_voxel_corrections", b2_phi_expression, "mean_delta_r", "h_b2_voxel_mean_delta_r_vs_phi", "B2 mean #Deltar vs voxel #phi;#phi [rad];mean #Deltar [cm]", 72, 0.0, 6.283185307179586, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_r"}},
+          {"cpm_voxel_corrections", b2_rphi_expression, "mean_delta_r", "h_b2_voxel_mean_delta_r_vs_rphi", "B2 mean #Deltar vs voxel r#phi;r#phi [cm];mean #Deltar [cm]", 120, 0.0, 500.0, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_r"}},
+          {"cpm_voxel_corrections", "voxel_z", "mean_delta_r", "h_b2_voxel_mean_delta_r_vs_z", "B2 mean #Deltar vs voxel z;z [cm];mean #Deltar [cm]", 120, -110.0, 110.0, 120, -5.0, 5.0, {"voxel_z", "mean_delta_r"}},
+          {"cpm_voxel_corrections", b2_r_expression, "mean_delta_rphi", "h_b2_voxel_mean_delta_rphi_vs_r", "B2 mean r#Delta#phi vs voxel r;r [cm];mean r#Delta#phi [cm]", 80, 20.0, 78.0, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_rphi"}},
+          {"cpm_voxel_corrections", b2_phi_expression, "mean_delta_rphi", "h_b2_voxel_mean_delta_rphi_vs_phi", "B2 mean r#Delta#phi vs voxel #phi;#phi [rad];mean r#Delta#phi [cm]", 72, 0.0, 6.283185307179586, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_rphi"}},
+          {"cpm_voxel_corrections", b2_rphi_expression, "mean_delta_rphi", "h_b2_voxel_mean_delta_rphi_vs_rphi", "B2 mean r#Delta#phi vs voxel r#phi;r#phi [cm];mean r#Delta#phi [cm]", 120, 0.0, 500.0, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_rphi"}},
+          {"cpm_voxel_corrections", "voxel_z", "mean_delta_rphi", "h_b2_voxel_mean_delta_rphi_vs_z", "B2 mean r#Delta#phi vs voxel z;z [cm];mean r#Delta#phi [cm]", 120, -110.0, 110.0, 120, -5.0, 5.0, {"voxel_z", "mean_delta_rphi"}},
+          {"cpm_voxel_corrections", b2_r_expression, "mean_delta_z", "h_b2_voxel_mean_delta_z_vs_r", "B2 mean #Deltaz vs voxel r;r [cm];mean #Deltaz [cm]", 80, 20.0, 78.0, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_z"}},
+          {"cpm_voxel_corrections", b2_phi_expression, "mean_delta_z", "h_b2_voxel_mean_delta_z_vs_phi", "B2 mean #Deltaz vs voxel #phi;#phi [rad];mean #Deltaz [cm]", 72, 0.0, 6.283185307179586, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_z"}},
+          {"cpm_voxel_corrections", b2_rphi_expression, "mean_delta_z", "h_b2_voxel_mean_delta_z_vs_rphi", "B2 mean #Deltaz vs voxel r#phi;r#phi [cm];mean #Deltaz [cm]", 120, 0.0, 500.0, 120, -5.0, 5.0, {"voxel_x", "voxel_y", "mean_delta_z"}},
+          {"cpm_voxel_corrections", "voxel_z", "mean_delta_z", "h_b2_voxel_mean_delta_z_vs_z", "B2 mean #Deltaz vs voxel z;z [cm];mean #Deltaz [cm]", 120, -110.0, 110.0, 120, -5.0, 5.0, {"voxel_z", "mean_delta_z"}},
       },
       output_dir,
       save_pdf);
