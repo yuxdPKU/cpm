@@ -515,6 +515,45 @@ namespace CPMClosureSlice
     line->Draw("same");
   }
 
+  std::string legend_pdf_name(const std::string& output_pdf)
+  {
+    const std::string suffix = ".pdf";
+    if (output_pdf.size() >= suffix.size() &&
+        output_pdf.substr(output_pdf.size() - suffix.size()) == suffix)
+    {
+      return output_pdf.substr(0, output_pdf.size() - suffix.size()) + "_legend.pdf";
+    }
+    return output_pdf + "_legend.pdf";
+  }
+
+  void draw_legend_pdf(
+      const std::vector<std::pair<TObject*, std::string>>& entries,
+      const std::string& title,
+      const std::string& output_pdf)
+  {
+    if (entries.empty())
+    {
+      return;
+    }
+
+    TCanvas canvas("c_closure_legend", title.c_str(), 1100, 520);
+    TLegend legend(0.05, 0.06, 0.95, 0.92);
+    legend.SetHeader(title.c_str());
+    legend.SetBorderSize(0);
+    legend.SetFillStyle(0);
+    legend.SetTextSize(0.045);
+    if (entries.size() > 5)
+    {
+      legend.SetNColumns(2);
+    }
+    for (const auto& [object, label] : entries)
+    {
+      legend.AddEntry(object, label.c_str(), "l");
+    }
+    legend.Draw();
+    canvas.SaveAs(output_pdf.c_str());
+  }
+
   void draw_point_components(
       ThresholdProfiles& profiles,
       const std::string& title,
@@ -554,16 +593,13 @@ namespace CPMClosureSlice
     profiles.point_b_z->Draw("hist same");
     draw_zero_line();
 
-    auto* legend = new TLegend(0.14, 0.74, 0.88, 0.9);
-    legend->SetBorderSize(0);
-    legend->SetFillStyle(0);
-    legend->AddEntry(profiles.midpoint_r, "midpoint", "l");
-    legend->AddEntry(profiles.point_a_r, "positive-track PoCA point", "l");
-    legend->AddEntry(profiles.point_b_r, "negative-track PoCA point", "l");
-    canvas.cd(1);
-    legend->Draw();
-
     canvas.SaveAs(output_pdf.c_str());
+    draw_legend_pdf(
+        {{profiles.midpoint_r, "midpoint"},
+         {profiles.point_a_r, "positive-track PoCA point"},
+         {profiles.point_b_r, "negative-track PoCA point"}},
+        title + " legend",
+        legend_pdf_name(output_pdf));
   }
 
   void draw_dca_scan_component(
@@ -580,9 +616,7 @@ namespace CPMClosureSlice
     canvas.SetGridy();
 
     bool drew = false;
-    TLegend legend(0.14, 0.72, 0.88, 0.9);
-    legend.SetBorderSize(0);
-    legend.SetFillStyle(0);
+    std::vector<std::pair<TObject*, std::string>> legend_entries;
 
     for (std::size_t ithr = 0; ithr < side_profiles.size(); ++ithr)
     {
@@ -603,19 +637,21 @@ namespace CPMClosureSlice
       profile->SetTitle(title.c_str());
       profile->Draw(drew ? "hist same" : "hist");
       drew = true;
-      legend.AddEntry(profile, Form("B1 pairs DCA <= %.2f cm", side_profiles[ithr].dca_threshold), "l");
+      legend_entries.emplace_back(
+          profile,
+          Form("B1 pairs DCA <= %.2f cm", side_profiles[ithr].dca_threshold));
     }
 
     if (b3_hist)
     {
       set_hist_style(b3_hist, kGray + 2, 2, 3);
       b3_hist->Draw(drew ? "hist same" : "hist");
-      legend.AddEntry(b3_hist, "B3 original map", "l");
+      legend_entries.emplace_back(b3_hist, "B3 original map");
     }
 
     draw_zero_line();
-    legend.Draw();
     canvas.SaveAs(output_pdf.c_str());
+    draw_legend_pdf(legend_entries, title + " legend", legend_pdf_name(output_pdf));
   }
 
   void draw_entries_scan(
@@ -630,22 +666,21 @@ namespace CPMClosureSlice
     canvas.SetLogy();
 
     bool drew = false;
-    TLegend legend(0.14, 0.72, 0.88, 0.9);
-    legend.SetBorderSize(0);
-    legend.SetFillStyle(0);
+    std::vector<std::pair<TObject*, std::string>> legend_entries;
 
     for (std::size_t ithr = 0; ithr < side_profiles.size(); ++ithr)
     {
       auto* hist = side_profiles[ithr].entries;
       set_hist_style(hist, colors[ithr % colors.size()], 1, ithr == 0 ? 3 : 2);
+      hist->SetMinimum(1.0e3);
       hist->SetTitle(title.c_str());
       hist->Draw(drew ? "hist same" : "hist");
       drew = true;
-      legend.AddEntry(hist, Form("DCA <= %.2f cm", side_profiles[ithr].dca_threshold), "l");
+      legend_entries.emplace_back(hist, Form("DCA <= %.2f cm", side_profiles[ithr].dca_threshold));
     }
 
-    legend.Draw();
     canvas.SaveAs(output_pdf.c_str());
+    draw_legend_pdf(legend_entries, title + " legend", legend_pdf_name(output_pdf));
   }
 
   void write_profiles(

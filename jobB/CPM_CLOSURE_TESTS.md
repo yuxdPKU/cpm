@@ -132,6 +132,11 @@ For each sample, the output directory contains:
   `PREFIX_closure_entries_negz_dca_scan.pdf`: accepted pair counts after each
   DCA refilter.
 
+Each closure PDF has a companion `*_legend.pdf` file. The data PDFs do not draw
+legends inside the plot area, which avoids hiding the R-scan curves when many
+DCA thresholds are shown. The entries/statistics PDFs use log-y with a minimum
+of `1e3`.
+
 ## Test Log
 
 | Date | Sample | Command | Status | Notes |
