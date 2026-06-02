@@ -21,10 +21,7 @@ lib_LTLIBRARIES = \
   libcpm.la
 
 ACTS_LIBS = \
-  -lActsCore \
-  -lActsPluginTGeo \
-  -lActsExamplesDetectorTGeo \
-  -lActsExamplesFramework
+  -lActsCore
 
 CPM_EXTERNAL_LIBS = \
   $(ACTS_LIBS) \
