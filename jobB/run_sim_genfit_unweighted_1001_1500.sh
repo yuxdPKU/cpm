@@ -9,14 +9,11 @@ echo run sim genfit unweighted
   --prefix sim_genfit_unweighted \
   --unweighted
 
-echo $?
-
 echo run sim genfit qa unweighted
 ./run_cpm_qa_chain.sh \
   --input simlist_genfit_1001_1500.txt \
   --input-is-list \
   --out-dir output/sim_genfit_1001_1500_unweighted_qa \
   --prefix sim_genfit_unweighted \
-  --unweighted
-
-echo $?
+  --unweighted \
+  --write-pair-tree
