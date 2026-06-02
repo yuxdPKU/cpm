@@ -41,6 +41,12 @@
 namespace CPMClosureSlice
 {
   constexpr double kPi = 3.14159265358979323846;
+  constexpr double kPlotDeltaRMin = -0.5;
+  constexpr double kPlotDeltaRMax = 0.5;
+  constexpr double kPlotDeltaPhiMin = -0.01;
+  constexpr double kPlotDeltaPhiMax = 0.03;
+  constexpr double kPlotDeltaZMin = -0.1;
+  constexpr double kPlotDeltaZMax = 0.1;
 
   struct Grid
   {
@@ -153,7 +159,7 @@ namespace CPMClosureSlice
     }
     if (out.empty())
     {
-      out = {2.0, 1.0, 0.5, 0.2};
+      out = {2.0, 1.0, 0.5, 0.2, 0.1, 0.05, 0.02};
     }
     std::sort(out.begin(), out.end(), std::greater<double>());
     out.erase(std::unique(out.begin(), out.end()), out.end());
@@ -425,15 +431,15 @@ namespace CPMClosureSlice
 
     ThresholdProfiles out;
     out.dca_threshold = dca_threshold;
-    out.point_a_r = make_profile(base + "_point_pos_delta_r", "positive-track PoCA;R [cm];#Deltar [cm]", grid, -1.0, 1.0);
-    out.point_a_phi = make_profile(base + "_point_pos_delta_phi", "positive-track PoCA;R [cm];#Delta#phi [rad]", grid, -0.02, 0.02);
-    out.point_a_z = make_profile(base + "_point_pos_delta_z", "positive-track PoCA;R [cm];#Deltaz [cm]", grid, -0.5, 0.5);
-    out.point_b_r = make_profile(base + "_point_neg_delta_r", "negative-track PoCA;R [cm];#Deltar [cm]", grid, -1.0, 1.0);
-    out.point_b_phi = make_profile(base + "_point_neg_delta_phi", "negative-track PoCA;R [cm];#Delta#phi [rad]", grid, -0.02, 0.02);
-    out.point_b_z = make_profile(base + "_point_neg_delta_z", "negative-track PoCA;R [cm];#Deltaz [cm]", grid, -0.5, 0.5);
-    out.midpoint_r = make_profile(base + "_midpoint_delta_r", "midpoint;R [cm];#Deltar [cm]", grid, -1.0, 1.0);
-    out.midpoint_phi = make_profile(base + "_midpoint_delta_phi", "midpoint;R [cm];#Delta#phi [rad]", grid, -0.02, 0.02);
-    out.midpoint_z = make_profile(base + "_midpoint_delta_z", "midpoint;R [cm];#Deltaz [cm]", grid, -0.5, 0.5);
+    out.point_a_r = make_profile(base + "_point_pos_delta_r", "positive-track PoCA;R [cm];#Deltar [cm]", grid, kPlotDeltaRMin, kPlotDeltaRMax);
+    out.point_a_phi = make_profile(base + "_point_pos_delta_phi", "positive-track PoCA;R [cm];#Delta#phi [rad]", grid, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
+    out.point_a_z = make_profile(base + "_point_pos_delta_z", "positive-track PoCA;R [cm];#Deltaz [cm]", grid, kPlotDeltaZMin, kPlotDeltaZMax);
+    out.point_b_r = make_profile(base + "_point_neg_delta_r", "negative-track PoCA;R [cm];#Deltar [cm]", grid, kPlotDeltaRMin, kPlotDeltaRMax);
+    out.point_b_phi = make_profile(base + "_point_neg_delta_phi", "negative-track PoCA;R [cm];#Delta#phi [rad]", grid, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
+    out.point_b_z = make_profile(base + "_point_neg_delta_z", "negative-track PoCA;R [cm];#Deltaz [cm]", grid, kPlotDeltaZMin, kPlotDeltaZMax);
+    out.midpoint_r = make_profile(base + "_midpoint_delta_r", "midpoint;R [cm];#Deltar [cm]", grid, kPlotDeltaRMin, kPlotDeltaRMax);
+    out.midpoint_phi = make_profile(base + "_midpoint_delta_phi", "midpoint;R [cm];#Delta#phi [rad]", grid, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
+    out.midpoint_z = make_profile(base + "_midpoint_delta_z", "midpoint;R [cm];#Deltaz [cm]", grid, kPlotDeltaZMin, kPlotDeltaZMax);
     out.dca = make_profile(base + "_mean_dca", "pair DCA;R [cm];DCA [cm]", grid, 0.0, std::max(2.0, dca_threshold));
     out.entries = make_entries(base + "_entries", "accepted pairs;R [cm];pairs", grid);
     return out;
@@ -567,7 +573,7 @@ namespace CPMClosureSlice
       const std::string& title,
       const std::string& output_pdf)
   {
-    const std::vector<int> colors = {kBlack, kRed + 1, kBlue + 1, kGreen + 2, kMagenta + 1, kOrange + 1};
+    const std::vector<int> colors = {kBlack, kRed + 1, kBlue + 1, kGreen + 2, kMagenta + 1, kOrange + 1, kCyan + 2, kViolet + 1};
 
     TCanvas canvas("c_closure_dca_scan", title.c_str(), 900, 700);
     canvas.SetGridx();
@@ -617,7 +623,7 @@ namespace CPMClosureSlice
       const std::string& title,
       const std::string& output_pdf)
   {
-    const std::vector<int> colors = {kBlack, kRed + 1, kBlue + 1, kGreen + 2, kMagenta + 1, kOrange + 1};
+    const std::vector<int> colors = {kBlack, kRed + 1, kBlue + 1, kGreen + 2, kMagenta + 1, kOrange + 1, kCyan + 2, kViolet + 1};
     TCanvas canvas("c_closure_entries", title.c_str(), 900, 700);
     canvas.SetGridx();
     canvas.SetGridy();
@@ -670,7 +676,7 @@ bool CPM_QA_DrawClosureSlice(
     const std::string& plot_dir = "",
     const double select_phi = 4.7,
     const double select_z = 10.0,
-    const std::string& dca_thresholds_csv = "2.0,1.0,0.5,0.2",
+    const std::string& dca_thresholds_csv = "2.0,1.0,0.5,0.2,0.1,0.05,0.02",
     const std::string& b1_input = "",
     const bool b1_input_is_list = false,
     const std::string& b3_file = "")

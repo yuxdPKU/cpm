@@ -20,7 +20,7 @@ Executable     = $(Initialdir)/run_cpm_closure_slice.sh
 
 Phi            = 4.7
 SelectZ        = 10.0
-DcaThresholds  = 2.0,1.0,0.5,0.2
+DcaThresholds  = 2.0,1.0,0.5,0.2,0.1,0.05,0.02
 
 Arguments      = --qa-dir $(QaDir) --prefix $(Prefix) --plot-dir $(PlotDir) --phi $(Phi) --z $(SelectZ) --dca-thresholds $(DcaThresholds)
 

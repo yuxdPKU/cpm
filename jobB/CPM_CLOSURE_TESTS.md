@@ -75,7 +75,7 @@ cd /sphenix/u/xyu3/workarea/cpm/jobB
   --plot-dir output/sim_genfit_unweighted_qa/closure_slice_phi4p70_z10 \
   --phi 4.7 \
   --z 10 \
-  --dca-thresholds 2.0,1.0,0.5,0.2
+  --dca-thresholds 2.0,1.0,0.5,0.2,0.1,0.05,0.02
 ```
 
 Standalone command for ACTS:
@@ -89,7 +89,7 @@ cd /sphenix/u/xyu3/workarea/cpm/jobB
   --plot-dir output/sim_acts_unweighted_qa/closure_slice_phi4p70_z10 \
   --phi 4.7 \
   --z 10 \
-  --dca-thresholds 2.0,1.0,0.5,0.2
+  --dca-thresholds 2.0,1.0,0.5,0.2,0.1,0.05,0.02
 ```
 
 Condor command:
@@ -105,6 +105,13 @@ The default Condor queue is listed in `closure_jobs.txt`.
 
 The test writes only to closure-specific directories, so the original QA plots
 and B3 files are not overwritten.
+
+The delta-plot y-axis ranges are fixed to match
+`jobB/plot/draw1D_r_from3D.C` for simulation R-scan comparisons:
+
+- `delta_r`: `[-0.5, 0.5] cm`;
+- `delta_phi`: `[-0.01, 0.03] rad`;
+- `delta_z`: `[-0.1, 0.1] cm`.
 
 For each sample, the output directory contains:
 

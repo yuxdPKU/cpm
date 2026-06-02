@@ -23,7 +23,7 @@ Options:
   --phi VALUE              Selected phi in radians. Default: 4.7
   --z VALUE                Selected |z| in cm. Default: 10.0
   --dca-thresholds CSV     DCA thresholds to refilter pair rows. Default:
-                           2.0,1.0,0.5,0.2
+                           2.0,1.0,0.5,0.2,0.1,0.05,0.02
   --b1-input PATH          Explicit B1 ROOT file or B1 chunk-list file.
   --b1-input-is-list       Treat --b1-input as a list of B1 ROOT files.
   --b3-file PATH           Optional B3 histogram file to overlay. Default:
@@ -55,7 +55,7 @@ PREFIX=""
 PLOT_DIR=""
 PHI="4.7"
 SELECT_Z="10.0"
-DCA_THRESHOLDS="2.0,1.0,0.5,0.2"
+DCA_THRESHOLDS="2.0,1.0,0.5,0.2,0.1,0.05,0.02"
 B1_INPUT=""
 B1_INPUT_IS_LIST=0
 B3_FILE=""
