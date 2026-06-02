@@ -138,6 +138,8 @@ For each sample, the output directory contains:
 | --- | --- | --- | --- | --- |
 | 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768145.0` | done | normal termination, return value 0 |
 | 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768145.1` | done | normal termination, return value 0 |
+| 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768147.0` | done | tight DCA scan, plot-matched y ranges |
+| 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768147.1` | done | tight DCA scan, plot-matched y ranges |
 
 ## Results From The First Closure Slice
 
@@ -185,6 +187,48 @@ especially for ACTS. GenFit improves more strongly under the same `0.2 cm` DCA
 refilter. The current evidence therefore points to B1-level pair quality and/or
 track/helix-extrapolation bias as the next place to investigate, rather than
 B2/B3 averaging.
+
+## Tight DCA Scan With Plot-Matched Axes
+
+After matching the delta-plot y-axis ranges to `draw1D_r_from3D.C`, the tight
+DCA scan was rerun into new output directories:
+
+- `output/sim_acts_unweighted_qa/closure_slice_phi4p70_z10_tightdca_plotrange`
+- `output/sim_genfit_unweighted_qa/closure_slice_phi4p70_z10_tightdca_plotrange`
+
+Each directory contains 10 PDF plots plus one
+`PREFIX_closure_slice_profiles.root` file. The earlier
+`closure_slice_phi4p70_z10` plots are unchanged.
+
+Pair-entry-weighted midpoint means for the tight DCA thresholds:
+
+| Sample | Side | DCA cut | Pairs | mean delta_r [cm] | mean delta_phi [rad] | mean delta_z [cm] |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| sim_acts_unweighted | +Z | `<= 0.20 cm` | 181,057 | 0.139942 | -0.000117550 | 0.0275570 |
+| sim_acts_unweighted | +Z | `<= 0.10 cm` | 103,703 | 0.144834 | -0.000108427 | 0.0291459 |
+| sim_acts_unweighted | +Z | `<= 0.05 cm` | 54,249 | 0.144757 | -0.000131250 | 0.0312075 |
+| sim_acts_unweighted | +Z | `<= 0.02 cm` | 22,340 | 0.144987 | -0.000107280 | 0.0317233 |
+| sim_acts_unweighted | -Z | `<= 0.20 cm` | 179,688 | 0.158782 | -0.000101995 | -0.0334790 |
+| sim_acts_unweighted | -Z | `<= 0.10 cm` | 102,374 | 0.153138 | -0.0000931793 | -0.0328488 |
+| sim_acts_unweighted | -Z | `<= 0.05 cm` | 53,703 | 0.155859 | -0.000112890 | -0.0334964 |
+| sim_acts_unweighted | -Z | `<= 0.02 cm` | 21,876 | 0.157899 | 0.000112974 | -0.0354721 |
+| sim_genfit_unweighted | +Z | `<= 0.20 cm` | 237,296 | 0.0295937 | -0.000124754 | 0.00671098 |
+| sim_genfit_unweighted | +Z | `<= 0.10 cm` | 192,007 | 0.0288544 | -0.000112073 | 0.00669465 |
+| sim_genfit_unweighted | +Z | `<= 0.05 cm` | 121,219 | 0.0290694 | -0.0000831481 | 0.00658041 |
+| sim_genfit_unweighted | +Z | `<= 0.02 cm` | 52,672 | 0.0249674 | -0.0000855785 | 0.00575622 |
+| sim_genfit_unweighted | -Z | `<= 0.20 cm` | 229,853 | 0.0313060 | -0.0000998302 | -0.0077664 |
+| sim_genfit_unweighted | -Z | `<= 0.10 cm` | 186,298 | 0.0329873 | -0.0000355916 | -0.00774196 |
+| sim_genfit_unweighted | -Z | `<= 0.05 cm` | 117,897 | 0.0294781 | -0.0000618612 | -0.00680631 |
+| sim_genfit_unweighted | -Z | `<= 0.02 cm` | 51,643 | 0.0273260 | -0.0000493642 | -0.00632211 |
+
+The tight DCA cuts preserve enough statistics in this slice. At
+`DCA <= 0.02 cm`, ACTS still has about `2.2e4` accepted pairs per z side, while
+GenFit has about `5.2e4`. GenFit continues to move modestly toward zero under
+the tightest DCA cut. ACTS improves strongly when moving from `2.0 cm` to
+`0.2 cm`, but the `0.2 -> 0.02 cm` scan mostly plateaus and does not eliminate
+the remaining radial/z offset. This suggests that the strict pair-crossing
+requirement helps, but the ACTS residual closure issue likely also contains a
+track-extrapolation or solver-model component beyond large-DCA pairs.
 
 ## Interpretation Checklist
 
