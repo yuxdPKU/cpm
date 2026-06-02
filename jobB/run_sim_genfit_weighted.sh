@@ -15,4 +15,5 @@ echo run sim genfit qa weighted
   --input-is-list \
   --out-dir output/sim_weighted_qa \
   --prefix sim_genfit_weighted \
-  --weighted
+  --weighted \
+  --write-pair-tree

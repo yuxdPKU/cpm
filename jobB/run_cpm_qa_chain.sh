@@ -29,8 +29,8 @@ Options:
   --metadata PATH               Job A file used for B3 cpm_metadata. Default:
                                 --input for single-file mode, first list entry
                                 for --input-is-list mode.
-  --run-b0-qa                   Also build/check the B0 event index. Default.
-  --skip-b0-qa                  Skip B0 event-index QA.
+  --run-b0-qa                   Also build/check the B0 event index.
+  --skip-b0-qa                  Skip B0 event-index QA. Default.
   --max-pair-dca VALUE          B1 max pair DCA. Default: 2.0
   --min-sin-angle VALUE         B1 minimum sin(opening angle) for line solver.
                                 Default: 1.0e-4
@@ -47,9 +47,11 @@ Options:
   --no-voxel-summaries          Do not print per-voxel B1 summaries. Default.
   --crossing-solver VALUE       B1 crossing solver: helix or line. Default: helix
   --magnetic-field-z VALUE      Helix-solver Bz field in tesla. Default: 1.4
-  --write-pair-tree             Write B1 cpm_poca_pairs. Default.
-  --no-pair-tree                Skip the pair-level tree and keep batch summaries.
-  --b2-input-mode VALUE         B2 input mode: auto, pairs, or batches. Default: auto
+  --write-pair-tree             Write B1 cpm_poca_pairs.
+  --no-pair-tree                Skip the pair-level tree and keep batch summaries. Default.
+  --b1-files-per-chunk VALUE    Max Job A files per B1 QA chunk in list mode.
+                                0 disables B1 chunking. Default: 100
+  --b2-input-mode VALUE         B2 input mode: auto, pairs, or batches. Default: batches
   --b2-max-pair-dca VALUE       Optional B2 pair-row DCA refilter. Default: -1.0
   --min-entries VALUE           Minimum accepted pairs per voxel. Default: 1
   --weighted                    Use pair weights in B2 voxel averaging. Default.
@@ -110,7 +112,7 @@ INPUT_IS_LIST=0
 OUT_DIR="."
 PREFIX="CPM_QA"
 METADATA=""
-RUN_B0_QA=1
+RUN_B0_QA=0
 B1_MAX_PAIR_DCA="2.0"
 B1_MIN_SIN_ANGLE="1.0e-4"
 B1_MAX_RECORDS="0"
@@ -120,11 +122,12 @@ B1_MIN_PAIR_PT="0.5"
 B1_MAX_PAIR_RECORDS="10"
 B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
-B1_WRITE_PAIR_TREE=1
+B1_WRITE_PAIR_TREE=0
+B1_FILES_PER_CHUNK="100"
 B2_MIN_ENTRIES="1"
 B2_MAX_PAIR_DCA="-1.0"
 B2_USE_PAIR_WEIGHTS=1
-B2_INPUT_MODE="auto"
+B2_INPUT_MODE="batches"
 B3_MIN_ENTRIES="1"
 MAKE_PLOTS=1
 PLOT_DIR=""
@@ -206,6 +209,10 @@ while [[ $# -gt 0 ]]; do
     --no-pair-tree)
       B1_WRITE_PAIR_TREE=0
       shift
+      ;;
+    --b1-files-per-chunk|--qa-files-per-chunk)
+      B1_FILES_PER_CHUNK=${2:-}
+      shift 2
       ;;
     --b2-input-mode)
       B2_INPUT_MODE=${2:-}
@@ -319,6 +326,7 @@ echo "[run_cpm_qa_chain] output directory: $OUT_DIR"
 echo "[run_cpm_qa_chain] prefix: $PREFIX"
 echo "[run_cpm_qa_chain] run_b0_qa: $RUN_B0_QA"
 echo "[run_cpm_qa_chain] write_pair_tree: $B1_WRITE_PAIR_TREE"
+echo "[run_cpm_qa_chain] b1_files_per_chunk: $B1_FILES_PER_CHUNK"
 echo "[run_cpm_qa_chain] min_pair_pt: $B1_MIN_PAIR_PT"
 echo "[run_cpm_qa_chain] max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
 echo "[run_cpm_qa_chain] print_voxel_summaries: $B1_PRINT_VOXEL_SUMMARIES"
@@ -329,7 +337,7 @@ echo "[run_cpm_qa_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 echo "[run_cpm_qa_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 echo "[run_cpm_qa_chain] make_plots: $MAKE_PLOTS"
 
-run_root_bool_check "${MACRO_DIR}/CPM_QA_RunOfflineDiagnostics.C" "CPM_QA_RunOfflineDiagnostics(${INPUT_Q},${OUT_DIR_Q},${PREFIX_Q},${INPUT_IS_LIST},${RUN_B0_QA},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARIES},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q},${B3_MIN_ENTRIES},${METADATA_Q})"
+run_root_bool_check "${MACRO_DIR}/CPM_QA_RunOfflineDiagnostics.C" "CPM_QA_RunOfflineDiagnostics(${INPUT_Q},${OUT_DIR_Q},${PREFIX_Q},${INPUT_IS_LIST},${RUN_B0_QA},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_PRINT_VOXEL_SUMMARIES},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${B1_WRITE_PAIR_TREE},${B2_MIN_ENTRIES},${B2_MAX_PAIR_DCA},${B2_USE_PAIR_WEIGHTS},${B2_INPUT_MODE_Q},${B3_MIN_ENTRIES},${METADATA_Q},${B1_FILES_PER_CHUNK})"
 
 if [[ "$MAKE_PLOTS" -eq 1 ]]; then
   run_root_bool_check "$PLOT_MACRO" "CPM_QA_DrawIntermediateDistributions(${OUT_DIR_Q},${PREFIX_Q},${PLOT_DIR_Q},true)"
@@ -337,7 +345,7 @@ fi
 
 echo
 echo "[run_cpm_qa_chain] done"
-echo "[run_cpm_qa_chain] B1: ${OUT_DIR}/${PREFIX}_QA_B1_poca.root"
+echo "[run_cpm_qa_chain] B1: ${OUT_DIR}/${PREFIX}_QA_B1_poca.root or ${OUT_DIR}/${PREFIX}_QA_B1_chunks/"
 echo "[run_cpm_qa_chain] B2: ${OUT_DIR}/${PREFIX}_QA_B2_voxel_corrections.root"
 echo "[run_cpm_qa_chain] B3: ${OUT_DIR}/${PREFIX}_B3_average_correction_histograms.root"
 if [[ "$RUN_B0_QA" -eq 1 ]]; then

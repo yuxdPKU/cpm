@@ -15,9 +15,13 @@
 
 #include <TSystem.h>
 
+#include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace CPMQADiagnostics
 {
@@ -48,6 +52,33 @@ namespace CPMQADiagnostics
     }
     return "";
   }
+
+  std::vector<std::string> read_file_list(const std::string& input_list)
+  {
+    std::ifstream input(input_list);
+    std::vector<std::string> files;
+    std::string line;
+    while (std::getline(input, line))
+    {
+      if (line.empty() || line[0] == '#')
+      {
+        continue;
+      }
+      files.push_back(line);
+    }
+    return files;
+  }
+
+  std::string chunk_output_name(
+      const std::string& prefix,
+      const std::size_t chunk_index)
+  {
+    std::ostringstream name;
+    name << prefix << "_QA_B1_poca_chunk"
+         << std::setw(4) << std::setfill('0') << chunk_index
+         << ".root";
+    return name.str();
+  }
 }
 
 bool CPM_QA_RunOfflineDiagnostics(
@@ -71,7 +102,8 @@ bool CPM_QA_RunOfflineDiagnostics(
     const bool use_pair_weights = true,
     const std::string& b2_input_mode = "auto",
     const unsigned int b3_min_entries_per_voxel = 1,
-    const std::string& metadata_file = "")
+    const std::string& metadata_file = "",
+    const unsigned int b1_input_files_per_chunk = 100)
 {
   if (gSystem && !output_dir.empty())
   {
@@ -82,6 +114,8 @@ bool CPM_QA_RunOfflineDiagnostics(
       CPMQADiagnostics::join_path(output_dir, prefix + "_QA_B0_event_index.root");
   const std::string b1_output =
       CPMQADiagnostics::join_path(output_dir, prefix + "_QA_B1_poca.root");
+  const std::string b1_chunk_list =
+      CPMQADiagnostics::join_path(output_dir, prefix + "_QA_B1_chunks.txt");
   const std::string b2_output =
       CPMQADiagnostics::join_path(output_dir, prefix + "_QA_B2_voxel_corrections.root");
   const std::string b3_output =
@@ -90,6 +124,9 @@ bool CPM_QA_RunOfflineDiagnostics(
   const std::string resolved_metadata = !metadata_file.empty() ?
       metadata_file :
       (input_is_list ? CPMQADiagnostics::first_list_entry(input_file_or_list) : input_file_or_list);
+  const std::vector<std::string> b1_input_files = input_is_list ?
+      CPMQADiagnostics::read_file_list(input_file_or_list) :
+      std::vector<std::string>{input_file_or_list};
 
   bool ok = true;
 
@@ -99,23 +136,86 @@ bool CPM_QA_RunOfflineDiagnostics(
     ok = CPM_QA_B0_CheckEventIndex(b0_output) && ok;
   }
 
-  CPM_QA_B1_ComputePoCA(
-      input_file_or_list,
-      b1_output,
-      input_is_list,
-      b1_max_pair_dca,
-      b1_min_sin_angle,
-      b1_max_records_per_voxel,
-      b1_min_records_per_charge,
-      b1_print_voxel_summaries,
-      b1_min_pair_pt,
-      b1_max_pair_records_per_voxel,
-      b1_crossing_solver,
-      b1_magnetic_field_z,
-      b1_write_pair_tree);
+  if (b1_input_files.empty())
+  {
+    std::cout << "CPM_QA_RunOfflineDiagnostics - no B1 input files" << std::endl;
+    return false;
+  }
+
+  std::vector<std::string> b1_outputs;
+  const bool chunk_b1 =
+      input_is_list &&
+      b1_input_files_per_chunk > 0 &&
+      b1_input_files.size() > b1_input_files_per_chunk;
+  const std::string b1_chunk_dir =
+      CPMQADiagnostics::join_path(output_dir, prefix + "_QA_B1_chunks");
+
+  if (chunk_b1)
+  {
+    if (gSystem)
+    {
+      gSystem->mkdir(b1_chunk_dir.c_str(), true);
+    }
+
+    std::size_t chunk_index = 0;
+    for (std::size_t begin = 0; begin < b1_input_files.size(); begin += b1_input_files_per_chunk)
+    {
+      const std::size_t end = std::min<std::size_t>(
+          begin + b1_input_files_per_chunk,
+          b1_input_files.size());
+      std::vector<std::string> chunk_files(
+          b1_input_files.begin() + begin,
+          b1_input_files.begin() + end);
+      const std::string chunk_output = CPMQADiagnostics::join_path(
+          b1_chunk_dir,
+          CPMQADiagnostics::chunk_output_name(prefix, chunk_index));
+      std::cout << "CPM_QA_RunOfflineDiagnostics - B1 chunk "
+                << (chunk_index + 1) << " files " << (begin + 1)
+                << "-" << end << "/" << b1_input_files.size()
+                << " -> " << chunk_output << std::endl;
+      CPM_QA_B1_ComputePoCA(
+          chunk_files,
+          chunk_output,
+          b1_max_pair_dca,
+          b1_min_sin_angle,
+          b1_max_records_per_voxel,
+          b1_min_records_per_charge,
+          b1_print_voxel_summaries,
+          b1_min_pair_pt,
+          b1_max_pair_records_per_voxel,
+          b1_crossing_solver,
+          b1_magnetic_field_z,
+          b1_write_pair_tree);
+      b1_outputs.push_back(chunk_output);
+      ++chunk_index;
+    }
+
+    std::ofstream chunk_list_output(b1_chunk_list);
+    for (const auto& chunk_output : b1_outputs)
+    {
+      chunk_list_output << chunk_output << '\n';
+    }
+  }
+  else
+  {
+    CPM_QA_B1_ComputePoCA(
+        b1_input_files,
+        b1_output,
+        b1_max_pair_dca,
+        b1_min_sin_angle,
+        b1_max_records_per_voxel,
+        b1_min_records_per_charge,
+        b1_print_voxel_summaries,
+        b1_min_pair_pt,
+        b1_max_pair_records_per_voxel,
+        b1_crossing_solver,
+        b1_magnetic_field_z,
+        b1_write_pair_tree);
+    b1_outputs.push_back(b1_output);
+  }
 
   CPM_QA_B2_AccumulateVoxelCorrections(
-      b1_output,
+      b1_outputs,
       b2_output,
       b2_min_entries_per_voxel,
       b2_max_pair_dca,
@@ -129,7 +229,17 @@ bool CPM_QA_RunOfflineDiagnostics(
       b3_min_entries_per_voxel);
   ok = CPM_QA_B3_CheckAverageCorrectionHistograms(b3_output) && ok;
 
-  std::cout << "CPM_QA_RunOfflineDiagnostics - B1 output: " << b1_output << std::endl;
+  if (chunk_b1)
+  {
+    std::cout << "CPM_QA_RunOfflineDiagnostics - B1 chunk outputs: "
+              << b1_outputs.size() << " files in " << b1_chunk_dir << std::endl;
+    std::cout << "CPM_QA_RunOfflineDiagnostics - B1 chunk list: "
+              << b1_chunk_list << std::endl;
+  }
+  else
+  {
+    std::cout << "CPM_QA_RunOfflineDiagnostics - B1 output: " << b1_output << std::endl;
+  }
   std::cout << "CPM_QA_RunOfflineDiagnostics - B2 output: " << b2_output << std::endl;
   std::cout << "CPM_QA_RunOfflineDiagnostics - B3 output: " << b3_output << std::endl;
   if (run_b0_qa)
