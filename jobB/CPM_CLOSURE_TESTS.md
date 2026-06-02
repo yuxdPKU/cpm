@@ -145,6 +145,11 @@ The latest legend-separated tight-DCA outputs are:
 Each latest directory has 10 data PDFs, 10 companion legend PDFs, and one
 profile ROOT file.
 
+For readability, DCA-scan PDFs now use two side-by-side panels. The left panel
+shows the original B3 map plus `DCA <= 2, 1, 0.5, 0.2 cm`; the right panel shows
+the tighter `DCA <= 0.1, 0.05, 0.02 cm` scans. Entries/statistics PDFs use the
+same left/right DCA split.
+
 ## Test Log
 
 | Date | Sample | Command | Status | Notes |

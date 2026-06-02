@@ -526,6 +526,21 @@ namespace CPMClosureSlice
     return output_pdf + "_legend.pdf";
   }
 
+  std::string title_with_panel_label(const std::string& title, const std::string& label)
+  {
+    const auto separator = title.find(';');
+    if (separator == std::string::npos)
+    {
+      return title + " (" + label + ")";
+    }
+    return title.substr(0, separator) + " (" + label + ")" + title.substr(separator);
+  }
+
+  bool is_loose_or_mid_dca(const double dca_threshold)
+  {
+    return dca_threshold >= 0.2 - 1.0e-9;
+  }
+
   void draw_legend_pdf(
       const std::vector<std::pair<TObject*, std::string>>& entries,
       const std::string& title,
@@ -536,12 +551,12 @@ namespace CPMClosureSlice
       return;
     }
 
-    TCanvas canvas("c_closure_legend", title.c_str(), 1100, 520);
+    TCanvas canvas("c_closure_legend", title.c_str(), 1200, 650);
     TLegend legend(0.05, 0.06, 0.95, 0.92);
     legend.SetHeader(title.c_str());
     legend.SetBorderSize(0);
     legend.SetFillStyle(0);
-    legend.SetTextSize(0.045);
+    legend.SetTextSize(0.04);
     if (entries.size() > 5)
     {
       legend.SetNColumns(2);
@@ -611,11 +626,8 @@ namespace CPMClosureSlice
   {
     const std::vector<int> colors = {kBlack, kRed + 1, kBlue + 1, kGreen + 2, kMagenta + 1, kOrange + 1, kCyan + 2, kViolet + 1};
 
-    TCanvas canvas("c_closure_dca_scan", title.c_str(), 900, 700);
-    canvas.SetGridx();
-    canvas.SetGridy();
-
-    bool drew = false;
+    TCanvas canvas("c_closure_dca_scan", title.c_str(), 1800, 700);
+    canvas.Divide(2, 1);
     std::vector<std::pair<TObject*, std::string>> legend_entries;
 
     for (std::size_t ithr = 0; ithr < side_profiles.size(); ++ithr)
@@ -634,9 +646,6 @@ namespace CPMClosureSlice
         profile = side_profiles[ithr].midpoint_z;
       }
       set_line_style(profile, colors[ithr % colors.size()], 1, ithr == 0 ? 3 : 2);
-      profile->SetTitle(title.c_str());
-      profile->Draw(drew ? "hist same" : "hist");
-      drew = true;
       legend_entries.emplace_back(
           profile,
           Form("B1 pairs DCA <= %.2f cm", side_profiles[ithr].dca_threshold));
@@ -645,11 +654,59 @@ namespace CPMClosureSlice
     if (b3_hist)
     {
       set_hist_style(b3_hist, kGray + 2, 2, 3);
-      b3_hist->Draw(drew ? "hist same" : "hist");
       legend_entries.emplace_back(b3_hist, "B3 original map");
     }
 
-    draw_zero_line();
+    auto draw_panel = [&](const int pad, const bool draw_loose_or_mid)
+    {
+      canvas.cd(pad);
+      gPad->SetGridx();
+      gPad->SetGridy();
+      bool drew = false;
+      const std::string panel_label = draw_loose_or_mid ?
+          "original map, DCA <= 2/1/0.5/0.2" :
+          "DCA <= 0.1/0.05/0.02";
+
+      for (std::size_t ithr = 0; ithr < side_profiles.size(); ++ithr)
+      {
+        if (is_loose_or_mid_dca(side_profiles[ithr].dca_threshold) != draw_loose_or_mid)
+        {
+          continue;
+        }
+
+        TProfile* profile = nullptr;
+        if (component == 0)
+        {
+          profile = side_profiles[ithr].midpoint_r;
+        }
+        else if (component == 1)
+        {
+          profile = side_profiles[ithr].midpoint_phi;
+        }
+        else
+        {
+          profile = side_profiles[ithr].midpoint_z;
+        }
+        profile->SetTitle(title_with_panel_label(title, panel_label).c_str());
+        profile->Draw(drew ? "hist same" : "hist");
+        drew = true;
+      }
+
+      if (draw_loose_or_mid && b3_hist)
+      {
+        b3_hist->SetTitle(title_with_panel_label(title, panel_label).c_str());
+        b3_hist->Draw(drew ? "hist same" : "hist");
+        drew = true;
+      }
+
+      if (drew)
+      {
+        draw_zero_line();
+      }
+    };
+
+    draw_panel(1, true);
+    draw_panel(2, false);
     canvas.SaveAs(output_pdf.c_str());
     draw_legend_pdf(legend_entries, title + " legend", legend_pdf_name(output_pdf));
   }
@@ -660,12 +717,8 @@ namespace CPMClosureSlice
       const std::string& output_pdf)
   {
     const std::vector<int> colors = {kBlack, kRed + 1, kBlue + 1, kGreen + 2, kMagenta + 1, kOrange + 1, kCyan + 2, kViolet + 1};
-    TCanvas canvas("c_closure_entries", title.c_str(), 900, 700);
-    canvas.SetGridx();
-    canvas.SetGridy();
-    canvas.SetLogy();
-
-    bool drew = false;
+    TCanvas canvas("c_closure_entries", title.c_str(), 1800, 700);
+    canvas.Divide(2, 1);
     std::vector<std::pair<TObject*, std::string>> legend_entries;
 
     for (std::size_t ithr = 0; ithr < side_profiles.size(); ++ithr)
@@ -673,12 +726,35 @@ namespace CPMClosureSlice
       auto* hist = side_profiles[ithr].entries;
       set_hist_style(hist, colors[ithr % colors.size()], 1, ithr == 0 ? 3 : 2);
       hist->SetMinimum(1.0e3);
-      hist->SetTitle(title.c_str());
-      hist->Draw(drew ? "hist same" : "hist");
-      drew = true;
       legend_entries.emplace_back(hist, Form("DCA <= %.2f cm", side_profiles[ithr].dca_threshold));
     }
 
+    auto draw_panel = [&](const int pad, const bool draw_loose_or_mid)
+    {
+      canvas.cd(pad);
+      gPad->SetGridx();
+      gPad->SetGridy();
+      gPad->SetLogy();
+      bool drew = false;
+      const std::string panel_label = draw_loose_or_mid ?
+          "DCA <= 2/1/0.5/0.2" :
+          "DCA <= 0.1/0.05/0.02";
+
+      for (std::size_t ithr = 0; ithr < side_profiles.size(); ++ithr)
+      {
+        if (is_loose_or_mid_dca(side_profiles[ithr].dca_threshold) != draw_loose_or_mid)
+        {
+          continue;
+        }
+        auto* hist = side_profiles[ithr].entries;
+        hist->SetTitle(title_with_panel_label(title, panel_label).c_str());
+        hist->Draw(drew ? "hist same" : "hist");
+        drew = true;
+      }
+    };
+
+    draw_panel(1, true);
+    draw_panel(2, false);
     canvas.SaveAs(output_pdf.c_str());
     draw_legend_pdf(legend_entries, title + " legend", legend_pdf_name(output_pdf));
   }
