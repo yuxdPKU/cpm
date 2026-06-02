@@ -137,6 +137,14 @@ legends inside the plot area, which avoids hiding the R-scan curves when many
 DCA thresholds are shown. The entries/statistics PDFs use log-y with a minimum
 of `1e3`.
 
+The latest legend-separated tight-DCA outputs are:
+
+- `output/sim_acts_unweighted_qa/closure_slice_phi4p70_z10_tightdca_nolegend`
+- `output/sim_genfit_unweighted_qa/closure_slice_phi4p70_z10_tightdca_nolegend`
+
+Each latest directory has 10 data PDFs, 10 companion legend PDFs, and one
+profile ROOT file.
+
 ## Test Log
 
 | Date | Sample | Command | Status | Notes |
@@ -145,6 +153,8 @@ of `1e3`.
 | 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768145.1` | done | normal termination, return value 0 |
 | 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768147.0` | done | tight DCA scan, plot-matched y ranges |
 | 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768147.1` | done | tight DCA scan, plot-matched y ranges |
+| 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768148.0` | done | legends moved to companion PDFs |
+| 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768148.1` | done | legends moved to companion PDFs |
 
 ## Results From The First Closure Slice
 
