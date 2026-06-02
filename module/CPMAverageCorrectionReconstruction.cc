@@ -159,6 +159,130 @@ bool CPMAverageCorrectionReconstruction::add_from_file(
   return ok;
 }
 
+bool CPMAverageCorrectionReconstruction::add_accumulators_from_file(
+    const std::string& filename,
+    const std::string& tree_name)
+{
+  std::unique_ptr<TFile> input(TFile::Open(filename.c_str(), "READ"));
+  if (!input || input->IsZombie())
+  {
+    std::cout << "CPMAverageCorrectionReconstruction::add_accumulators_from_file - could not open "
+              << filename << std::endl;
+    return false;
+  }
+
+  if (!read_summary_tree(*input))
+  {
+    std::cout << "CPMAverageCorrectionReconstruction::add_accumulators_from_file - could not read summary/grid from "
+              << filename << std::endl;
+    return false;
+  }
+
+  auto* tree = dynamic_cast<TTree*>(input->Get(tree_name.c_str()));
+  if (!tree)
+  {
+    std::cout << "CPMAverageCorrectionReconstruction::add_accumulators_from_file - could not find tree "
+              << tree_name << " in " << filename << std::endl;
+    return false;
+  }
+
+  int iphi = -1;
+  int ir = -1;
+  int iz = -1;
+  unsigned long long entries = 0;
+  double sum_pair_weight = 0.0;
+  double sum_pair_weight2 = 0.0;
+  double sum_delta_r = 0.0;
+  double sum_delta_r2 = 0.0;
+  double sum_delta_rphi = 0.0;
+  double sum_delta_rphi2 = 0.0;
+  double sum_delta_phi = 0.0;
+  double sum_delta_phi2 = 0.0;
+  double sum_delta_z = 0.0;
+  double sum_delta_z2 = 0.0;
+  double sum_weighted_delta_r = 0.0;
+  double sum_weighted_delta_r2 = 0.0;
+  double sum_weighted_delta_rphi = 0.0;
+  double sum_weighted_delta_rphi2 = 0.0;
+  double sum_weighted_delta_phi = 0.0;
+  double sum_weighted_delta_phi2 = 0.0;
+  double sum_weighted_delta_z = 0.0;
+  double sum_weighted_delta_z2 = 0.0;
+  double sum_dca = 0.0;
+  double sum_dca2 = 0.0;
+  double sum_voxel_x = 0.0;
+  double sum_voxel_y = 0.0;
+  double sum_voxel_z = 0.0;
+
+  tree->SetBranchAddress("iphi", &iphi);
+  tree->SetBranchAddress("ir", &ir);
+  tree->SetBranchAddress("iz", &iz);
+  tree->SetBranchAddress("entries", &entries);
+  tree->SetBranchAddress("sum_pair_weight", &sum_pair_weight);
+  tree->SetBranchAddress("sum_pair_weight2", &sum_pair_weight2);
+  tree->SetBranchAddress("sum_delta_r", &sum_delta_r);
+  tree->SetBranchAddress("sum_delta_r2", &sum_delta_r2);
+  tree->SetBranchAddress("sum_delta_rphi", &sum_delta_rphi);
+  tree->SetBranchAddress("sum_delta_rphi2", &sum_delta_rphi2);
+  tree->SetBranchAddress("sum_delta_phi", &sum_delta_phi);
+  tree->SetBranchAddress("sum_delta_phi2", &sum_delta_phi2);
+  tree->SetBranchAddress("sum_delta_z", &sum_delta_z);
+  tree->SetBranchAddress("sum_delta_z2", &sum_delta_z2);
+  tree->SetBranchAddress("sum_weighted_delta_r", &sum_weighted_delta_r);
+  tree->SetBranchAddress("sum_weighted_delta_r2", &sum_weighted_delta_r2);
+  tree->SetBranchAddress("sum_weighted_delta_rphi", &sum_weighted_delta_rphi);
+  tree->SetBranchAddress("sum_weighted_delta_rphi2", &sum_weighted_delta_rphi2);
+  tree->SetBranchAddress("sum_weighted_delta_phi", &sum_weighted_delta_phi);
+  tree->SetBranchAddress("sum_weighted_delta_phi2", &sum_weighted_delta_phi2);
+  tree->SetBranchAddress("sum_weighted_delta_z", &sum_weighted_delta_z);
+  tree->SetBranchAddress("sum_weighted_delta_z2", &sum_weighted_delta_z2);
+  tree->SetBranchAddress("sum_dca", &sum_dca);
+  tree->SetBranchAddress("sum_dca2", &sum_dca2);
+  tree->SetBranchAddress("sum_voxel_x", &sum_voxel_x);
+  tree->SetBranchAddress("sum_voxel_y", &sum_voxel_y);
+  tree->SetBranchAddress("sum_voxel_z", &sum_voxel_z);
+
+  for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
+  {
+    tree->GetEntry(entry);
+    if (iphi < 0 || ir < 0 || iz < 0 || entries == 0 ||
+        !std::isfinite(sum_pair_weight) ||
+        !std::isfinite(sum_pair_weight2))
+    {
+      continue;
+    }
+
+    auto& accumulator = m_accumulators[{iphi, ir, iz}];
+    accumulator.entries += entries;
+    accumulator.sum_pair_weight += sum_pair_weight;
+    accumulator.sum_pair_weight2 += sum_pair_weight2;
+    accumulator.sum_delta_r += sum_delta_r;
+    accumulator.sum_delta_r2 += sum_delta_r2;
+    accumulator.sum_delta_rphi += sum_delta_rphi;
+    accumulator.sum_delta_rphi2 += sum_delta_rphi2;
+    accumulator.sum_delta_phi += sum_delta_phi;
+    accumulator.sum_delta_phi2 += sum_delta_phi2;
+    accumulator.sum_delta_z += sum_delta_z;
+    accumulator.sum_delta_z2 += sum_delta_z2;
+    accumulator.sum_weighted_delta_r += sum_weighted_delta_r;
+    accumulator.sum_weighted_delta_r2 += sum_weighted_delta_r2;
+    accumulator.sum_weighted_delta_rphi += sum_weighted_delta_rphi;
+    accumulator.sum_weighted_delta_rphi2 += sum_weighted_delta_rphi2;
+    accumulator.sum_weighted_delta_phi += sum_weighted_delta_phi;
+    accumulator.sum_weighted_delta_phi2 += sum_weighted_delta_phi2;
+    accumulator.sum_weighted_delta_z += sum_weighted_delta_z;
+    accumulator.sum_weighted_delta_z2 += sum_weighted_delta_z2;
+    accumulator.sum_dca += sum_dca;
+    accumulator.sum_dca2 += sum_dca2;
+    accumulator.sum_voxel_x += sum_voxel_x;
+    accumulator.sum_voxel_y += sum_voxel_y;
+    accumulator.sum_voxel_z += sum_voxel_z;
+  }
+
+  m_summary.accumulator_voxels = m_accumulators.size();
+  return true;
+}
+
 bool CPMAverageCorrectionReconstruction::set_crossing_solver(const std::string& solver)
 {
   bool ok = false;
@@ -555,6 +679,7 @@ bool CPMAverageCorrectionReconstruction::save_average_corrections(
   m_hdistortion_p_rec->Write();
   m_hdistortion_z_rec->Write();
 
+  write_accumulator_tree(output);
   CPMReconstructionHelper::write_guarded_histograms(output, m_hentries_rec.get(), "hentries");
   CPMReconstructionHelper::write_guarded_histograms(output, m_hdistortion_r_rec.get(), "hIntDistortionR");
   CPMReconstructionHelper::write_guarded_histograms(output, m_hdistortion_p_rec.get(), "hIntDistortionP");
@@ -563,6 +688,220 @@ bool CPMAverageCorrectionReconstruction::save_average_corrections(
   write_summary_tree(output);
   output.Close();
   return true;
+}
+
+bool CPMAverageCorrectionReconstruction::read_summary_tree(TFile& input)
+{
+  auto* summary = dynamic_cast<TTree*>(input.Get("cpm_b3_summary"));
+  if (!summary || summary->GetEntries() <= 0)
+  {
+    return false;
+  }
+
+  unsigned int input_files = 0;
+  unsigned long long input_records = 0;
+  unsigned int input_voxels = 0;
+  unsigned int skipped_large_voxels = 0;
+  unsigned int skipped_low_selected_voxels = 0;
+  unsigned int skipped_low_charge_voxels = 0;
+  unsigned int skipped_low_batch_charge_voxels = 0;
+  unsigned long long pt_rejected_records = 0;
+  unsigned long long duplicate_dropped_records = 0;
+  unsigned long long candidate_pairs = 0;
+  unsigned long long accepted_pairs = 0;
+  unsigned long long same_event_track_pairs = 0;
+  unsigned long long invalid_weight_pairs = 0;
+  unsigned long long invalid_poca_pairs = 0;
+  unsigned long long dca_rejected_pairs = 0;
+  int phi_bins = 0;
+  int r_bins = 0;
+  int z_bins = 0;
+  double phi_min = 0.0;
+  double phi_max = 0.0;
+  double r_min = 0.0;
+  double r_max = 0.0;
+  double z_min = 0.0;
+  double z_max = 0.0;
+
+  auto set_branch = [summary](const char* name, auto* value)
+  {
+    if (summary->GetBranch(name))
+    {
+      summary->SetBranchAddress(name, value);
+    }
+  };
+
+  set_branch("input_files", &input_files);
+  set_branch("input_records", &input_records);
+  set_branch("input_voxels", &input_voxels);
+  set_branch("skipped_large_voxels", &skipped_large_voxels);
+  set_branch("skipped_low_selected_voxels", &skipped_low_selected_voxels);
+  set_branch("skipped_low_charge_voxels", &skipped_low_charge_voxels);
+  set_branch("skipped_low_batch_charge_voxels", &skipped_low_batch_charge_voxels);
+  set_branch("pt_rejected_records", &pt_rejected_records);
+  set_branch("duplicate_dropped_records", &duplicate_dropped_records);
+  set_branch("candidate_pairs", &candidate_pairs);
+  set_branch("accepted_pairs", &accepted_pairs);
+  set_branch("same_event_track_pairs", &same_event_track_pairs);
+  set_branch("invalid_weight_pairs", &invalid_weight_pairs);
+  set_branch("invalid_poca_pairs", &invalid_poca_pairs);
+  set_branch("dca_rejected_pairs", &dca_rejected_pairs);
+  set_branch("phi_bins", &phi_bins);
+  set_branch("r_bins", &r_bins);
+  set_branch("z_bins", &z_bins);
+  set_branch("phi_min", &phi_min);
+  set_branch("phi_max", &phi_max);
+  set_branch("r_min", &r_min);
+  set_branch("r_max", &r_max);
+  set_branch("z_min", &z_min);
+  set_branch("z_max", &z_max);
+  summary->GetEntry(0);
+
+  CPMVoxelContainer::Grid grid;
+  grid.phi_bins = phi_bins;
+  grid.r_bins = r_bins;
+  grid.z_bins = z_bins;
+  grid.phi_min = phi_min;
+  grid.phi_max = phi_max;
+  grid.r_min = r_min;
+  grid.r_max = r_max;
+  grid.z_min = z_min;
+  grid.z_max = z_max;
+  if (!grid.valid())
+  {
+    return false;
+  }
+
+  if (!m_records.grid().valid())
+  {
+    m_records.set_grid(
+        grid.phi_bins,
+        grid.r_bins,
+        grid.z_bins,
+        grid.r_min,
+        grid.r_max,
+        grid.z_min,
+        grid.z_max,
+        grid.phi_min,
+        grid.phi_max);
+  }
+  else if (!CPMReconstructionHelper::same_grid(m_records.grid(), grid))
+  {
+    std::cout << "CPMAverageCorrectionReconstruction::read_summary_tree - inconsistent grid" << std::endl;
+    return false;
+  }
+
+  m_summary.input_files += input_files;
+  m_summary.input_records += input_records;
+  m_summary.input_voxels = std::max(m_summary.input_voxels, input_voxels);
+  m_summary.skipped_large_voxels += skipped_large_voxels;
+  m_summary.skipped_low_selected_voxels += skipped_low_selected_voxels;
+  m_summary.skipped_low_charge_voxels += skipped_low_charge_voxels;
+  m_summary.skipped_low_batch_charge_voxels += skipped_low_batch_charge_voxels;
+  m_summary.pt_rejected_records += pt_rejected_records;
+  m_summary.duplicate_dropped_records += duplicate_dropped_records;
+  m_summary.candidate_pairs += candidate_pairs;
+  m_summary.accepted_pairs += accepted_pairs;
+  m_summary.same_event_track_pairs += same_event_track_pairs;
+  m_summary.invalid_weight_pairs += invalid_weight_pairs;
+  m_summary.invalid_poca_pairs += invalid_poca_pairs;
+  m_summary.dca_rejected_pairs += dca_rejected_pairs;
+  return true;
+}
+
+void CPMAverageCorrectionReconstruction::write_accumulator_tree(TFile& output) const
+{
+  output.cd();
+  TTree sums("cpm_voxel_correction_sums", "CPM production voxel correction sums");
+  int iphi = -1;
+  int ir = -1;
+  int iz = -1;
+  unsigned long long entries = 0;
+  double sum_pair_weight = 0.0;
+  double sum_pair_weight2 = 0.0;
+  double sum_delta_r = 0.0;
+  double sum_delta_r2 = 0.0;
+  double sum_delta_rphi = 0.0;
+  double sum_delta_rphi2 = 0.0;
+  double sum_delta_phi = 0.0;
+  double sum_delta_phi2 = 0.0;
+  double sum_delta_z = 0.0;
+  double sum_delta_z2 = 0.0;
+  double sum_weighted_delta_r = 0.0;
+  double sum_weighted_delta_r2 = 0.0;
+  double sum_weighted_delta_rphi = 0.0;
+  double sum_weighted_delta_rphi2 = 0.0;
+  double sum_weighted_delta_phi = 0.0;
+  double sum_weighted_delta_phi2 = 0.0;
+  double sum_weighted_delta_z = 0.0;
+  double sum_weighted_delta_z2 = 0.0;
+  double sum_dca = 0.0;
+  double sum_dca2 = 0.0;
+  double sum_voxel_x = 0.0;
+  double sum_voxel_y = 0.0;
+  double sum_voxel_z = 0.0;
+
+  sums.Branch("iphi", &iphi);
+  sums.Branch("ir", &ir);
+  sums.Branch("iz", &iz);
+  sums.Branch("entries", &entries);
+  sums.Branch("sum_pair_weight", &sum_pair_weight);
+  sums.Branch("sum_pair_weight2", &sum_pair_weight2);
+  sums.Branch("sum_delta_r", &sum_delta_r);
+  sums.Branch("sum_delta_r2", &sum_delta_r2);
+  sums.Branch("sum_delta_rphi", &sum_delta_rphi);
+  sums.Branch("sum_delta_rphi2", &sum_delta_rphi2);
+  sums.Branch("sum_delta_phi", &sum_delta_phi);
+  sums.Branch("sum_delta_phi2", &sum_delta_phi2);
+  sums.Branch("sum_delta_z", &sum_delta_z);
+  sums.Branch("sum_delta_z2", &sum_delta_z2);
+  sums.Branch("sum_weighted_delta_r", &sum_weighted_delta_r);
+  sums.Branch("sum_weighted_delta_r2", &sum_weighted_delta_r2);
+  sums.Branch("sum_weighted_delta_rphi", &sum_weighted_delta_rphi);
+  sums.Branch("sum_weighted_delta_rphi2", &sum_weighted_delta_rphi2);
+  sums.Branch("sum_weighted_delta_phi", &sum_weighted_delta_phi);
+  sums.Branch("sum_weighted_delta_phi2", &sum_weighted_delta_phi2);
+  sums.Branch("sum_weighted_delta_z", &sum_weighted_delta_z);
+  sums.Branch("sum_weighted_delta_z2", &sum_weighted_delta_z2);
+  sums.Branch("sum_dca", &sum_dca);
+  sums.Branch("sum_dca2", &sum_dca2);
+  sums.Branch("sum_voxel_x", &sum_voxel_x);
+  sums.Branch("sum_voxel_y", &sum_voxel_y);
+  sums.Branch("sum_voxel_z", &sum_voxel_z);
+
+  for (const auto& [voxel, accumulator] : m_accumulators)
+  {
+    iphi = voxel.iphi;
+    ir = voxel.ir;
+    iz = voxel.iz;
+    entries = accumulator.entries;
+    sum_pair_weight = accumulator.sum_pair_weight;
+    sum_pair_weight2 = accumulator.sum_pair_weight2;
+    sum_delta_r = accumulator.sum_delta_r;
+    sum_delta_r2 = accumulator.sum_delta_r2;
+    sum_delta_rphi = accumulator.sum_delta_rphi;
+    sum_delta_rphi2 = accumulator.sum_delta_rphi2;
+    sum_delta_phi = accumulator.sum_delta_phi;
+    sum_delta_phi2 = accumulator.sum_delta_phi2;
+    sum_delta_z = accumulator.sum_delta_z;
+    sum_delta_z2 = accumulator.sum_delta_z2;
+    sum_weighted_delta_r = accumulator.sum_weighted_delta_r;
+    sum_weighted_delta_r2 = accumulator.sum_weighted_delta_r2;
+    sum_weighted_delta_rphi = accumulator.sum_weighted_delta_rphi;
+    sum_weighted_delta_rphi2 = accumulator.sum_weighted_delta_rphi2;
+    sum_weighted_delta_phi = accumulator.sum_weighted_delta_phi;
+    sum_weighted_delta_phi2 = accumulator.sum_weighted_delta_phi2;
+    sum_weighted_delta_z = accumulator.sum_weighted_delta_z;
+    sum_weighted_delta_z2 = accumulator.sum_weighted_delta_z2;
+    sum_dca = accumulator.sum_dca;
+    sum_dca2 = accumulator.sum_dca2;
+    sum_voxel_x = accumulator.sum_voxel_x;
+    sum_voxel_y = accumulator.sum_voxel_y;
+    sum_voxel_z = accumulator.sum_voxel_z;
+    sums.Fill();
+  }
+
+  sums.Write();
 }
 
 void CPMAverageCorrectionReconstruction::write_summary_tree(TFile& output) const
