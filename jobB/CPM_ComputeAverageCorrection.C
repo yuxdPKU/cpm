@@ -9,6 +9,7 @@
 #include <CPMAverageCorrectionReconstruction.h>
 #include <CPMReconstructionHelper.h>
 
+#include <cstddef>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -46,11 +47,39 @@ bool CPM_ComputeAverageCorrection(
     return false;
   }
 
-  for (const auto& input_file : input_files)
+  std::cout << "CPM_ComputeAverageCorrection - input files: "
+            << input_files.size() << std::endl;
+
+  for (std::size_t ifile = 0; ifile < input_files.size(); ++ifile)
   {
+    const auto& input_file = input_files[ifile];
+    const bool print_progress =
+        ifile == 0 ||
+        (ifile + 1) % 25 == 0 ||
+        (ifile + 1) == input_files.size();
+
+    if (print_progress)
+    {
+      std::cout << "CPM_ComputeAverageCorrection - loading input "
+                << (ifile + 1) << "/" << input_files.size()
+                << ": " << input_file << std::endl;
+    }
+
     if (!reconstruction.add_from_file(input_file))
     {
+      std::cout << "CPM_ComputeAverageCorrection - failed while loading input "
+                << (ifile + 1) << "/" << input_files.size()
+                << ": " << input_file << std::endl;
       return false;
+    }
+
+    if (print_progress)
+    {
+      std::cout << "CPM_ComputeAverageCorrection - loaded inputs: "
+                << (ifile + 1) << "/" << input_files.size()
+                << " records: " << reconstruction.records().record_count()
+                << " voxels: " << reconstruction.records().voxel_count()
+                << std::endl;
     }
   }
 
@@ -69,10 +98,15 @@ bool CPM_ComputeAverageCorrection(
     }
   }
 
+  std::cout << "CPM_ComputeAverageCorrection - calculating average corrections"
+            << std::endl;
   if (!reconstruction.calculate_average_corrections())
   {
     return false;
   }
+
+  std::cout << "CPM_ComputeAverageCorrection - saving average corrections"
+            << std::endl;
   if (!reconstruction.save_average_corrections(output_file))
   {
     return false;
