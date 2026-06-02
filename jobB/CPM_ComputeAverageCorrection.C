@@ -31,7 +31,7 @@ bool CPM_ComputeAverageCorrection(
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
     const std::string& metadata_file = "",
-    const unsigned long long max_input_records_per_chunk = 2000000)
+    const unsigned long long max_input_records_per_chunk = 500000)
 {
   CPMAverageCorrectionReconstruction reconstruction;
   reconstruction.set_use_pair_weights(use_pair_weights);
@@ -163,7 +163,7 @@ bool CPM_ComputeAverageCorrection(
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
     const std::string& metadata_file = "",
-    const unsigned long long max_input_records_per_chunk = 2000000)
+    const unsigned long long max_input_records_per_chunk = 500000)
 {
   const auto input_files = input_is_list ?
       CPMReconstructionHelper::read_file_list(input_file_or_list) :

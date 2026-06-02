@@ -50,7 +50,7 @@ Options:
   --max-input-records-per-chunk VALUE
                                 Max loaded Job A records before processing a
                                 streaming CPM chunk. 0 disables chunking and
-                                keeps all records in memory. Default: 2000000
+                                keeps all records in memory. Default: 500000
   --weighted                    Use pair weights in voxel averaging. Default.
   --unweighted                  Use a simple unweighted average.
   --help                        Show this message.
@@ -121,7 +121,7 @@ B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
 B2_MIN_ENTRIES="1"
 B2_USE_PAIR_WEIGHTS=1
-B_MAX_INPUT_RECORDS_PER_CHUNK="2000000"
+B_MAX_INPUT_RECORDS_PER_CHUNK="500000"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
