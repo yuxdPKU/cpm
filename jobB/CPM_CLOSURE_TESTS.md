@@ -129,8 +129,55 @@ For each sample, the output directory contains:
 
 | Date | Sample | Command | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job` | pending | closure slice at phi=4.7, z=+/-10 cm |
-| 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job` | pending | closure slice at phi=4.7, z=+/-10 cm |
+| 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768145.0` | done | normal termination, return value 0 |
+| 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768145.1` | done | normal termination, return value 0 |
+
+## Results From The First Closure Slice
+
+Slice selection:
+
+- requested `phi = 4.7 rad`, selected phi bin center `4.62512 rad`;
+- requested `|z| = 10 cm`, selected z bin centers `+8.97794 cm` and
+  `-8.97794 cm`.
+
+Pair-row statistics:
+
+| Sample | Scanned B1 pair rows | Selected pair rows before DCA scan |
+| --- | ---: | ---: |
+| sim_acts_unweighted | 84,854,056 | 734,861 |
+| sim_genfit_unweighted | 60,904,087 | 547,463 |
+
+Pair-entry-weighted slice means for the midpoint are:
+
+| Sample | Side | DCA cut | Pairs | mean delta_r [cm] | mean delta_phi [rad] | mean delta_z [cm] |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| sim_acts_unweighted | +Z | `<= 2.0 cm` | 369,950 | 0.177351 | -0.000607912 | 0.0315611 |
+| sim_acts_unweighted | +Z | `<= 0.2 cm` | 181,057 | 0.139942 | -0.000117550 | 0.0275570 |
+| sim_acts_unweighted | -Z | `<= 2.0 cm` | 364,911 | 0.197194 | -0.000511747 | -0.0387139 |
+| sim_acts_unweighted | -Z | `<= 0.2 cm` | 179,688 | 0.158782 | -0.000101995 | -0.0334790 |
+| sim_genfit_unweighted | +Z | `<= 2.0 cm` | 278,340 | 0.0871131 | -0.000910439 | 0.0160473 |
+| sim_genfit_unweighted | +Z | `<= 0.2 cm` | 237,296 | 0.0295937 | -0.000124754 | 0.00671098 |
+| sim_genfit_unweighted | -Z | `<= 2.0 cm` | 269,123 | 0.0975554 | -0.000517532 | -0.0190846 |
+| sim_genfit_unweighted | -Z | `<= 0.2 cm` | 229,853 | 0.0313060 | -0.0000998302 | -0.0077664 |
+
+For the loose `DCA <= 2.0 cm` selection, the B3 overlay extracted from
+`PREFIX_B3_average_correction_histograms.root` matches the B1 midpoint profile
+means exactly within print precision. This confirms that the observed offset is
+already present in the B1 crossing-point estimate and is not introduced by B2
+accumulation or B3 histogram splitting/guard-bin handling.
+
+The `point_a` and `point_b` means are very close to each other. For example, in
+the ACTS +Z slice with `DCA <= 2.0 cm`, `point_a` and `point_b` have mean
+`delta_r = 0.177287 cm` and `0.177255 cm`, while the midpoint has
+`delta_r = 0.177351 cm`. This indicates that the midpoint is mostly inheriting a
+common same-direction bias of the two helix PoCA points rather than averaging
+away opposite point biases.
+
+Tightening the pair DCA cut improves the closure but does not remove the bias,
+especially for ACTS. GenFit improves more strongly under the same `0.2 cm` DCA
+refilter. The current evidence therefore points to B1-level pair quality and/or
+track/helix-extrapolation bias as the next place to investigate, rather than
+B2/B3 averaging.
 
 ## Interpretation Checklist
 
