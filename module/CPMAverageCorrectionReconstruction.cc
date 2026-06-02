@@ -47,7 +47,20 @@ bool CPMAverageCorrectionReconstruction::add(const CPMVoxelContainer& source)
     return false;
   }
 
-  return m_records.add(source);
+  const auto source_records = source.record_count();
+  if (!m_records.add(source))
+  {
+    return false;
+  }
+
+  m_summary.input_records += source_records;
+  for (const auto& [voxel, records] : source.records())
+  {
+    (void) records;
+    m_input_voxels.insert(voxel);
+  }
+  m_summary.input_voxels = static_cast<unsigned int>(m_input_voxels.size());
+  return true;
 }
 
 bool CPMAverageCorrectionReconstruction::add_from_file(
@@ -100,23 +113,30 @@ void CPMAverageCorrectionReconstruction::reset_output()
   m_hdistortion_z_rec.reset();
 }
 
-bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
+void CPMAverageCorrectionReconstruction::reset_calculation_summary()
+{
+  const unsigned int input_files = m_summary.input_files;
+  const unsigned long long input_records = m_summary.input_records;
+  const unsigned int input_voxels = m_summary.input_voxels;
+  m_summary = {};
+  m_summary.input_files = input_files;
+  m_summary.input_records = input_records;
+  m_summary.input_voxels = input_voxels;
+}
+
+bool CPMAverageCorrectionReconstruction::process_loaded_records()
 {
   const auto& grid = m_records.grid();
   if (!grid.valid())
   {
-    std::cout << "CPMAverageCorrectionReconstruction::calculate_average_corrections - no valid input grid" << std::endl;
+    std::cout << "CPMAverageCorrectionReconstruction::process_loaded_records - no valid input grid" << std::endl;
     return false;
   }
 
-  const unsigned int input_files = m_summary.input_files;
-  m_summary = {};
-  m_summary.input_files = input_files;
-  m_summary.input_records = m_records.record_count();
-  m_summary.input_voxels = m_records.voxel_count();
-  reset_output();
-
-  std::map<VoxelId, CPMReconstructionHelper::CorrectionAccumulator> accumulators;
+  if (m_records.record_count() == 0)
+  {
+    return true;
+  }
 
   for (const auto& [voxel, records] : m_records.records())
   {
@@ -211,6 +231,7 @@ bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
         static_cast<std::size_t>(m_max_pair_records_per_charge_batch) :
         std::numeric_limits<std::size_t>::max();
 
+    const bool had_accumulator = m_accumulators.find(voxel) != m_accumulators.end();
     bool accepted_any_batch = false;
     std::size_t positive_index = 0;
     std::size_t negative_index = 0;
@@ -282,7 +303,7 @@ bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
 
           const double accumulation_weight =
               m_use_pair_weights ? pair_result.pair_weight : 1.0;
-          accumulators[voxel].add(
+          m_accumulators[voxel].add(
               pair_result.delta_r,
               pair_result.delta_rphi,
               pair_result.delta_phi,
@@ -299,7 +320,7 @@ bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
       }
     }
 
-    if (accepted_any_batch)
+    if (accepted_any_batch && !had_accumulator)
     {
       ++m_summary.processed_voxels;
     }
@@ -309,7 +330,25 @@ bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
     }
   }
 
-  m_summary.accumulator_voxels = accumulators.size();
+  m_summary.accumulator_voxels = m_accumulators.size();
+  m_records.Reset();
+  return true;
+}
+
+bool CPMAverageCorrectionReconstruction::finalize_average_corrections()
+{
+  const auto& grid = m_records.grid();
+  if (!grid.valid())
+  {
+    std::cout << "CPMAverageCorrectionReconstruction::finalize_average_corrections - no valid input grid" << std::endl;
+    return false;
+  }
+
+  reset_output();
+  m_summary.accumulator_voxels = m_accumulators.size();
+  m_summary.filled_voxels = 0;
+  m_summary.skipped_low_entry_voxels = 0;
+  m_summary.skipped_invalid_voxels = 0;
 
   m_hentries_rec.reset(new TH3F(
       "hentries_rec",
@@ -336,7 +375,7 @@ bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
       grid.r_bins, grid.r_min, grid.r_max,
       grid.z_bins, grid.z_min, grid.z_max));
 
-  for (const auto& [voxel, accumulator] : accumulators)
+  for (const auto& [voxel, accumulator] : m_accumulators)
   {
     if (accumulator.entries < m_min_entries_per_voxel)
     {
@@ -381,6 +420,18 @@ bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
   }
 
   return true;
+}
+
+bool CPMAverageCorrectionReconstruction::calculate_average_corrections()
+{
+  reset_output();
+  reset_calculation_summary();
+  m_accumulators.clear();
+  if (!process_loaded_records())
+  {
+    return false;
+  }
+  return finalize_average_corrections();
 }
 
 bool CPMAverageCorrectionReconstruction::save_average_corrections(

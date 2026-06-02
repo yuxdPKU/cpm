@@ -47,6 +47,10 @@ Options:
   --crossing-solver VALUE        Crossing solver: helix or line. Default: helix
   --magnetic-field-z VALUE       Helix-solver Bz field in tesla. Default: 1.4
   --min-entries VALUE           Minimum accepted pairs per voxel. Default: 1
+  --max-input-records-per-chunk VALUE
+                                Max loaded Job A records before processing a
+                                streaming CPM chunk. 0 disables chunking and
+                                keeps all records in memory. Default: 2000000
   --weighted                    Use pair weights in voxel averaging. Default.
   --unweighted                  Use a simple unweighted average.
   --help                        Show this message.
@@ -117,6 +121,7 @@ B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
 B2_MIN_ENTRIES="1"
 B2_USE_PAIR_WEIGHTS=1
+B_MAX_INPUT_RECORDS_PER_CHUNK="2000000"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -174,6 +179,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --min-entries|--b2-min-entries)
       B2_MIN_ENTRIES=${2:-}
+      shift 2
+      ;;
+    --max-input-records-per-chunk|--chunk-records)
+      B_MAX_INPUT_RECORDS_PER_CHUNK=${2:-}
       shift 2
       ;;
     --weighted|--b2-weighted)
@@ -253,8 +262,9 @@ echo "[run_cpm_b_chain] crossing_solver: $B1_CROSSING_SOLVER"
 echo "[run_cpm_b_chain] magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
 echo "[run_cpm_b_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 echo "[run_cpm_b_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
+echo "[run_cpm_b_chain] max_input_records_per_chunk: $B_MAX_INPUT_RECORDS_PER_CHUNK"
 
-run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q})"
+run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK})"
 
 run_root_bool_check "${MACRO_DIR}/CPM_QA_B3_CheckAverageCorrectionHistograms.C" "CPM_QA_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 

@@ -5,8 +5,10 @@
 #include "CPMVoxelContainerv1.h"
 
 #include <iostream>
+#include <map>
 #include <memory>
 #include <ostream>
+#include <set>
 #include <string>
 
 class TH3;
@@ -47,6 +49,8 @@ class CPMAverageCorrectionReconstruction
       const std::string& filename,
       const std::string& objectname = "CPMVoxelContainer");
 
+  bool process_loaded_records();
+  bool finalize_average_corrections();
   bool calculate_average_corrections();
   bool save_average_corrections(
       const std::string& filename = "CPM_B3_average_correction_histograms.root") const;
@@ -78,9 +82,12 @@ class CPMAverageCorrectionReconstruction
 
  private:
   void reset_output();
+  void reset_calculation_summary();
   void write_summary_tree(TFile& output) const;
 
   CPMVoxelContainerv1 m_records;
+  std::map<VoxelId, CPMReconstructionHelper::CorrectionAccumulator> m_accumulators;
+  std::set<VoxelId> m_input_voxels;
   Summary m_summary;
 
   bool m_use_pair_weights = true;

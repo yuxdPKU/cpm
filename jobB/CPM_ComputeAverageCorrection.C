@@ -30,7 +30,8 @@ bool CPM_ComputeAverageCorrection(
     const unsigned int max_pair_records_per_charge_batch = 10,
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
-    const std::string& metadata_file = "")
+    const std::string& metadata_file = "",
+    const unsigned long long max_input_records_per_chunk = 2000000)
 {
   CPMAverageCorrectionReconstruction reconstruction;
   reconstruction.set_use_pair_weights(use_pair_weights);
@@ -49,6 +50,8 @@ bool CPM_ComputeAverageCorrection(
 
   std::cout << "CPM_ComputeAverageCorrection - input files: "
             << input_files.size() << std::endl;
+  std::cout << "CPM_ComputeAverageCorrection - max input records per chunk: "
+            << max_input_records_per_chunk << std::endl;
 
   for (std::size_t ifile = 0; ifile < input_files.size(); ++ifile)
   {
@@ -81,6 +84,25 @@ bool CPM_ComputeAverageCorrection(
                 << " voxels: " << reconstruction.records().voxel_count()
                 << std::endl;
     }
+
+    if (max_input_records_per_chunk > 0 &&
+        reconstruction.records().record_count() >= max_input_records_per_chunk)
+    {
+      std::cout << "CPM_ComputeAverageCorrection - processing loaded records after input "
+                << (ifile + 1) << "/" << input_files.size()
+                << " records: " << reconstruction.records().record_count()
+                << " voxels: " << reconstruction.records().voxel_count()
+                << std::endl;
+      if (!reconstruction.process_loaded_records())
+      {
+        return false;
+      }
+      std::cout << "CPM_ComputeAverageCorrection - accumulated accepted pairs: "
+                << reconstruction.summary().accepted_pairs
+                << " accumulator voxels: "
+                << reconstruction.summary().accumulator_voxels
+                << std::endl;
+    }
   }
 
   if (!metadata_file.empty())
@@ -98,9 +120,18 @@ bool CPM_ComputeAverageCorrection(
     }
   }
 
-  std::cout << "CPM_ComputeAverageCorrection - calculating average corrections"
+  std::cout << "CPM_ComputeAverageCorrection - processing final loaded records"
+            << " records: " << reconstruction.records().record_count()
+            << " voxels: " << reconstruction.records().voxel_count()
             << std::endl;
-  if (!reconstruction.calculate_average_corrections())
+  if (!reconstruction.process_loaded_records())
+  {
+    return false;
+  }
+
+  std::cout << "CPM_ComputeAverageCorrection - finalizing average corrections"
+            << std::endl;
+  if (!reconstruction.finalize_average_corrections())
   {
     return false;
   }
@@ -131,7 +162,8 @@ bool CPM_ComputeAverageCorrection(
     const unsigned int max_pair_records_per_charge_batch = 10,
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
-    const std::string& metadata_file = "")
+    const std::string& metadata_file = "",
+    const unsigned long long max_input_records_per_chunk = 2000000)
 {
   const auto input_files = input_is_list ?
       CPMReconstructionHelper::read_file_list(input_file_or_list) :
@@ -150,5 +182,6 @@ bool CPM_ComputeAverageCorrection(
       max_pair_records_per_charge_batch,
       crossing_solver,
       magnetic_field_z,
-      metadata_file);
+      metadata_file,
+      max_input_records_per_chunk);
 }
