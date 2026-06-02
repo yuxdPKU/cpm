@@ -82,10 +82,12 @@ TH1 *h_N_neg_method1[nrun], *h_R_neg_method1[nrun], *h_P_neg_method1[nrun], *h_Z
 TH1 *h_N_pos_method2[nrun], *h_R_pos_method2[nrun], *h_P_pos_method2[nrun], *h_Z_pos_method2[nrun];
 TH1 *h_N_neg_method2[nrun], *h_R_neg_method2[nrun], *h_P_neg_method2[nrun], *h_Z_neg_method2[nrun];
 
+TLine *l_nco_o_N[nrun], *l_nco_i_N[nrun], *l_nci_o_N[nrun], *l_nci_i_N[nrun];
 TLine *l_nco_o_R[nrun], *l_nco_i_R[nrun], *l_nci_o_R[nrun], *l_nci_i_R[nrun];
 TLine *l_nco_o_P[nrun], *l_nco_i_P[nrun], *l_nci_o_P[nrun], *l_nci_i_P[nrun];
 TLine *l_nco_o_Z[nrun], *l_nco_i_Z[nrun], *l_nci_o_Z[nrun], *l_nci_i_Z[nrun];
 TLine *l_nco_o_RP[nrun], *l_nco_i_RP[nrun], *l_nci_o_RP[nrun], *l_nci_i_RP[nrun];
+TLine *l_sci_i_N[nrun], *l_sci_o_N[nrun], *l_sco_i_N[nrun], *l_sco_o_N[nrun];
 TLine *l_sci_i_R[nrun], *l_sci_o_R[nrun], *l_sco_i_R[nrun], *l_sco_o_R[nrun];
 TLine *l_sci_i_P[nrun], *l_sci_o_P[nrun], *l_sco_i_P[nrun], *l_sco_o_P[nrun];
 TLine *l_sci_i_Z[nrun], *l_sci_o_Z[nrun], *l_sco_i_Z[nrun], *l_sco_o_Z[nrun];
@@ -103,19 +105,27 @@ for (int i = 0; i < nrun; i++)
 
   draw1Dmap_2D(cdbfilename_lamination[i].c_str(), Form("%d_lamination_cdb",runs[i]), selectR, lcdb_lamination_R_pos[i], lcdb_lamination_R_neg[i], lcdb_lamination_P_pos[i], lcdb_lamination_P_neg[i], lcdb_lamination_Z_pos[i], lcdb_lamination_Z_neg[i], 1);
 
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/TPCdistortion/Si_TPOT_fit/run3pp_newSiFieldonAlignment_newTPOTzfAlignment/jobB/Rootfiles/Distortions_full_mm_%d.root",runs[i]), Form("%d_MI",runs[i]), selectR, h_R_pos_method1[i], h_R_neg_method1[i], h_P_pos_method1[i], h_P_neg_method1[i], h_Z_pos_method1[i], h_Z_neg_method1[i], 2);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/TPCdistortion/Si_TPOT_fit/run3pp_newSiFieldonAlignment_newTPOTzfAlignment/jobB/Rootfiles/Distortions_full_mm_%d.root",runs[i]), Form("%d_MI",runs[i]), selectR, h_R_pos_method1[i], h_R_neg_method1[i], h_P_pos_method1[i], h_P_neg_method1[i], h_Z_pos_method1[i], h_Z_neg_method1[i], h_N_pos_method1[i], h_N_neg_method1[i], 2);
 
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d/run%d_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm",runs[i]), selectR, h_R_pos_method2[i], h_R_neg_method2[i], h_P_pos_method2[i], h_P_neg_method2[i], h_Z_pos_method2[i], h_Z_neg_method2[i], 4);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d/run%d_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm",runs[i]), selectR, h_R_pos_method2[i], h_R_neg_method2[i], h_P_pos_method2[i], h_P_neg_method2[i], h_Z_pos_method2[i], h_Z_neg_method2[i], h_N_pos_method2[i], h_N_neg_method2[i], 4);
 
 }
 
 TH1 *h_N_pos_method3, *h_R_pos_method3, *h_P_pos_method3, *h_Z_pos_method3;
 TH1 *h_N_neg_method3, *h_R_neg_method3, *h_P_neg_method3, *h_Z_neg_method3;
-draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim/sim_B3_average_correction_histograms.root"), Form("sim_cpm"), selectR, h_R_pos_method3, h_R_neg_method3, h_P_pos_method3, h_P_neg_method3, h_Z_pos_method3, h_Z_neg_method3, 1);
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim/sim_B3_average_correction_histograms.root"), Form("sim_cpm"), selectR, h_R_pos_method3, h_R_neg_method3, h_P_pos_method3, h_P_neg_method3, h_Z_pos_method3, h_Z_neg_method3, h_N_pos_method3, h_N_neg_method3, 1);
 
+std::vector<TH1*> hists_N; hists_N.clear();
 std::vector<TH1*> hists_P; hists_P.clear();
 std::vector<TH1*> hists_R; hists_R.clear();
 std::vector<TH1*> hists_Z; hists_Z.clear();
+for (int i=0; i<nrun; i++)
+{
+	hists_N.push_back(h_N_neg_method1[i]);
+	hists_N.push_back(h_N_pos_method1[i]);
+	hists_N.push_back(h_N_neg_method2[i]);
+	hists_N.push_back(h_N_pos_method2[i]);
+}
 for (int i=0; i<nrun; i++)
 {
 	hists_P.push_back(h_P_neg_method1[i]);
@@ -137,6 +147,7 @@ for (int i=0; i<nrun; i++)
 	hists_Z.push_back(h_Z_neg_method2[i]);
 	hists_Z.push_back(h_Z_pos_method2[i]);
 }
+std::pair<double,double> yrange_N = SetCommonYRange(hists_N);
 std::pair<double,double> yrange_P = SetCommonYRange(hists_P);
 std::pair<double,double> yrange_R = SetCommonYRange(hists_R);
 std::pair<double,double> yrange_Z = SetCommonYRange(hists_Z);
@@ -153,34 +164,42 @@ std::pair<double,double> yrange_Z = SetCommonYRange(hists_Z);
 
 for (int i=0; i<nrun; i++)
 {
+  l_nco_o_N[i] = new TLine(selectR*tan(phirange_NCO.second),yrange_N.first,selectR*tan(phirange_NCO.second),yrange_N.second);
   l_nco_o_R[i] = new TLine(selectR*tan(phirange_NCO.second),yrange_R.first,selectR*tan(phirange_NCO.second),yrange_R.second);
   l_nco_o_P[i] = new TLine(selectR*tan(phirange_NCO.second),yrange_P.first,selectR*tan(phirange_NCO.second),yrange_P.second);
   l_nco_o_Z[i] = new TLine(selectR*tan(phirange_NCO.second),yrange_Z.first,selectR*tan(phirange_NCO.second),yrange_Z.second);
 
+  l_nco_i_N[i] = new TLine(selectR*tan(phirange_NCO.first),yrange_N.first,selectR*tan(phirange_NCO.first),yrange_N.second);
   l_nco_i_R[i] = new TLine(selectR*tan(phirange_NCO.first),yrange_R.first,selectR*tan(phirange_NCO.first),yrange_R.second);
   l_nco_i_P[i] = new TLine(selectR*tan(phirange_NCO.first),yrange_P.first,selectR*tan(phirange_NCO.first),yrange_P.second);
   l_nco_i_Z[i] = new TLine(selectR*tan(phirange_NCO.first),yrange_Z.first,selectR*tan(phirange_NCO.first),yrange_Z.second);
 
+  l_nci_o_N[i] = new TLine(selectR*tan(phirange_NCI.second),yrange_N.first,selectR*tan(phirange_NCI.second),yrange_N.second);
   l_nci_o_R[i] = new TLine(selectR*tan(phirange_NCI.second),yrange_R.first,selectR*tan(phirange_NCI.second),yrange_R.second);
   l_nci_o_P[i] = new TLine(selectR*tan(phirange_NCI.second),yrange_P.first,selectR*tan(phirange_NCI.second),yrange_P.second);
   l_nci_o_Z[i] = new TLine(selectR*tan(phirange_NCI.second),yrange_Z.first,selectR*tan(phirange_NCI.second),yrange_Z.second);
 
+  l_nci_i_N[i] = new TLine(selectR*tan(phirange_NCI.first),yrange_N.first,selectR*tan(phirange_NCI.first),yrange_N.second);
   l_nci_i_R[i] = new TLine(selectR*tan(phirange_NCI.first),yrange_R.first,selectR*tan(phirange_NCI.first),yrange_R.second);
   l_nci_i_P[i] = new TLine(selectR*tan(phirange_NCI.first),yrange_P.first,selectR*tan(phirange_NCI.first),yrange_P.second);
   l_nci_i_Z[i] = new TLine(selectR*tan(phirange_NCI.first),yrange_Z.first,selectR*tan(phirange_NCI.first),yrange_Z.second);
 
+  l_sci_i_N[i] = new TLine(selectR*tan(phirange_SCI.second),yrange_N.first,selectR*tan(phirange_SCI.second),yrange_N.second);
   l_sci_i_R[i] = new TLine(selectR*tan(phirange_SCI.second),yrange_R.first,selectR*tan(phirange_SCI.second),yrange_R.second);
   l_sci_i_P[i] = new TLine(selectR*tan(phirange_SCI.second),yrange_P.first,selectR*tan(phirange_SCI.second),yrange_P.second);
   l_sci_i_Z[i] = new TLine(selectR*tan(phirange_SCI.second),yrange_Z.first,selectR*tan(phirange_SCI.second),yrange_Z.second);
 
+  l_sci_o_N[i] = new TLine(selectR*tan(phirange_SCI.first),yrange_N.first,selectR*tan(phirange_SCI.first),yrange_N.second);
   l_sci_o_R[i] = new TLine(selectR*tan(phirange_SCI.first),yrange_R.first,selectR*tan(phirange_SCI.first),yrange_R.second);
   l_sci_o_P[i] = new TLine(selectR*tan(phirange_SCI.first),yrange_P.first,selectR*tan(phirange_SCI.first),yrange_P.second);
   l_sci_o_Z[i] = new TLine(selectR*tan(phirange_SCI.first),yrange_Z.first,selectR*tan(phirange_SCI.first),yrange_Z.second);
 
+  l_sco_i_N[i] = new TLine(selectR*tan(phirange_SCO.second),yrange_N.first,selectR*tan(phirange_SCO.second),yrange_N.second);
   l_sco_i_R[i] = new TLine(selectR*tan(phirange_SCO.second),yrange_R.first,selectR*tan(phirange_SCO.second),yrange_R.second);
   l_sco_i_P[i] = new TLine(selectR*tan(phirange_SCO.second),yrange_P.first,selectR*tan(phirange_SCO.second),yrange_P.second);
   l_sco_i_Z[i] = new TLine(selectR*tan(phirange_SCO.second),yrange_Z.first,selectR*tan(phirange_SCO.second),yrange_Z.second);
 
+  l_sco_o_N[i] = new TLine(selectR*tan(phirange_SCO.first),yrange_N.first,selectR*tan(phirange_SCO.first),yrange_N.second);
   l_sco_o_R[i] = new TLine(selectR*tan(phirange_SCO.first),yrange_R.first,selectR*tan(phirange_SCO.first),yrange_R.second);
   l_sco_o_P[i] = new TLine(selectR*tan(phirange_SCO.first),yrange_P.first,selectR*tan(phirange_SCO.first),yrange_P.second);
   l_sco_o_Z[i] = new TLine(selectR*tan(phirange_SCO.first),yrange_Z.first,selectR*tan(phirange_SCO.first),yrange_Z.second);
@@ -222,8 +241,16 @@ ofile3->Write();
 for (int i = 0; i < nrun; i++)
 {
 TCanvas* can_MI_CPM_LAM = new TCanvas("can_MI_CPM_LAM","",2400,1200);
-can_MI_CPM_LAM->Divide(3,2);
+can_MI_CPM_LAM->Divide(4,2);
 can_MI_CPM_LAM->cd(1);
+gPad->SetLogy(0);
+h_N_pos_method1[i]->Draw("hist,e,same");
+h_N_pos_method2[i]->Draw("hist,same");
+l_nco_i_N[i]->Draw();
+l_nco_o_N[i]->Draw();
+l_nci_i_N[i]->Draw();
+l_nci_o_N[i]->Draw();
+can_MI_CPM_LAM->cd(2);
 gPad->SetLogy(0);
 h_P_pos_method1[i]->Draw("hist,e,same");
 h_P_pos_method2[i]->Draw("hist,same");
@@ -231,7 +258,7 @@ l_nco_i_P[i]->Draw();
 l_nco_o_P[i]->Draw();
 l_nci_i_P[i]->Draw();
 l_nci_o_P[i]->Draw();
-can_MI_CPM_LAM->cd(2);
+can_MI_CPM_LAM->cd(3);
 gPad->SetLogy(0);
 h_R_pos_method1[i]->Draw("hist,e,same");
 h_R_pos_method2[i]->Draw("hist,same");
@@ -239,7 +266,7 @@ l_nco_i_R[i]->Draw();
 l_nco_o_R[i]->Draw();
 l_nci_i_R[i]->Draw();
 l_nci_o_R[i]->Draw();
-can_MI_CPM_LAM->cd(3);
+can_MI_CPM_LAM->cd(4);
 gPad->SetLogy(0);
 h_Z_pos_method1[i]->Draw("hist,e,same");
 h_Z_pos_method2[i]->Draw("hist,same");
@@ -247,7 +274,15 @@ l_nco_i_Z[i]->Draw();
 l_nco_o_Z[i]->Draw();
 l_nci_i_Z[i]->Draw();
 l_nci_o_Z[i]->Draw();
-can_MI_CPM_LAM->cd(4);
+can_MI_CPM_LAM->cd(5);
+gPad->SetLogy(0);
+h_N_neg_method1[i]->Draw("hist,e,same");
+h_N_neg_method2[i]->Draw("hist,same");
+l_sco_i_N[i]->Draw();
+l_sco_o_N[i]->Draw();
+l_sci_i_N[i]->Draw();
+l_sci_o_N[i]->Draw();
+can_MI_CPM_LAM->cd(6);
 gPad->SetLogy(0);
 h_P_neg_method1[i]->Draw("hist,e,same");
 h_P_neg_method2[i]->Draw("hist,same");
@@ -255,7 +290,7 @@ l_sco_i_P[i]->Draw();
 l_sco_o_P[i]->Draw();
 l_sci_i_P[i]->Draw();
 l_sci_o_P[i]->Draw();
-can_MI_CPM_LAM->cd(5);
+can_MI_CPM_LAM->cd(7);
 gPad->SetLogy(0);
 h_R_neg_method1[i]->Draw("hist,e,same");
 h_R_neg_method2[i]->Draw("hist,same");
@@ -263,7 +298,7 @@ l_sco_i_R[i]->Draw();
 l_sco_o_R[i]->Draw();
 l_sci_i_R[i]->Draw();
 l_sci_o_R[i]->Draw();
-can_MI_CPM_LAM->cd(6);
+can_MI_CPM_LAM->cd(8);
 gPad->SetLogy(0);
 h_Z_neg_method1[i]->Draw("hist,e,same");
 h_Z_neg_method2[i]->Draw("hist,same");
@@ -381,6 +416,7 @@ void draw1Dmap(TString filename, TString tag, double selectR,
   TH1*& h_R_pos, TH1*& h_R_neg,
   TH1*& h_P_pos, TH1*& h_P_neg,
   TH1*& h_Z_pos, TH1*& h_Z_neg,
+  TH1*& h_N_pos, TH1*& h_N_neg,
   int color=1,
   bool convert_RP_2_P=false)
 {
@@ -393,11 +429,11 @@ void draw1Dmap(TString filename, TString tag, double selectR,
   TH3* h_R_prz_pos = (TH3*) file_3D_map->Get("hIntDistortionR_posz");
   TH3* h_P_prz_pos = (TH3*) file_3D_map->Get("hIntDistortionP_posz");
   TH3* h_Z_prz_pos = (TH3*) file_3D_map->Get("hIntDistortionZ_posz");
-  //TH3* h_N_prz_pos = (TH3*) file_3D_map->Get("hentries_posz");
+  TH3* h_N_prz_pos = (TH3*) file_3D_map->Get("hentries_posz");
   TH3* h_R_prz_neg = (TH3*) file_3D_map->Get("hIntDistortionR_negz");
   TH3* h_P_prz_neg = (TH3*) file_3D_map->Get("hIntDistortionP_negz");
   TH3* h_Z_prz_neg = (TH3*) file_3D_map->Get("hIntDistortionZ_negz");
-  //TH3* h_N_prz_neg = (TH3*) file_3D_map->Get("hentries_negz");
+  TH3* h_N_prz_neg = (TH3*) file_3D_map->Get("hentries_negz");
 
   if (!h_R_prz_pos || !h_P_prz_pos || !h_Z_prz_pos ||
       !h_R_prz_neg || !h_P_prz_neg || !h_Z_prz_neg) {
@@ -406,40 +442,40 @@ void draw1Dmap(TString filename, TString tag, double selectR,
       return;
   }
 
-  //h_N_pos = new TH1F(Form("hentries_posz_%s",tag.Data()),Form("N @ R=%d cm;Z (cm);N",(int)selectR),h_N_prz_pos->GetZaxis()->GetNbins(),h_N_prz_pos->GetZaxis()->GetXmin(),h_N_prz_pos->GetZaxis()->GetXmax());
+  h_N_pos = new TH1F(Form("hentries_posz_%s",tag.Data()),Form("N @ R=%d cm;Z (cm);N",(int)selectR),h_N_prz_pos->GetZaxis()->GetNbins(),h_N_prz_pos->GetZaxis()->GetXmin(),h_N_prz_pos->GetZaxis()->GetXmax());
   h_R_pos = new TH1F(Form("hIntDistortionR_posz_%s",tag.Data()),Form("dR @ R=%d cm;Z (cm);dR (cm)",(int)selectR),h_R_prz_pos->GetZaxis()->GetNbins(),h_R_prz_pos->GetZaxis()->GetXmin(),h_R_prz_pos->GetZaxis()->GetXmax());
   h_P_pos = new TH1F(Form("hIntDistortionP_posz_%s",tag.Data()),Form("dphi @ R=%d cm;Z (cm);dphi (rad)",(int)selectR),h_P_prz_pos->GetZaxis()->GetNbins(),h_P_prz_pos->GetZaxis()->GetXmin(),h_P_prz_pos->GetZaxis()->GetXmax());
   h_Z_pos = new TH1F(Form("hIntDistortionZ_posz_%s",tag.Data()),Form("dz @ R=%d cm;Z (cm);dz (cm)",(int)selectR),h_Z_prz_pos->GetZaxis()->GetNbins(),h_Z_prz_pos->GetZaxis()->GetXmin(),h_Z_prz_pos->GetZaxis()->GetXmax());
-  //h_N_neg = new TH1F(Form("hentries_negz_%s",tag.Data()),Form("N @ R=%d cm;Z (cm);N",(int)selectR),h_N_prz_neg->GetZaxis()->GetNbins(),h_N_prz_neg->GetZaxis()->GetXmin(),h_N_prz_neg->GetZaxis()->GetXmax());
+  h_N_neg = new TH1F(Form("hentries_negz_%s",tag.Data()),Form("N @ R=%d cm;Z (cm);N",(int)selectR),h_N_prz_neg->GetZaxis()->GetNbins(),h_N_prz_neg->GetZaxis()->GetXmin(),h_N_prz_neg->GetZaxis()->GetXmax());
   h_R_neg = new TH1F(Form("hIntDistortionR_negz_%s",tag.Data()),Form("dR @ R=%d cm;Z (cm);dR (cm)",(int)selectR),h_R_prz_neg->GetZaxis()->GetNbins(),h_R_prz_neg->GetZaxis()->GetXmin(),h_R_prz_neg->GetZaxis()->GetXmax());
   h_P_neg = new TH1F(Form("hIntDistortionP_negz_%s",tag.Data()),Form("dphi @ R=%d cm;Z (cm);dphi (rad)",(int)selectR),h_P_prz_neg->GetZaxis()->GetNbins(),h_P_prz_neg->GetZaxis()->GetXmin(),h_P_prz_neg->GetZaxis()->GetXmax());
   h_Z_neg = new TH1F(Form("hIntDistortionZ_negz_%s",tag.Data()),Form("dz @ R=%d cm;Z (cm);dz (cm)",(int)selectR),h_Z_prz_neg->GetZaxis()->GetNbins(),h_Z_prz_neg->GetZaxis()->GetXmin(),h_Z_prz_neg->GetZaxis()->GetXmax());
 
   // do not save in the file_3D_map
   // directly saved in the stack memory
-  //h_N_pos->SetDirectory(0);
+  h_N_pos->SetDirectory(0);
   h_R_pos->SetDirectory(0);
   h_P_pos->SetDirectory(0);
   h_Z_pos->SetDirectory(0);
-  //h_N_neg->SetDirectory(0);
+  h_N_neg->SetDirectory(0);
   h_R_neg->SetDirectory(0);
   h_P_neg->SetDirectory(0);
   h_Z_neg->SetDirectory(0);
 
-  //plot1D_Zbin(h_N_prz_pos,h_N_pos,selectR, false);
+  plot1D_Zbin(h_N_prz_pos,h_N_pos,selectR, false);
   plot1D_Zbin(h_R_prz_pos,h_R_pos,selectR, false);
   plot1D_Zbin(h_P_prz_pos,h_P_pos,selectR, convert_RP_2_P);
   plot1D_Zbin(h_Z_prz_pos,h_Z_pos,selectR, false);
-  //plot1D_Zbin(h_N_prz_neg,h_N_neg,selectR, false);
+  plot1D_Zbin(h_N_prz_neg,h_N_neg,selectR, false);
   plot1D_Zbin(h_R_prz_neg,h_R_neg,selectR, false);
   plot1D_Zbin(h_P_prz_neg,h_P_neg,selectR, convert_RP_2_P);
   plot1D_Zbin(h_Z_prz_neg,h_Z_neg,selectR, false);
 
-  //h_N_pos->SetLineColor(color); h_N_pos->SetLineWidth(1); h_N_pos->SetFillColor(0); h_N_pos->SetMarkerColor(color);
+  h_N_pos->SetLineColor(color); h_N_pos->SetLineWidth(1); h_N_pos->SetFillColor(0); h_N_pos->SetMarkerColor(color);
   h_R_pos->SetLineColor(color); h_R_pos->SetLineWidth(1); h_R_pos->SetFillColor(0); h_R_pos->SetMarkerColor(color);
   h_P_pos->SetLineColor(color); h_P_pos->SetLineWidth(1); h_P_pos->SetFillColor(0); h_P_pos->SetMarkerColor(color);
   h_Z_pos->SetLineColor(color); h_Z_pos->SetLineWidth(1); h_Z_pos->SetFillColor(0); h_Z_pos->SetMarkerColor(color);
-  //h_N_neg->SetLineColor(color); h_N_neg->SetLineWidth(1); h_N_neg->SetFillColor(0); h_R_neg->SetMarkerColor(color);
+  h_N_neg->SetLineColor(color); h_N_neg->SetLineWidth(1); h_N_neg->SetFillColor(0); h_R_neg->SetMarkerColor(color);
   h_R_neg->SetLineColor(color); h_R_neg->SetLineWidth(1); h_R_neg->SetFillColor(0); h_R_neg->SetMarkerColor(color);
   h_P_neg->SetLineColor(color); h_P_neg->SetLineWidth(1); h_P_neg->SetFillColor(0); h_P_neg->SetMarkerColor(color);
   h_Z_neg->SetLineColor(color); h_Z_neg->SetLineWidth(1); h_Z_neg->SetFillColor(0); h_Z_neg->SetMarkerColor(color);
@@ -464,11 +500,11 @@ void draw1Dmap_2D(TString filename, TString tag, double selectR,
   TH2* h_R_pr_pos = (TH2*) file_2D_map->Get("hIntDistortionR_posz");
   TH2* h_P_pr_pos = (TH2*) file_2D_map->Get("hIntDistortionP_posz");
   TH2* h_Z_pr_pos = (TH2*) file_2D_map->Get("hIntDistortionZ_posz");
-  //TH2* h_N_pr_pos = (TH2*) file_2D_map->Get("hentries_posz");
+  TH2* h_N_pr_pos = (TH2*) file_2D_map->Get("hentries_posz");
   TH2* h_R_pr_neg = (TH2*) file_2D_map->Get("hIntDistortionR_negz");
   TH2* h_P_pr_neg = (TH2*) file_2D_map->Get("hIntDistortionP_negz");
   TH2* h_Z_pr_neg = (TH2*) file_2D_map->Get("hIntDistortionZ_negz");
-  //TH2* h_N_pr_neg = (TH2*) file_2D_map->Get("hentries_negz");
+  TH2* h_N_pr_neg = (TH2*) file_2D_map->Get("hentries_negz");
 
   if (!h_R_pr_pos || !h_P_pr_pos || !h_Z_pr_pos ||
       !h_R_pr_neg || !h_P_pr_neg || !h_Z_pr_neg) {

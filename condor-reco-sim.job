@@ -48,7 +48,8 @@ NJob           = 2000
 Segment        = $(Process)
 InFileName     = /sphenix/u/xyu3/hftg01/DST_FOR_DISTORTION/SimulationDST/G4Hits-$INT(Segment,%05d).root
 OutDir         = $(Initialdir)/root/
-OutFileName    = dst_sim_acts
+#OutFileName    = dst_sim_acts
+OutFileName    = dst_sim_genfit
 # FitMode can be auto, actsfit, or genfit. In auto mode the macro chooses
 # ACTS when OutFileName contains "acts" and GenFit when it contains "genfit".
 FitMode        = auto
