@@ -20,8 +20,14 @@ AM_LDFLAGS = \
 lib_LTLIBRARIES = \
   libcpm.la
 
-libcpm_la_LIBADD = \
+ACTS_LIBS = \
   -lActsCore \
+  -lActsPluginTGeo \
+  -lActsExamplesDetectorTGeo \
+  -lActsExamplesFramework
+
+CPM_EXTERNAL_LIBS = \
+  $(ACTS_LIBS) \
   -lCore \
   -lffaobjects \
   -lHist \
@@ -37,6 +43,9 @@ libcpm_la_LIBADD = \
   -ltrackbase_historic \
   -ltpc_io \
   -ltpccalib
+
+libcpm_la_LIBADD = \
+  $(CPM_EXTERNAL_LIBS)
 
 pkginclude_HEADERS = \
   CPMAverageCorrectionReconstruction.h \
@@ -75,14 +84,15 @@ testexternals_cpm_SOURCES = \
   testexternals.cc
 
 testexternals_cpm_LDADD = \
-  libcpm.la
+  libcpm.la \
+  $(CPM_EXTERNAL_LIBS)
 
 test_local_line_poca_SOURCES = \
   test_local_line_poca.cc
 
 test_local_line_poca_LDADD = \
   libcpm.la \
-  -lPhysics
+  $(CPM_EXTERNAL_LIBS)
 
 # Rule for generating table CINT dictionaries.
 %_Dict.cc: %.h %LinkDef.h
