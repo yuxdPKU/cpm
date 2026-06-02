@@ -48,6 +48,9 @@ class CPMAverageCorrectionReconstruction
   bool add_from_file(
       const std::string& filename,
       const std::string& objectname = "CPMVoxelContainer");
+  bool add_accumulators_from_file(
+      const std::string& filename,
+      const std::string& tree_name = "cpm_voxel_correction_sums");
 
   bool process_loaded_records();
   bool finalize_average_corrections();
@@ -83,6 +86,8 @@ class CPMAverageCorrectionReconstruction
  private:
   void reset_output();
   void reset_calculation_summary();
+  bool read_summary_tree(TFile& input);
+  void write_accumulator_tree(TFile& output) const;
   void write_summary_tree(TFile& output) const;
 
   CPMVoxelContainerv1 m_records;

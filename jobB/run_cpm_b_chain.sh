@@ -51,6 +51,11 @@ Options:
                                 Max loaded Job A records before processing a
                                 streaming CPM chunk. 0 disables chunking and
                                 keeps all records in memory. Default: 500000
+  --files-per-process VALUE     For input lists, split production into separate
+                                ROOT processes with this many input files per
+                                partial output, then merge accumulator sums.
+                                0 disables this process-level split.
+                                Default: 200
   --weighted                    Use pair weights in voxel averaging. Default.
   --unweighted                  Use a simple unweighted average.
   --help                        Show this message.
@@ -122,6 +127,7 @@ B1_MAGNETIC_FIELD_Z="1.4"
 B2_MIN_ENTRIES="1"
 B2_USE_PAIR_WEIGHTS=1
 B_MAX_INPUT_RECORDS_PER_CHUNK="500000"
+B_FILES_PER_PROCESS="200"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -185,6 +191,10 @@ while [[ $# -gt 0 ]]; do
       B_MAX_INPUT_RECORDS_PER_CHUNK=${2:-}
       shift 2
       ;;
+    --files-per-process|--process-files)
+      B_FILES_PER_PROCESS=${2:-}
+      shift 2
+      ;;
     --weighted|--b2-weighted)
       B2_USE_PAIR_WEIGHTS=1
       shift
@@ -226,6 +236,11 @@ if [[ "$B1_CROSSING_SOLVER" != "line" && "$B1_CROSSING_SOLVER" != "helix" ]]; th
   exit 2
 fi
 
+if [[ ! "$B_FILES_PER_PROCESS" =~ ^[0-9]+$ ]]; then
+  echo "Invalid --files-per-process: $B_FILES_PER_PROCESS (expected a non-negative integer)" >&2
+  exit 2
+fi
+
 mkdir -p "$OUT_DIR"
 
 if [[ -z "$METADATA" ]]; then
@@ -245,6 +260,8 @@ if [[ ! -e "$METADATA" ]]; then
 fi
 
 B3_HISTOGRAMS="${OUT_DIR}/${PREFIX}_B3_average_correction_histograms.root"
+SEGMENT_DIR="${OUT_DIR}/${PREFIX}_B_partial_segments"
+PARTIAL_OUTPUT_LIST="${SEGMENT_DIR}/${PREFIX}_partial_outputs.txt"
 
 INPUT_Q=$(root_string "$INPUT")
 B3_Q=$(root_string "$B3_HISTOGRAMS")
@@ -263,8 +280,74 @@ echo "[run_cpm_b_chain] magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
 echo "[run_cpm_b_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 echo "[run_cpm_b_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 echo "[run_cpm_b_chain] max_input_records_per_chunk: $B_MAX_INPUT_RECORDS_PER_CHUNK"
+echo "[run_cpm_b_chain] files_per_process: $B_FILES_PER_PROCESS"
 
-run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK})"
+SEGMENT_LISTS=()
+SEGMENT_OUTPUTS=()
+
+write_segment_lists() {
+  local input_list=$1
+  local segment_dir=$2
+  local outputs_list=$3
+  local files_per_process=$4
+  local line
+  local segment_index=-1
+  local segment_count=0
+  local segment_tag=""
+  local current_list=""
+  local current_output=""
+
+  mkdir -p "$segment_dir"
+  : > "$outputs_list"
+
+  while IFS= read -r line; do
+    if [[ -z "$line" || "${line:0:1}" == "#" ]]; then
+      continue
+    fi
+    if [[ "$segment_count" -eq 0 ]]; then
+      segment_index=$((segment_index + 1))
+      printf -v segment_tag "%04d" "$segment_index"
+      current_list="${segment_dir}/${PREFIX}_partial_${segment_tag}.list"
+      current_output="${segment_dir}/${PREFIX}_partial_${segment_tag}_B3_average_correction_histograms.root"
+      : > "$current_list"
+      printf '%s\n' "$current_output" >> "$outputs_list"
+      SEGMENT_LISTS+=("$current_list")
+      SEGMENT_OUTPUTS+=("$current_output")
+    fi
+    printf '%s\n' "$line" >> "$current_list"
+    segment_count=$((segment_count + 1))
+    if [[ "$segment_count" -ge "$files_per_process" ]]; then
+      segment_count=0
+    fi
+  done < "$input_list"
+
+  [[ "$segment_index" -ge 0 ]]
+}
+
+if [[ "$INPUT_IS_LIST" -eq 1 && "$B_FILES_PER_PROCESS" != "0" ]]; then
+  if ! write_segment_lists "$INPUT" "$SEGMENT_DIR" "$PARTIAL_OUTPUT_LIST" "$B_FILES_PER_PROCESS"; then
+    echo "Could not split input list: $INPUT" >&2
+    exit 1
+  fi
+
+  echo "[run_cpm_b_chain] process-level partial segments: ${#SEGMENT_LISTS[@]}"
+  echo "[run_cpm_b_chain] partial output directory: $SEGMENT_DIR"
+
+  for segment_index in "${!SEGMENT_LISTS[@]}"; do
+    segment_list=${SEGMENT_LISTS[$segment_index]}
+    segment_output=${SEGMENT_OUTPUTS[$segment_index]}
+    segment_list_q=$(root_string "$segment_list")
+    segment_output_q=$(root_string "$segment_output")
+    echo
+    echo "[run_cpm_b_chain] running partial segment $((segment_index + 1))/${#SEGMENT_LISTS[@]}: $segment_list"
+    run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${segment_list_q},${segment_output_q},1,${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK})"
+  done
+
+  PARTIAL_OUTPUT_LIST_Q=$(root_string "$PARTIAL_OUTPUT_LIST")
+  run_root_bool_check "${MACRO_DIR}/CPM_MergeAverageCorrectionSums.C" "CPM_MergeAverageCorrectionSumsFromList(${PARTIAL_OUTPUT_LIST_Q},${B3_Q},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES})"
+else
+  run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK})"
+fi
 
 run_root_bool_check "${MACRO_DIR}/CPM_QA_B3_CheckAverageCorrectionHistograms.C" "CPM_QA_B3_CheckAverageCorrectionHistograms(${B3_Q})"
 
