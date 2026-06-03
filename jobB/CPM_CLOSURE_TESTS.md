@@ -162,6 +162,8 @@ same left/right DCA split.
 | 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768148.1` | done | legends moved to companion PDFs |
 | 2026-06-02 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768149.0` | done | split DCA scan into two panels |
 | 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768149.1` | done | split DCA scan into two panels |
+| 2026-06-03 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768161.0` | done | fixed-phi/fixed-R Z scan at `R=60 cm` |
+| 2026-06-03 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768161.1` | done | fixed-phi/fixed-R Z scan at `R=60 cm` |
 
 ## Results From The First Closure Slice
 
@@ -251,6 +253,52 @@ the tightest DCA cut. ACTS improves strongly when moving from `2.0 cm` to
 the remaining radial/z offset. This suggests that the strict pair-crossing
 requirement helps, but the ACTS residual closure issue likely also contains a
 track-extrapolation or solver-model component beyond large-DCA pairs.
+
+## Fixed-R Z Scan At R = 60 cm
+
+To check the north/south behavior at fixed radius, the closure macro was
+extended to support a fixed-phi/fixed-R signed-Z scan:
+
+```sh
+condor_submit \
+  -append 'Arguments = --qa-dir $(QaDir) --prefix $(Prefix) --plot-dir $(QaDir)/closure_slice_phi4p7_r60_tightdca_splitpanel --mode z --phi 4.7 --r 60 --dca-thresholds 2.0,1.0,0.5,0.2,0.1,0.05,0.02' \
+  condor-cpm-closure.job
+```
+
+The corrected output directories are:
+
+- `output/sim_acts_unweighted_qa/closure_slice_phi4p7_r60_tightdca_splitpanel`
+- `output/sim_genfit_unweighted_qa/closure_slice_phi4p7_r60_tightdca_splitpanel`
+
+Each directory contains 5 data PDFs, 5 companion legend PDFs, and one
+`PREFIX_closure_slice_profiles.root` file. The requested `phi = 4.7 rad` maps
+to phi-bin center `4.62512 rad`; requested `R = 60 cm` maps to R-bin center
+`61.6875 cm`.
+
+Pair-entry-weighted signed-Z side means for `DCA <= 0.02 cm` are:
+
+| Sample | Component | South mean | South pairs | North mean | North pairs |
+| --- | --- | ---: | ---: | ---: | ---: |
+| sim_acts_unweighted | midpoint delta_r [cm] | 0.134008 | 46,589 | 0.150564 | 45,319 |
+| sim_acts_unweighted | midpoint delta_phi [rad] | -0.000200759 | 46,589 | -0.000181313 | 45,319 |
+| sim_acts_unweighted | midpoint delta_z [cm] | -0.0780253 | 46,589 | 0.0892993 | 45,319 |
+| sim_genfit_unweighted | midpoint delta_r [cm] | 0.0361055 | 105,044 | -0.113689 | 92,456 |
+| sim_genfit_unweighted | midpoint delta_phi [rad] | -0.000154236 | 105,044 | -0.000397839 | 92,456 |
+| sim_genfit_unweighted | midpoint delta_z [cm] | -0.0191711 | 105,044 | -0.126422 | 92,456 |
+
+The GenFit Z scan confirms the observed north-side anomaly: south-side
+`midpoint delta_z` is close to zero, while the north side is shifted by about
+`-0.13 cm` even with `DCA <= 0.02 cm`. ACTS does not show the same one-sided
+pattern in this slice; its `delta_z` is more nearly odd in signed Z, with
+similar magnitude and opposite sign on the two sides.
+
+For GenFit, `point_pos_delta_z`, `point_neg_delta_z`, and `midpoint_delta_z`
+are equal within print precision in both Z sides. This indicates that the
+tight-DCA crossing solver is not producing a midpoint-only artifact: the two
+track PoCA points are close to each other but are shifted together relative to
+the voxel center. The next likely place to investigate is therefore the GenFit
+track-state/cluster extrapolation on the north side, not the B2/B3 averaging or
+the midpoint construction itself.
 
 ## Interpretation Checklist
 
