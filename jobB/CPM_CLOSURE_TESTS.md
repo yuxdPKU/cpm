@@ -164,6 +164,8 @@ same left/right DCA split.
 | 2026-06-02 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768149.1` | done | split DCA scan into two panels |
 | 2026-06-03 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768161.0` | done | fixed-phi/fixed-R Z scan at `R=60 cm` |
 | 2026-06-03 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768161.1` | done | fixed-phi/fixed-R Z scan at `R=60 cm` |
+| 2026-06-03 | sim_acts_unweighted | `condor-cpm-closure.job`, cluster `2768162.0` | done | fixed-R Z scan with widened delta-r/z axes |
+| 2026-06-03 | sim_genfit_unweighted | `condor-cpm-closure.job`, cluster `2768162.1` | done | fixed-R Z scan with widened delta-r/z axes |
 
 ## Results From The First Closure Slice
 
@@ -269,6 +271,13 @@ The corrected output directories are:
 
 - `output/sim_acts_unweighted_qa/closure_slice_phi4p7_r60_tightdca_splitpanel`
 - `output/sim_genfit_unweighted_qa/closure_slice_phi4p7_r60_tightdca_splitpanel`
+
+The same scan was redrawn with wider closure axes after the first plots clipped
+the `delta_r` and `delta_z` curves. The wide-range outputs use
+`delta_r = [-0.8, 0.8] cm` and `delta_z = [-0.2, 0.2] cm`:
+
+- `output/sim_acts_unweighted_qa/closure_slice_phi4p7_r60_tightdca_splitpanel_wideyrange`
+- `output/sim_genfit_unweighted_qa/closure_slice_phi4p7_r60_tightdca_splitpanel_wideyrange`
 
 Each directory contains 5 data PDFs, 5 companion legend PDFs, and one
 `PREFIX_closure_slice_profiles.root` file. The requested `phi = 4.7 rad` maps
