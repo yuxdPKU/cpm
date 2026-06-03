@@ -43,12 +43,12 @@
 namespace CPMClosureSlice
 {
   constexpr double kPi = 3.14159265358979323846;
-  constexpr double kPlotDeltaRMin = -0.5;
-  constexpr double kPlotDeltaRMax = 0.5;
+  constexpr double kPlotDeltaRMin = -0.8;
+  constexpr double kPlotDeltaRMax = 0.8;
   constexpr double kPlotDeltaPhiMin = -0.01;
   constexpr double kPlotDeltaPhiMax = 0.03;
-  constexpr double kPlotDeltaZMin = -0.1;
-  constexpr double kPlotDeltaZMax = 0.1;
+  constexpr double kPlotDeltaZMin = -0.2;
+  constexpr double kPlotDeltaZMax = 0.2;
 
   struct Grid
   {
