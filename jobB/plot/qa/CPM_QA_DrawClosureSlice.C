@@ -538,6 +538,7 @@ namespace CPMClosureSlice
       const std::string& b3_file,
       const std::string& pos_hist_name,
       const std::string& neg_hist_name,
+      const Grid& grid,
       const double select_phi,
       const double select_r,
       const std::string& output_name)
@@ -563,23 +564,24 @@ namespace CPMClosureSlice
     auto* out = new TH1F(
         output_name.c_str(),
         Form("%s/%s;Z [cm];value", pos_hist_name.c_str(), neg_hist_name.c_str()),
-        source_pos->GetZaxis()->GetNbins(),
-        source_pos->GetZaxis()->GetXmin(),
-        source_pos->GetZaxis()->GetXmax());
+        grid.z_bins,
+        grid.z_min,
+        grid.z_max);
     out->SetDirectory(nullptr);
 
     const int phi_bin_pos = source_pos->GetXaxis()->FindBin(select_phi);
     const int r_bin_pos = source_pos->GetYaxis()->FindBin(select_r);
     const int phi_bin_neg = source_neg->GetXaxis()->FindBin(select_phi);
     const int r_bin_neg = source_neg->GetYaxis()->FindBin(select_r);
-    for (int iz = 1; iz <= source_pos->GetNbinsZ(); ++iz)
+    for (int iz = 1; iz <= out->GetNbinsX(); ++iz)
     {
-      const double z_center = source_pos->GetZaxis()->GetBinCenter(iz);
+      const double z_center = out->GetXaxis()->GetBinCenter(iz);
       TH3* source = z_center >= 0.0 ? source_pos : source_neg;
       const int phi_bin = z_center >= 0.0 ? phi_bin_pos : phi_bin_neg;
       const int r_bin = z_center >= 0.0 ? r_bin_pos : r_bin_neg;
-      out->SetBinContent(iz, source->GetBinContent(phi_bin, r_bin, iz));
-      out->SetBinError(iz, source->GetBinError(phi_bin, r_bin, iz));
+      const int source_z_bin = source->GetZaxis()->FindBin(z_center);
+      out->SetBinContent(iz, source->GetBinContent(phi_bin, r_bin, source_z_bin));
+      out->SetBinError(iz, source->GetBinError(phi_bin, r_bin, source_z_bin));
     }
     return out;
   }
@@ -1105,6 +1107,7 @@ bool CPM_QA_DrawClosureSlice(
         resolved_b3_file,
         "hIntDistortionR_posz",
         "hIntDistortionR_negz",
+        grid,
         normalized_phi,
         select_r,
         prefix + "_b3_zscan_delta_r"));
@@ -1112,6 +1115,7 @@ bool CPM_QA_DrawClosureSlice(
         resolved_b3_file,
         "hIntDistortionP_posz",
         "hIntDistortionP_negz",
+        grid,
         normalized_phi,
         select_r,
         prefix + "_b3_zscan_delta_phi"));
@@ -1119,6 +1123,7 @@ bool CPM_QA_DrawClosureSlice(
         resolved_b3_file,
         "hIntDistortionZ_posz",
         "hIntDistortionZ_negz",
+        grid,
         normalized_phi,
         select_r,
         prefix + "_b3_zscan_delta_z"));
