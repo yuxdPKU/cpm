@@ -1,6 +1,7 @@
 /*
- * Draw CPM closure diagnostics for the same fixed-phi/fixed-z R scan used by
- * jobB/plot/draw1D_r_from3D.C.
+ * Draw CPM closure diagnostics for the fixed-phi/fixed-z R scan used by
+ * jobB/plot/draw1D_r_from3D.C, or the fixed-phi/fixed-R Z scan used by
+ * jobB/plot/draw1D_z_from3D.C.
  *
  * The macro reads B1 cpm_poca_pairs and compares, per R bin,
  *   voxel center - PoCA point from the positive track,
@@ -28,6 +29,7 @@
 #include <TTree.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -60,6 +62,20 @@ namespace CPMClosureSlice
     double z_min = -102.605;
     double z_max = 102.605;
     bool valid = false;
+  };
+
+  enum class SliceMode
+  {
+    RScan,
+    ZScan
+  };
+
+  struct Axis
+  {
+    int bins = 0;
+    double min = 0.0;
+    double max = 0.0;
+    std::string title = "R [cm]";
   };
 
   struct SourceList
@@ -164,6 +180,17 @@ namespace CPMClosureSlice
     std::sort(out.begin(), out.end(), std::greater<double>());
     out.erase(std::unique(out.begin(), out.end()), out.end());
     return out;
+  }
+
+  SliceMode parse_slice_mode(const std::string& mode)
+  {
+    std::string lower = mode;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char ch) { return std::tolower(ch); });
+    if (lower == "z" || lower == "zscan" || lower == "scan-z")
+    {
+      return SliceMode::ZScan;
+    }
+    return SliceMode::RScan;
   }
 
   double wrap_delta_phi(double value)
@@ -387,16 +414,16 @@ namespace CPMClosureSlice
   TProfile* make_profile(
       const std::string& name,
       const std::string& title,
-      const Grid& grid,
+      const Axis& axis,
       const double ymin,
       const double ymax)
   {
     auto* profile = new TProfile(
         name.c_str(),
         title.c_str(),
-        grid.r_bins,
-        grid.r_min,
-        grid.r_max);
+        axis.bins,
+        axis.min,
+        axis.max);
     profile->SetDirectory(nullptr);
     profile->SetMinimum(ymin);
     profile->SetMaximum(ymax);
@@ -407,14 +434,14 @@ namespace CPMClosureSlice
   TH1F* make_entries(
       const std::string& name,
       const std::string& title,
-      const Grid& grid)
+      const Axis& axis)
   {
     auto* hist = new TH1F(
         name.c_str(),
         title.c_str(),
-        grid.r_bins,
-        grid.r_min,
-        grid.r_max);
+        axis.bins,
+        axis.min,
+        axis.max);
     hist->SetDirectory(nullptr);
     hist->SetStats(false);
     return hist;
@@ -424,24 +451,24 @@ namespace CPMClosureSlice
       const std::string& prefix,
       const std::string& side_label,
       const double dca_threshold,
-      const Grid& grid)
+      const Axis& axis)
   {
     const std::string dca_tag = sanitize_number(dca_threshold);
     const std::string base = prefix + "_" + side_label + "_dca" + dca_tag;
 
     ThresholdProfiles out;
     out.dca_threshold = dca_threshold;
-    out.point_a_r = make_profile(base + "_point_pos_delta_r", "positive-track PoCA;R [cm];#Deltar [cm]", grid, kPlotDeltaRMin, kPlotDeltaRMax);
-    out.point_a_phi = make_profile(base + "_point_pos_delta_phi", "positive-track PoCA;R [cm];#Delta#phi [rad]", grid, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
-    out.point_a_z = make_profile(base + "_point_pos_delta_z", "positive-track PoCA;R [cm];#Deltaz [cm]", grid, kPlotDeltaZMin, kPlotDeltaZMax);
-    out.point_b_r = make_profile(base + "_point_neg_delta_r", "negative-track PoCA;R [cm];#Deltar [cm]", grid, kPlotDeltaRMin, kPlotDeltaRMax);
-    out.point_b_phi = make_profile(base + "_point_neg_delta_phi", "negative-track PoCA;R [cm];#Delta#phi [rad]", grid, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
-    out.point_b_z = make_profile(base + "_point_neg_delta_z", "negative-track PoCA;R [cm];#Deltaz [cm]", grid, kPlotDeltaZMin, kPlotDeltaZMax);
-    out.midpoint_r = make_profile(base + "_midpoint_delta_r", "midpoint;R [cm];#Deltar [cm]", grid, kPlotDeltaRMin, kPlotDeltaRMax);
-    out.midpoint_phi = make_profile(base + "_midpoint_delta_phi", "midpoint;R [cm];#Delta#phi [rad]", grid, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
-    out.midpoint_z = make_profile(base + "_midpoint_delta_z", "midpoint;R [cm];#Deltaz [cm]", grid, kPlotDeltaZMin, kPlotDeltaZMax);
-    out.dca = make_profile(base + "_mean_dca", "pair DCA;R [cm];DCA [cm]", grid, 0.0, std::max(2.0, dca_threshold));
-    out.entries = make_entries(base + "_entries", "accepted pairs;R [cm];pairs", grid);
+    out.point_a_r = make_profile(base + "_point_pos_delta_r", std::string("positive-track PoCA;") + axis.title + ";#Deltar [cm]", axis, kPlotDeltaRMin, kPlotDeltaRMax);
+    out.point_a_phi = make_profile(base + "_point_pos_delta_phi", std::string("positive-track PoCA;") + axis.title + ";#Delta#phi [rad]", axis, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
+    out.point_a_z = make_profile(base + "_point_pos_delta_z", std::string("positive-track PoCA;") + axis.title + ";#Deltaz [cm]", axis, kPlotDeltaZMin, kPlotDeltaZMax);
+    out.point_b_r = make_profile(base + "_point_neg_delta_r", std::string("negative-track PoCA;") + axis.title + ";#Deltar [cm]", axis, kPlotDeltaRMin, kPlotDeltaRMax);
+    out.point_b_phi = make_profile(base + "_point_neg_delta_phi", std::string("negative-track PoCA;") + axis.title + ";#Delta#phi [rad]", axis, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
+    out.point_b_z = make_profile(base + "_point_neg_delta_z", std::string("negative-track PoCA;") + axis.title + ";#Deltaz [cm]", axis, kPlotDeltaZMin, kPlotDeltaZMax);
+    out.midpoint_r = make_profile(base + "_midpoint_delta_r", std::string("midpoint;") + axis.title + ";#Deltar [cm]", axis, kPlotDeltaRMin, kPlotDeltaRMax);
+    out.midpoint_phi = make_profile(base + "_midpoint_delta_phi", std::string("midpoint;") + axis.title + ";#Delta#phi [rad]", axis, kPlotDeltaPhiMin, kPlotDeltaPhiMax);
+    out.midpoint_z = make_profile(base + "_midpoint_delta_z", std::string("midpoint;") + axis.title + ";#Deltaz [cm]", axis, kPlotDeltaZMin, kPlotDeltaZMax);
+    out.dca = make_profile(base + "_mean_dca", std::string("pair DCA;") + axis.title + ";DCA [cm]", axis, 0.0, std::max(2.0, dca_threshold));
+    out.entries = make_entries(base + "_entries", std::string("accepted pairs;") + axis.title + ";pairs", axis);
     return out;
   }
 
@@ -503,6 +530,56 @@ namespace CPMClosureSlice
     {
       out->SetBinContent(ir, source->GetBinContent(phi_bin, ir, z_bin));
       out->SetBinError(ir, source->GetBinError(phi_bin, ir, z_bin));
+    }
+    return out;
+  }
+
+  TH1* extract_b3_z_slice(
+      const std::string& b3_file,
+      const std::string& pos_hist_name,
+      const std::string& neg_hist_name,
+      const double select_phi,
+      const double select_r,
+      const std::string& output_name)
+  {
+    if (!file_exists(b3_file))
+    {
+      return nullptr;
+    }
+
+    std::unique_ptr<TFile> input(TFile::Open(b3_file.c_str(), "READ"));
+    if (!input || input->IsZombie())
+    {
+      return nullptr;
+    }
+
+    auto* source_pos = dynamic_cast<TH3*>(input->Get(pos_hist_name.c_str()));
+    auto* source_neg = dynamic_cast<TH3*>(input->Get(neg_hist_name.c_str()));
+    if (!source_pos || !source_neg)
+    {
+      return nullptr;
+    }
+
+    auto* out = new TH1F(
+        output_name.c_str(),
+        Form("%s/%s;Z [cm];value", pos_hist_name.c_str(), neg_hist_name.c_str()),
+        source_pos->GetZaxis()->GetNbins(),
+        source_pos->GetZaxis()->GetXmin(),
+        source_pos->GetZaxis()->GetXmax());
+    out->SetDirectory(nullptr);
+
+    const int phi_bin_pos = source_pos->GetXaxis()->FindBin(select_phi);
+    const int r_bin_pos = source_pos->GetYaxis()->FindBin(select_r);
+    const int phi_bin_neg = source_neg->GetXaxis()->FindBin(select_phi);
+    const int r_bin_neg = source_neg->GetYaxis()->FindBin(select_r);
+    for (int iz = 1; iz <= source_pos->GetNbinsZ(); ++iz)
+    {
+      const double z_center = source_pos->GetZaxis()->GetBinCenter(iz);
+      TH3* source = z_center >= 0.0 ? source_pos : source_neg;
+      const int phi_bin = z_center >= 0.0 ? phi_bin_pos : phi_bin_neg;
+      const int r_bin = z_center >= 0.0 ? r_bin_pos : r_bin_neg;
+      out->SetBinContent(iz, source->GetBinContent(phi_bin, r_bin, iz));
+      out->SetBinError(iz, source->GetBinError(phi_bin, r_bin, iz));
     }
     return out;
   }
@@ -572,6 +649,7 @@ namespace CPMClosureSlice
   void draw_point_components(
       ThresholdProfiles& profiles,
       const std::string& title,
+      const std::string& axis_title,
       const std::string& output_pdf)
   {
     set_line_style(profiles.midpoint_r, kBlack, 1, 3);
@@ -588,21 +666,21 @@ namespace CPMClosureSlice
     canvas.Divide(3, 1);
 
     canvas.cd(1);
-    profiles.midpoint_r->SetTitle((title + ";R [cm];voxel - point #Deltar [cm]").c_str());
+    profiles.midpoint_r->SetTitle((title + ";" + axis_title + ";voxel - point #Deltar [cm]").c_str());
     profiles.midpoint_r->Draw("hist");
     profiles.point_a_r->Draw("hist same");
     profiles.point_b_r->Draw("hist same");
     draw_zero_line();
 
     canvas.cd(2);
-    profiles.midpoint_phi->SetTitle((title + ";R [cm];voxel - point #Delta#phi [rad]").c_str());
+    profiles.midpoint_phi->SetTitle((title + ";" + axis_title + ";voxel - point #Delta#phi [rad]").c_str());
     profiles.midpoint_phi->Draw("hist");
     profiles.point_a_phi->Draw("hist same");
     profiles.point_b_phi->Draw("hist same");
     draw_zero_line();
 
     canvas.cd(3);
-    profiles.midpoint_z->SetTitle((title + ";R [cm];voxel - point #Deltaz [cm]").c_str());
+    profiles.midpoint_z->SetTitle((title + ";" + axis_title + ";voxel - point #Deltaz [cm]").c_str());
     profiles.midpoint_z->Draw("hist");
     profiles.point_a_z->Draw("hist same");
     profiles.point_b_z->Draw("hist same");
@@ -790,7 +868,9 @@ bool CPM_QA_DrawClosureSlice(
     const std::string& dca_thresholds_csv = "2.0,1.0,0.5,0.2,0.1,0.05,0.02",
     const std::string& b1_input = "",
     const bool b1_input_is_list = false,
-    const std::string& b3_file = "")
+    const std::string& b3_file = "",
+    const double select_r = 60.0,
+    const std::string& slice_mode = "r")
 {
   using namespace CPMClosureSlice;
 
@@ -813,18 +893,33 @@ bool CPM_QA_DrawClosureSlice(
   }
 
   const double normalized_phi = normalize_phi(select_phi);
+  const SliceMode mode = parse_slice_mode(slice_mode);
+  const Axis axis =
+      mode == SliceMode::ZScan ?
+      Axis{grid.z_bins, grid.z_min, grid.z_max, "Z [cm]"} :
+      Axis{grid.r_bins, grid.r_min, grid.r_max, "R [cm]"};
   const int target_iphi = find_bin_index(normalized_phi, grid.phi_min, grid.phi_max, grid.phi_bins);
-  const int target_iz_pos = find_bin_index(std::abs(select_z), grid.z_min, grid.z_max, grid.z_bins);
-  const int target_iz_neg = find_bin_index(-std::abs(select_z), grid.z_min, grid.z_max, grid.z_bins);
-  if (target_iphi < 0 || target_iz_pos < 0 || target_iz_neg < 0)
+  const int target_iz_pos =
+      mode == SliceMode::RScan ? find_bin_index(std::abs(select_z), grid.z_min, grid.z_max, grid.z_bins) : -1;
+  const int target_iz_neg =
+      mode == SliceMode::RScan ? find_bin_index(-std::abs(select_z), grid.z_min, grid.z_max, grid.z_bins) : -1;
+  const int target_ir =
+      mode == SliceMode::ZScan ? find_bin_index(select_r, grid.r_min, grid.r_max, grid.r_bins) : -1;
+  if (target_iphi < 0 ||
+      (mode == SliceMode::RScan && (target_iz_pos < 0 || target_iz_neg < 0)) ||
+      (mode == SliceMode::ZScan && target_ir < 0))
   {
-    std::cout << "CPM_QA_DrawClosureSlice - requested phi/z is outside the grid" << std::endl;
+    std::cout << "CPM_QA_DrawClosureSlice - requested slice is outside the grid" << std::endl;
     return false;
   }
 
   const double phi_center = bin_center(target_iphi, grid.phi_min, grid.phi_max, grid.phi_bins);
-  const double z_center_pos = bin_center(target_iz_pos, grid.z_min, grid.z_max, grid.z_bins);
-  const double z_center_neg = bin_center(target_iz_neg, grid.z_min, grid.z_max, grid.z_bins);
+  const double z_center_pos =
+      mode == SliceMode::RScan ? bin_center(target_iz_pos, grid.z_min, grid.z_max, grid.z_bins) : std::numeric_limits<double>::quiet_NaN();
+  const double z_center_neg =
+      mode == SliceMode::RScan ? bin_center(target_iz_neg, grid.z_min, grid.z_max, grid.z_bins) : std::numeric_limits<double>::quiet_NaN();
+  const double r_center =
+      mode == SliceMode::ZScan ? bin_center(target_ir, grid.r_min, grid.r_max, grid.r_bins) : std::numeric_limits<double>::quiet_NaN();
 
   TChain pairs("cpm_poca_pairs");
   for (const auto& file : sources.files)
@@ -847,14 +942,22 @@ bool CPM_QA_DrawClosureSlice(
   const std::vector<double> dca_thresholds = parse_dca_thresholds(dca_thresholds_csv);
   std::vector<ThresholdProfiles> pos_profiles;
   std::vector<ThresholdProfiles> neg_profiles;
+  std::vector<ThresholdProfiles> z_profiles;
   for (const double threshold : dca_thresholds)
   {
-    pos_profiles.push_back(make_threshold_profiles(prefix, "posz", threshold, grid));
-    neg_profiles.push_back(make_threshold_profiles(prefix, "negz", threshold, grid));
+    if (mode == SliceMode::RScan)
+    {
+      pos_profiles.push_back(make_threshold_profiles(prefix, "posz", threshold, axis));
+      neg_profiles.push_back(make_threshold_profiles(prefix, "negz", threshold, axis));
+    }
+    else
+    {
+      z_profiles.push_back(make_threshold_profiles(prefix, "zscan", threshold, axis));
+    }
   }
 
   const Long64_t entries = pairs.GetEntries();
-  unsigned long long selected_phi_z_pairs = 0;
+  unsigned long long selected_pair_rows = 0;
   for (Long64_t entry = 0; entry < entries; ++entry)
   {
     pairs.GetEntry(entry);
@@ -864,13 +967,21 @@ bool CPM_QA_DrawClosureSlice(
     }
 
     std::vector<ThresholdProfiles>* target_profiles = nullptr;
-    if (branches.iz == target_iz_pos)
+    double profile_x = std::numeric_limits<double>::quiet_NaN();
+    if (mode == SliceMode::RScan && branches.iz == target_iz_pos)
     {
       target_profiles = &pos_profiles;
+      profile_x = std::hypot(branches.voxel_center_x, branches.voxel_center_y);
     }
-    else if (branches.iz == target_iz_neg)
+    else if (mode == SliceMode::RScan && branches.iz == target_iz_neg)
     {
       target_profiles = &neg_profiles;
+      profile_x = std::hypot(branches.voxel_center_x, branches.voxel_center_y);
+    }
+    else if (mode == SliceMode::ZScan && branches.ir == target_ir)
+    {
+      target_profiles = &z_profiles;
+      profile_x = branches.voxel_center_z;
     }
     else
     {
@@ -882,7 +993,6 @@ bool CPM_QA_DrawClosureSlice(
       continue;
     }
 
-    const double voxel_r = std::hypot(branches.voxel_center_x, branches.voxel_center_y);
     const Delta point_a = delta_to_voxel(
         branches.voxel_center_x,
         branches.voxel_center_y,
@@ -905,7 +1015,7 @@ bool CPM_QA_DrawClosureSlice(
         branches.midpoint_y,
         branches.midpoint_z);
 
-    ++selected_phi_z_pairs;
+    ++selected_pair_rows;
     for (auto& profile : *target_profiles)
     {
       if (branches.dca > profile.dca_threshold)
@@ -913,24 +1023,26 @@ bool CPM_QA_DrawClosureSlice(
         continue;
       }
 
-      profile.point_a_r->Fill(voxel_r, point_a.r);
-      profile.point_a_phi->Fill(voxel_r, point_a.phi);
-      profile.point_a_z->Fill(voxel_r, point_a.z);
-      profile.point_b_r->Fill(voxel_r, point_b.r);
-      profile.point_b_phi->Fill(voxel_r, point_b.phi);
-      profile.point_b_z->Fill(voxel_r, point_b.z);
-      profile.midpoint_r->Fill(voxel_r, midpoint.r);
-      profile.midpoint_phi->Fill(voxel_r, midpoint.phi);
-      profile.midpoint_z->Fill(voxel_r, midpoint.z);
-      profile.dca->Fill(voxel_r, branches.dca);
-      profile.entries->Fill(voxel_r, 1.0);
+      profile.point_a_r->Fill(profile_x, point_a.r);
+      profile.point_a_phi->Fill(profile_x, point_a.phi);
+      profile.point_a_z->Fill(profile_x, point_a.z);
+      profile.point_b_r->Fill(profile_x, point_b.r);
+      profile.point_b_phi->Fill(profile_x, point_b.phi);
+      profile.point_b_z->Fill(profile_x, point_b.z);
+      profile.midpoint_r->Fill(profile_x, midpoint.r);
+      profile.midpoint_phi->Fill(profile_x, midpoint.phi);
+      profile.midpoint_z->Fill(profile_x, midpoint.z);
+      profile.dca->Fill(profile_x, branches.dca);
+      profile.entries->Fill(profile_x, 1.0);
       ++profile.accepted_pairs;
     }
   }
 
   const std::string resolved_plot_dir =
       plot_dir.empty() ?
-      qa_dir + "/closure_slice_phi" + sanitize_number(normalized_phi) + "_z" + sanitize_number(std::abs(select_z)) :
+      (mode == SliceMode::ZScan ?
+       qa_dir + "/closure_slice_phi" + sanitize_number(normalized_phi) + "_r" + sanitize_number(select_r) :
+       qa_dir + "/closure_slice_phi" + sanitize_number(normalized_phi) + "_z" + sanitize_number(std::abs(select_z))) :
       plot_dir;
   gSystem->mkdir(resolved_plot_dir.c_str(), true);
 
@@ -939,42 +1051,78 @@ bool CPM_QA_DrawClosureSlice(
       qa_dir + "/" + prefix + "_B3_average_correction_histograms.root" :
       b3_file;
 
-  std::unique_ptr<TH1> b3_pos_r(extract_b3_slice(
-      resolved_b3_file,
-      "hIntDistortionR_posz",
-      normalized_phi,
-      std::abs(select_z),
-      prefix + "_b3_posz_delta_r"));
-  std::unique_ptr<TH1> b3_pos_phi(extract_b3_slice(
-      resolved_b3_file,
-      "hIntDistortionP_posz",
-      normalized_phi,
-      std::abs(select_z),
-      prefix + "_b3_posz_delta_phi"));
-  std::unique_ptr<TH1> b3_pos_z(extract_b3_slice(
-      resolved_b3_file,
-      "hIntDistortionZ_posz",
-      normalized_phi,
-      std::abs(select_z),
-      prefix + "_b3_posz_delta_z"));
-  std::unique_ptr<TH1> b3_neg_r(extract_b3_slice(
-      resolved_b3_file,
-      "hIntDistortionR_negz",
-      normalized_phi,
-      -std::abs(select_z),
-      prefix + "_b3_negz_delta_r"));
-  std::unique_ptr<TH1> b3_neg_phi(extract_b3_slice(
-      resolved_b3_file,
-      "hIntDistortionP_negz",
-      normalized_phi,
-      -std::abs(select_z),
-      prefix + "_b3_negz_delta_phi"));
-  std::unique_ptr<TH1> b3_neg_z(extract_b3_slice(
-      resolved_b3_file,
-      "hIntDistortionZ_negz",
-      normalized_phi,
-      -std::abs(select_z),
-      prefix + "_b3_negz_delta_z"));
+  std::unique_ptr<TH1> b3_pos_r;
+  std::unique_ptr<TH1> b3_pos_phi;
+  std::unique_ptr<TH1> b3_pos_z;
+  std::unique_ptr<TH1> b3_neg_r;
+  std::unique_ptr<TH1> b3_neg_phi;
+  std::unique_ptr<TH1> b3_neg_z;
+  std::unique_ptr<TH1> b3_zscan_r;
+  std::unique_ptr<TH1> b3_zscan_phi;
+  std::unique_ptr<TH1> b3_zscan_z;
+  if (mode == SliceMode::RScan)
+  {
+    b3_pos_r.reset(extract_b3_slice(
+        resolved_b3_file,
+        "hIntDistortionR_posz",
+        normalized_phi,
+        std::abs(select_z),
+        prefix + "_b3_posz_delta_r"));
+    b3_pos_phi.reset(extract_b3_slice(
+        resolved_b3_file,
+        "hIntDistortionP_posz",
+        normalized_phi,
+        std::abs(select_z),
+        prefix + "_b3_posz_delta_phi"));
+    b3_pos_z.reset(extract_b3_slice(
+        resolved_b3_file,
+        "hIntDistortionZ_posz",
+        normalized_phi,
+        std::abs(select_z),
+        prefix + "_b3_posz_delta_z"));
+    b3_neg_r.reset(extract_b3_slice(
+        resolved_b3_file,
+        "hIntDistortionR_negz",
+        normalized_phi,
+        -std::abs(select_z),
+        prefix + "_b3_negz_delta_r"));
+    b3_neg_phi.reset(extract_b3_slice(
+        resolved_b3_file,
+        "hIntDistortionP_negz",
+        normalized_phi,
+        -std::abs(select_z),
+        prefix + "_b3_negz_delta_phi"));
+    b3_neg_z.reset(extract_b3_slice(
+        resolved_b3_file,
+        "hIntDistortionZ_negz",
+        normalized_phi,
+        -std::abs(select_z),
+        prefix + "_b3_negz_delta_z"));
+  }
+  else
+  {
+    b3_zscan_r.reset(extract_b3_z_slice(
+        resolved_b3_file,
+        "hIntDistortionR_posz",
+        "hIntDistortionR_negz",
+        normalized_phi,
+        select_r,
+        prefix + "_b3_zscan_delta_r"));
+    b3_zscan_phi.reset(extract_b3_z_slice(
+        resolved_b3_file,
+        "hIntDistortionP_posz",
+        "hIntDistortionP_negz",
+        normalized_phi,
+        select_r,
+        prefix + "_b3_zscan_delta_phi"));
+    b3_zscan_z.reset(extract_b3_z_slice(
+        resolved_b3_file,
+        "hIntDistortionZ_posz",
+        "hIntDistortionZ_negz",
+        normalized_phi,
+        select_r,
+        prefix + "_b3_zscan_delta_z"));
+  }
 
   const std::string root_output = resolved_plot_dir + "/" + prefix + "_closure_slice_profiles.root";
   TFile output(root_output.c_str(), "RECREATE");
@@ -986,6 +1134,7 @@ bool CPM_QA_DrawClosureSlice(
 
   write_profiles(output, pos_profiles);
   write_profiles(output, neg_profiles);
+  write_profiles(output, z_profiles);
   if (b3_pos_r)
   {
     b3_pos_r->Write();
@@ -995,125 +1144,194 @@ bool CPM_QA_DrawClosureSlice(
     b3_neg_phi->Write();
     b3_neg_z->Write();
   }
+  if (b3_zscan_r)
+  {
+    b3_zscan_r->Write();
+    b3_zscan_phi->Write();
+    b3_zscan_z->Write();
+  }
 
   TTree summary("cpm_closure_slice_summary", "CPM closure slice plotting summary");
   std::string source_description = sources.description;
   std::string output_plot_dir = resolved_plot_dir;
   std::string output_root_file = root_output;
   std::string b3_source = resolved_b3_file;
+  std::string output_slice_mode = mode == SliceMode::ZScan ? "zscan" : "rscan";
   int source_files = static_cast<int>(sources.files.size());
   int target_phi_bin = target_iphi;
   int target_pos_z_bin = target_iz_pos;
   int target_neg_z_bin = target_iz_neg;
+  int target_r_bin = target_ir;
   double requested_phi = normalized_phi;
   double requested_z = std::abs(select_z);
+  double requested_r = select_r;
   double selected_phi_center = phi_center;
   double selected_pos_z_center = z_center_pos;
   double selected_neg_z_center = z_center_neg;
+  double selected_r_center = r_center;
   unsigned long long scanned_pair_rows = static_cast<unsigned long long>(entries);
-  unsigned long long selected_pair_rows = selected_phi_z_pairs;
   summary.Branch("source_description", &source_description);
   summary.Branch("source_files", &source_files);
   summary.Branch("b3_source", &b3_source);
   summary.Branch("plot_dir", &output_plot_dir);
   summary.Branch("root_file", &output_root_file);
+  summary.Branch("slice_mode", &output_slice_mode);
   summary.Branch("requested_phi", &requested_phi);
   summary.Branch("requested_z", &requested_z);
+  summary.Branch("requested_r", &requested_r);
   summary.Branch("target_phi_bin", &target_phi_bin);
   summary.Branch("target_pos_z_bin", &target_pos_z_bin);
   summary.Branch("target_neg_z_bin", &target_neg_z_bin);
+  summary.Branch("target_r_bin", &target_r_bin);
   summary.Branch("selected_phi_center", &selected_phi_center);
   summary.Branch("selected_pos_z_center", &selected_pos_z_center);
   summary.Branch("selected_neg_z_center", &selected_neg_z_center);
+  summary.Branch("selected_r_center", &selected_r_center);
   summary.Branch("scanned_pair_rows", &scanned_pair_rows);
   summary.Branch("selected_pair_rows", &selected_pair_rows);
   summary.Fill();
   summary.Write();
   output.Close();
 
-  const std::string slice_label =
-      Form("#phi bin center %.3f rad, z = +%.2f / %.2f cm",
-           selected_phi_center,
-           selected_pos_z_center,
-           selected_neg_z_center);
+  if (mode == SliceMode::RScan)
+  {
+    const std::string slice_label =
+        Form("#phi bin center %.3f rad, z = +%.2f / %.2f cm",
+             selected_phi_center,
+             selected_pos_z_center,
+             selected_neg_z_center);
 
-  draw_point_components(
-      pos_profiles.front(),
-      prefix + " +Z " + slice_label + Form(", DCA <= %.2f cm", pos_profiles.front().dca_threshold),
-      resolved_plot_dir + "/" + prefix + "_closure_points_posz_dca" + sanitize_number(pos_profiles.front().dca_threshold) + ".pdf");
-  draw_point_components(
-      neg_profiles.front(),
-      prefix + " -Z " + slice_label + Form(", DCA <= %.2f cm", neg_profiles.front().dca_threshold),
-      resolved_plot_dir + "/" + prefix + "_closure_points_negz_dca" + sanitize_number(neg_profiles.front().dca_threshold) + ".pdf");
+    draw_point_components(
+        pos_profiles.front(),
+        prefix + " +Z " + slice_label + Form(", DCA <= %.2f cm", pos_profiles.front().dca_threshold),
+        axis.title,
+        resolved_plot_dir + "/" + prefix + "_closure_points_posz_dca" + sanitize_number(pos_profiles.front().dca_threshold) + ".pdf");
+    draw_point_components(
+        neg_profiles.front(),
+        prefix + " -Z " + slice_label + Form(", DCA <= %.2f cm", neg_profiles.front().dca_threshold),
+        axis.title,
+        resolved_plot_dir + "/" + prefix + "_closure_points_negz_dca" + sanitize_number(neg_profiles.front().dca_threshold) + ".pdf");
 
-  draw_dca_scan_component(
-      pos_profiles,
-      0,
-      b3_pos_r.get(),
-      prefix + " +Z midpoint #Deltar DCA scan;R [cm];#Deltar [cm]",
-      resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_r_posz_dca_scan.pdf");
-  draw_dca_scan_component(
-      pos_profiles,
-      1,
-      b3_pos_phi.get(),
-      prefix + " +Z midpoint #Delta#phi DCA scan;R [cm];#Delta#phi [rad]",
-      resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_phi_posz_dca_scan.pdf");
-  draw_dca_scan_component(
-      pos_profiles,
-      2,
-      b3_pos_z.get(),
-      prefix + " +Z midpoint #Deltaz DCA scan;R [cm];#Deltaz [cm]",
-      resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_z_posz_dca_scan.pdf");
-  draw_dca_scan_component(
-      neg_profiles,
-      0,
-      b3_neg_r.get(),
-      prefix + " -Z midpoint #Deltar DCA scan;R [cm];#Deltar [cm]",
-      resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_r_negz_dca_scan.pdf");
-  draw_dca_scan_component(
-      neg_profiles,
-      1,
-      b3_neg_phi.get(),
-      prefix + " -Z midpoint #Delta#phi DCA scan;R [cm];#Delta#phi [rad]",
-      resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_phi_negz_dca_scan.pdf");
-  draw_dca_scan_component(
-      neg_profiles,
-      2,
-      b3_neg_z.get(),
-      prefix + " -Z midpoint #Deltaz DCA scan;R [cm];#Deltaz [cm]",
-      resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_z_negz_dca_scan.pdf");
+    draw_dca_scan_component(
+        pos_profiles,
+        0,
+        b3_pos_r.get(),
+        prefix + " +Z midpoint #Deltar DCA scan;R [cm];#Deltar [cm]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_r_posz_dca_scan.pdf");
+    draw_dca_scan_component(
+        pos_profiles,
+        1,
+        b3_pos_phi.get(),
+        prefix + " +Z midpoint #Delta#phi DCA scan;R [cm];#Delta#phi [rad]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_phi_posz_dca_scan.pdf");
+    draw_dca_scan_component(
+        pos_profiles,
+        2,
+        b3_pos_z.get(),
+        prefix + " +Z midpoint #Deltaz DCA scan;R [cm];#Deltaz [cm]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_z_posz_dca_scan.pdf");
+    draw_dca_scan_component(
+        neg_profiles,
+        0,
+        b3_neg_r.get(),
+        prefix + " -Z midpoint #Deltar DCA scan;R [cm];#Deltar [cm]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_r_negz_dca_scan.pdf");
+    draw_dca_scan_component(
+        neg_profiles,
+        1,
+        b3_neg_phi.get(),
+        prefix + " -Z midpoint #Delta#phi DCA scan;R [cm];#Delta#phi [rad]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_phi_negz_dca_scan.pdf");
+    draw_dca_scan_component(
+        neg_profiles,
+        2,
+        b3_neg_z.get(),
+        prefix + " -Z midpoint #Deltaz DCA scan;R [cm];#Deltaz [cm]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_z_negz_dca_scan.pdf");
 
-  draw_entries_scan(
-      pos_profiles,
-      prefix + " +Z accepted pairs after DCA refilter;R [cm];pairs",
-      resolved_plot_dir + "/" + prefix + "_closure_entries_posz_dca_scan.pdf");
-  draw_entries_scan(
-      neg_profiles,
-      prefix + " -Z accepted pairs after DCA refilter;R [cm];pairs",
-      resolved_plot_dir + "/" + prefix + "_closure_entries_negz_dca_scan.pdf");
+    draw_entries_scan(
+        pos_profiles,
+        prefix + " +Z accepted pairs after DCA refilter;R [cm];pairs",
+        resolved_plot_dir + "/" + prefix + "_closure_entries_posz_dca_scan.pdf");
+    draw_entries_scan(
+        neg_profiles,
+        prefix + " -Z accepted pairs after DCA refilter;R [cm];pairs",
+        resolved_plot_dir + "/" + prefix + "_closure_entries_negz_dca_scan.pdf");
+  }
+  else
+  {
+    const std::string slice_label =
+        Form("#phi bin center %.3f rad, R = %.2f cm",
+             selected_phi_center,
+             selected_r_center);
+
+    draw_point_components(
+        z_profiles.front(),
+        prefix + " Z scan " + slice_label + Form(", DCA <= %.2f cm", z_profiles.front().dca_threshold),
+        axis.title,
+        resolved_plot_dir + "/" + prefix + "_closure_points_zscan_dca" + sanitize_number(z_profiles.front().dca_threshold) + ".pdf");
+
+    draw_dca_scan_component(
+        z_profiles,
+        0,
+        b3_zscan_r.get(),
+        prefix + " Z scan midpoint #Deltar DCA scan;Z [cm];#Deltar [cm]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_r_zscan_dca_scan.pdf");
+    draw_dca_scan_component(
+        z_profiles,
+        1,
+        b3_zscan_phi.get(),
+        prefix + " Z scan midpoint #Delta#phi DCA scan;Z [cm];#Delta#phi [rad]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_phi_zscan_dca_scan.pdf");
+    draw_dca_scan_component(
+        z_profiles,
+        2,
+        b3_zscan_z.get(),
+        prefix + " Z scan midpoint #Deltaz DCA scan;Z [cm];#Deltaz [cm]",
+        resolved_plot_dir + "/" + prefix + "_closure_midpoint_delta_z_zscan_dca_scan.pdf");
+
+    draw_entries_scan(
+        z_profiles,
+        prefix + " Z scan accepted pairs after DCA refilter;Z [cm];pairs",
+        resolved_plot_dir + "/" + prefix + "_closure_entries_zscan_dca_scan.pdf");
+  }
 
   std::cout << "CPM_QA_DrawClosureSlice - B1 source: " << sources.description << std::endl;
   std::cout << "CPM_QA_DrawClosureSlice - source files: " << sources.files.size() << std::endl;
   std::cout << "CPM_QA_DrawClosureSlice - scanned pair rows: " << entries << std::endl;
-  std::cout << "CPM_QA_DrawClosureSlice - selected phi/z pair rows before DCA scan: "
-            << selected_phi_z_pairs << std::endl;
+  std::cout << "CPM_QA_DrawClosureSlice - selected pair rows before DCA scan: "
+            << selected_pair_rows << std::endl;
   std::cout << "CPM_QA_DrawClosureSlice - selected phi bin: " << target_iphi
             << " center " << selected_phi_center << std::endl;
-  std::cout << "CPM_QA_DrawClosureSlice - selected z bins: + " << target_iz_pos
-            << " center " << selected_pos_z_center
-            << " / - " << target_iz_neg
-            << " center " << selected_neg_z_center << std::endl;
-  for (const auto& profile : pos_profiles)
+  if (mode == SliceMode::RScan)
   {
-    std::cout << "CPM_QA_DrawClosureSlice - +Z DCA <= "
-              << profile.dca_threshold
-              << " accepted pairs: " << profile.accepted_pairs << std::endl;
+    std::cout << "CPM_QA_DrawClosureSlice - selected z bins: + " << target_iz_pos
+              << " center " << selected_pos_z_center
+              << " / - " << target_iz_neg
+              << " center " << selected_neg_z_center << std::endl;
+    for (const auto& profile : pos_profiles)
+    {
+      std::cout << "CPM_QA_DrawClosureSlice - +Z DCA <= "
+                << profile.dca_threshold
+                << " accepted pairs: " << profile.accepted_pairs << std::endl;
+    }
+    for (const auto& profile : neg_profiles)
+    {
+      std::cout << "CPM_QA_DrawClosureSlice - -Z DCA <= "
+                << profile.dca_threshold
+                << " accepted pairs: " << profile.accepted_pairs << std::endl;
+    }
   }
-  for (const auto& profile : neg_profiles)
+  else
   {
-    std::cout << "CPM_QA_DrawClosureSlice - -Z DCA <= "
-              << profile.dca_threshold
-              << " accepted pairs: " << profile.accepted_pairs << std::endl;
+    std::cout << "CPM_QA_DrawClosureSlice - selected r bin: " << target_ir
+              << " center " << selected_r_center << std::endl;
+    for (const auto& profile : z_profiles)
+    {
+      std::cout << "CPM_QA_DrawClosureSlice - Z scan DCA <= "
+                << profile.dca_threshold
+                << " accepted pairs: " << profile.accepted_pairs << std::endl;
+    }
   }
   std::cout << "CPM_QA_DrawClosureSlice - output directory: " << resolved_plot_dir << std::endl;
   std::cout << "CPM_QA_DrawClosureSlice - profile root: " << root_output << std::endl;

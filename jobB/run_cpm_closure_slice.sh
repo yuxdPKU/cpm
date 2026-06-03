@@ -11,7 +11,8 @@ usage() {
 Usage:
   jobB/run_cpm_closure_slice.sh --qa-dir QA_DIR --prefix PREFIX [options]
 
-Draws fixed-phi/fixed-z CPM closure diagnostics from QA B1 cpm_poca_pairs.
+Draws fixed-phi/fixed-z R-scan or fixed-phi/fixed-R Z-scan CPM closure
+diagnostics from QA B1 cpm_poca_pairs.
 The output directory is separate from the regular qa_plots directory.
 
 Options:
@@ -19,9 +20,12 @@ Options:
                            or PREFIX_QA_B1_poca.root.
   --prefix NAME            QA filename prefix.
   --plot-dir DIR           Output plot directory. Default:
-                           QA_DIR/closure_slice_phiPHI_zZ
+                           QA_DIR/closure_slice_phiPHI_zZ or
+                           QA_DIR/closure_slice_phiPHI_rR
+  --mode MODE              Slice mode: r or z. Default: r
   --phi VALUE              Selected phi in radians. Default: 4.7
   --z VALUE                Selected |z| in cm. Default: 10.0
+  --r VALUE                Selected R in cm for --mode z. Default: 60.0
   --dca-thresholds CSV     DCA thresholds to refilter pair rows. Default:
                            2.0,1.0,0.5,0.2,0.1,0.05,0.02
   --b1-input PATH          Explicit B1 ROOT file or B1 chunk-list file.
@@ -36,6 +40,12 @@ Example:
     --prefix sim_genfit_unweighted \
     --phi 4.7 --z 10 \
     --dca-thresholds 2.0,1.0,0.5,0.2
+
+  jobB/run_cpm_closure_slice.sh \
+    --qa-dir jobB/output/sim_genfit_unweighted_qa \
+    --prefix sim_genfit_unweighted \
+    --plot-dir jobB/output/sim_genfit_unweighted_qa/closure_slice_phi4p70_r60_tightdca_splitpanel \
+    --mode z --phi 4.7 --r 60
 EOF
 }
 
@@ -55,6 +65,8 @@ PREFIX=""
 PLOT_DIR=""
 PHI="4.7"
 SELECT_Z="10.0"
+SELECT_R="60.0"
+SLICE_MODE="r"
 DCA_THRESHOLDS="2.0,1.0,0.5,0.2,0.1,0.05,0.02"
 B1_INPUT=""
 B1_INPUT_IS_LIST=0
@@ -78,8 +90,16 @@ while [[ $# -gt 0 ]]; do
       PHI=${2:-}
       shift 2
       ;;
+    --mode)
+      SLICE_MODE=${2:-}
+      shift 2
+      ;;
     --z|--select-z)
       SELECT_Z=${2:-}
+      shift 2
+      ;;
+    --r|--select-r)
+      SELECT_R=${2:-}
       shift 2
       ;;
     --dca-thresholds)
@@ -139,13 +159,17 @@ DCA_Q=$(root_string "$DCA_THRESHOLDS")
 B1_INPUT_Q=$(root_string "$B1_INPUT")
 B3_FILE_Q=$(root_string "$B3_FILE")
 
-FUNCTION_CALL="CPM_QA_DrawClosureSlice(${QA_DIR_Q},${PREFIX_Q},${PLOT_DIR_Q},${PHI},${SELECT_Z},${DCA_Q},${B1_INPUT_Q},${B1_INPUT_IS_LIST},${B3_FILE_Q})"
+SLICE_MODE_Q=$(root_string "$SLICE_MODE")
+
+FUNCTION_CALL="CPM_QA_DrawClosureSlice(${QA_DIR_Q},${PREFIX_Q},${PLOT_DIR_Q},${PHI},${SELECT_Z},${DCA_Q},${B1_INPUT_Q},${B1_INPUT_IS_LIST},${B3_FILE_Q},${SELECT_R},${SLICE_MODE_Q})"
 
 echo "[run_cpm_closure_slice] qa_dir: $QA_DIR"
 echo "[run_cpm_closure_slice] prefix: $PREFIX"
 echo "[run_cpm_closure_slice] plot_dir: ${PLOT_DIR:-<macro default>}"
+echo "[run_cpm_closure_slice] mode: $SLICE_MODE"
 echo "[run_cpm_closure_slice] phi: $PHI"
 echo "[run_cpm_closure_slice] |z|: $SELECT_Z"
+echo "[run_cpm_closure_slice] r: $SELECT_R"
 echo "[run_cpm_closure_slice] dca thresholds: $DCA_THRESHOLDS"
 if [[ -n "$B1_INPUT" ]]; then
   echo "[run_cpm_closure_slice] b1_input: $B1_INPUT"

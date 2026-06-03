@@ -20,9 +20,11 @@ Executable     = $(Initialdir)/run_cpm_closure_slice.sh
 
 Phi            = 4.7
 SelectZ        = 10.0
+SelectR        = 60.0
+SliceMode      = r
 DcaThresholds  = 2.0,1.0,0.5,0.2,0.1,0.05,0.02
 
-Arguments      = --qa-dir $(QaDir) --prefix $(Prefix) --plot-dir $(PlotDir) --phi $(Phi) --z $(SelectZ) --dca-thresholds $(DcaThresholds)
+Arguments      = --qa-dir $(QaDir) --prefix $(Prefix) --plot-dir $(PlotDir) --mode $(SliceMode) --phi $(Phi) --z $(SelectZ) --r $(SelectR) --dca-thresholds $(DcaThresholds)
 
 Output         = $(Initialdir)/condor_logs/jobB-Closure-$(Name).out
 Error          = $(Initialdir)/condor_logs/jobB-Closure-$(Name).err
