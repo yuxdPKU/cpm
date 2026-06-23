@@ -27,6 +27,7 @@ CPM_EXTERNAL_LIBS = \
   $(ACTS_LIBS) \
   -lCore \
   -lffaobjects \
+  -lphg4hit \
   -lHist \
   -lphool \
   -lPhysics \

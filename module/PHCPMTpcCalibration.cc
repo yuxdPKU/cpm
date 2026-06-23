@@ -8,11 +8,16 @@
 #include <ffaobjects/SyncDefs.h>
 #include <ffaobjects/SyncObject.h>
 
+#include <g4main/PHG4Hit.h>
+#include <g4main/PHG4HitContainer.h>
+
 #include <trackbase/ActsGeometry.h>
 #include <trackbase/TpcDefs.h>
 #include <trackbase/TrkrCluster.h>
+#include <trackbase/TrkrClusterHitAssoc.h>
 #include <trackbase/TrkrClusterContainer.h>
 #include <trackbase/TrkrDefs.h>
+#include <trackbase/TrkrHitTruthAssoc.h>
 
 #include <trackbase_historic/SvtxTrack.h>
 #include <trackbase_historic/SvtxTrackMap.h>
@@ -31,8 +36,89 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
+#include <vector>
+
+namespace
+{
+  double square(const double value)
+  {
+    return value * value;
+  }
+
+  double radius(const TVector3& position)
+  {
+    return std::sqrt(square(position.X()) + square(position.Y()));
+  }
+
+  bool finiteVector(const TVector3& value)
+  {
+    return std::isfinite(value.X()) &&
+           std::isfinite(value.Y()) &&
+           std::isfinite(value.Z());
+  }
+
+  struct TruthInterpolationPoint
+  {
+    TVector3 position;
+    TVector3 momentum;
+    double weight = 0.0;
+  };
+
+  template <class Accessor>
+  double interpolateRadius(
+      const std::vector<TruthInterpolationPoint>& points,
+      const double targetRadius,
+      Accessor accessor)
+  {
+    double sw = 0.0;
+    double swr = 0.0;
+    double swr2 = 0.0;
+    double swx = 0.0;
+    double swrx = 0.0;
+    bool valid = false;
+
+    for (const auto& point : points)
+    {
+      const double x = accessor(point);
+      if (!std::isfinite(x))
+      {
+        continue;
+      }
+
+      const double w = point.weight;
+      if (w <= 0.0)
+      {
+        continue;
+      }
+
+      valid = true;
+      const double r = radius(point.position);
+      sw += w;
+      swr += w * r;
+      swr2 += w * r * r;
+      swx += w * x;
+      swrx += w * x * r;
+    }
+
+    if (!valid)
+    {
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    const double denom = sw * swr2 - swr * swr;
+    if (denom == 0.0)
+    {
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    const double alpha = sw * swrx - swr * swx;
+    const double beta = swr2 * swx - swr * swrx;
+    return (alpha * targetRadius + beta) / denom;
+  }
+}
 
 PHCPMTpcCalibration::PHCPMTpcCalibration(const std::string& name)
   : SubsysReco(name)
@@ -47,6 +133,7 @@ int PHCPMTpcCalibration::Init(PHCompositeNode* /*topNode*/)
             << " grid: (" << m_phiBins << ", " << m_rBins << ", " << m_zBins << ")"
             << " write records: " << m_writeRecords
             << " write QA records: " << m_writeQARecords
+            << " use truth information: " << m_useTruthInformation
             << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -101,6 +188,15 @@ int PHCPMTpcCalibration::End(PHCompositeNode* /*topNode*/)
             << " accepted: " << m_accepted_states
             << std::endl;
 
+  if (m_useTruthInformation)
+  {
+    std::cout << "PHCPMTpcCalibration::End"
+              << " truth states requested: " << m_truth_requested_states
+              << " accepted: " << m_truth_accepted_states
+              << " missing: " << m_truth_missing_states
+              << std::endl;
+  }
+
   return writeOutput();
 }
 
@@ -137,6 +233,30 @@ int PHCPMTpcCalibration::getNodes(PHCompositeNode* topNode)
   {
     std::cout << PHWHERE << " " << m_trackmapname << " not on node tree. Exiting." << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
+  }
+
+  if (m_useTruthInformation)
+  {
+    m_clusterHitAssoc = findNode::getClass<TrkrClusterHitAssoc>(topNode, "TRKR_CLUSTERHITASSOC");
+    if (!m_clusterHitAssoc)
+    {
+      std::cout << PHWHERE << "TRKR_CLUSTERHITASSOC not on node tree while truth CPM is enabled. Exiting." << std::endl;
+      return Fun4AllReturnCodes::ABORTEVENT;
+    }
+
+    m_hitTruthAssoc = findNode::getClass<TrkrHitTruthAssoc>(topNode, "TRKR_HITTRUTHASSOC");
+    if (!m_hitTruthAssoc)
+    {
+      std::cout << PHWHERE << "TRKR_HITTRUTHASSOC not on node tree while truth CPM is enabled. Exiting." << std::endl;
+      return Fun4AllReturnCodes::ABORTEVENT;
+    }
+
+    m_g4hitsTpc = findNode::getClass<PHG4HitContainer>(topNode, "G4HIT_TPC");
+    if (!m_g4hitsTpc)
+    {
+      std::cout << PHWHERE << "G4HIT_TPC not on node tree while truth CPM is enabled. Exiting." << std::endl;
+      return Fun4AllReturnCodes::ABORTEVENT;
+    }
   }
 
   m_syncObject = findNode::getClass<SyncObject>(topNode, syncdefs::SYNCNODENAME);
@@ -192,13 +312,41 @@ int PHCPMTpcCalibration::processTracks()
           actsPosition.y(),
           actsPosition.z()};
 
+      TVector3 recordClusterPosition = clusterPosition;
+      TVector3 recordStatePosition{state->get_x(), state->get_y(), state->get_z()};
+      TVector3 recordStateMomentum{state->get_px(), state->get_py(), state->get_pz()};
+
+      if (m_useTruthInformation)
+      {
+        ++m_truth_requested_states;
+        TruthState truthState;
+        if (!getTruthState(cluskey, radius(clusterPosition), truthState))
+        {
+          ++m_truth_missing_states;
+          continue;
+        }
+
+        recordClusterPosition = truthState.position;
+        recordStatePosition = truthState.position;
+        recordStateMomentum = truthState.momentum;
+        ++m_truth_accepted_states;
+      }
+
       VoxelId voxel;
-      if (!getVoxelId(clusterPosition, voxel))
+      if (!getVoxelId(recordClusterPosition, voxel))
       {
         continue;
       }
 
-      auto record = makeRecord(trackKey, track, state, cluster, clusterPosition, voxel);
+      auto record = makeRecord(
+          trackKey,
+          track,
+          state,
+          cluster,
+          recordClusterPosition,
+          recordStatePosition,
+          recordStateMomentum,
+          voxel);
       auto [iter, inserted] = bestRecordsByVoxel.emplace(voxel, record);
       if (!inserted && isCloserToVoxelCenter(record, iter->second))
       {
@@ -266,6 +414,95 @@ bool PHCPMTpcCalibration::checkState(const SvtxTrackState* state) const
   }
 
   return TrkrDefs::getTrkrId(cluskey) == TrkrDefs::tpcId;
+}
+
+bool PHCPMTpcCalibration::getTruthState(
+    const TrkrDefs::cluskey cluskey,
+    const double targetRadius,
+    TruthState& truthState) const
+{
+  const auto g4hits = findG4Hits(cluskey);
+  if (g4hits.empty())
+  {
+    return false;
+  }
+
+  std::vector<TruthInterpolationPoint> points;
+  points.reserve(2 * g4hits.size());
+  for (const auto* g4hit : g4hits)
+  {
+    if (!g4hit)
+    {
+      continue;
+    }
+
+    const double weight = g4hit->get_edep();
+    for (int endpoint = 0; endpoint < 2; ++endpoint)
+    {
+      points.push_back({
+          {g4hit->get_x(endpoint), g4hit->get_y(endpoint), g4hit->get_z(endpoint)},
+          {g4hit->get_px(endpoint), g4hit->get_py(endpoint), g4hit->get_pz(endpoint)},
+          weight});
+    }
+  }
+
+  if (points.empty())
+  {
+    return false;
+  }
+
+  truthState.position = {
+      interpolateRadius(points, targetRadius, [](const TruthInterpolationPoint& point) { return point.position.X(); }),
+      interpolateRadius(points, targetRadius, [](const TruthInterpolationPoint& point) { return point.position.Y(); }),
+      interpolateRadius(points, targetRadius, [](const TruthInterpolationPoint& point) { return point.position.Z(); })};
+  truthState.momentum = {
+      interpolateRadius(points, targetRadius, [](const TruthInterpolationPoint& point) { return point.momentum.X(); }),
+      interpolateRadius(points, targetRadius, [](const TruthInterpolationPoint& point) { return point.momentum.Y(); }),
+      interpolateRadius(points, targetRadius, [](const TruthInterpolationPoint& point) { return point.momentum.Z(); })};
+
+  return finiteVector(truthState.position) &&
+         finiteVector(truthState.momentum) &&
+         truthState.momentum.Mag2() > 0.0;
+}
+
+std::set<PHG4Hit*> PHCPMTpcCalibration::findG4Hits(const TrkrDefs::cluskey cluskey) const
+{
+  std::set<PHG4Hit*> out;
+  if (!(m_clusterHitAssoc && m_hitTruthAssoc && m_g4hitsTpc))
+  {
+    return out;
+  }
+
+  const auto hitsetkey = TrkrDefs::getHitSetKeyFromClusKey(cluskey);
+  if (TrkrDefs::getTrkrId(hitsetkey) != TrkrDefs::tpcId)
+  {
+    return out;
+  }
+
+  const auto range = m_clusterHitAssoc->getHits(cluskey);
+  for (auto iter = range.first; iter != range.second; ++iter)
+  {
+    const auto hitkey = iter->second;
+    TrkrHitTruthAssoc::MMap g4hitMap;
+    m_hitTruthAssoc->getG4Hits(hitsetkey, hitkey, g4hitMap);
+
+    for (const auto& truthPair : g4hitMap)
+    {
+      const auto g4hitkey = truthPair.second.second;
+      auto* g4hit = m_g4hitsTpc->findHit(g4hitkey);
+      if (g4hit)
+      {
+        out.insert(g4hit);
+      }
+      else if (Verbosity() > 1)
+      {
+        std::cout << "PHCPMTpcCalibration::findG4Hits - G4HIT_TPC missing hit "
+                  << g4hitkey << std::endl;
+      }
+    }
+  }
+
+  return out;
 }
 
 bool PHCPMTpcCalibration::getVoxelId(const TVector3& position, VoxelId& voxel) const
@@ -339,6 +576,10 @@ int PHCPMTpcCalibration::writeOutput()
   unsigned long long acceptedStates = m_accepted_states;
   bool writeRecords = m_writeRecords;
   bool writeQARecords = m_writeQARecords;
+  bool useTruthInformation = m_useTruthInformation;
+  unsigned long long truthRequestedStates = m_truth_requested_states;
+  unsigned long long truthAcceptedStates = m_truth_accepted_states;
+  unsigned long long truthMissingStates = m_truth_missing_states;
   bool cpmVoxelContainerGrouped = true;
   int cpmVoxelContainerLayoutVersion = 4;
   std::string cpmVoxelContainerStorage = "CPMVoxelContainerv1";
@@ -358,6 +599,10 @@ int PHCPMTpcCalibration::writeOutput()
   metadata.Branch("accepted_states", &acceptedStates);
   metadata.Branch("write_records", &writeRecords);
   metadata.Branch("write_qa_records", &writeQARecords);
+  metadata.Branch("use_truth_information", &useTruthInformation);
+  metadata.Branch("truth_requested_states", &truthRequestedStates);
+  metadata.Branch("truth_accepted_states", &truthAcceptedStates);
+  metadata.Branch("truth_missing_states", &truthMissingStates);
   metadata.Branch("cpm_voxel_container_grouped", &cpmVoxelContainerGrouped);
   metadata.Branch("cpm_voxel_container_layout_version", &cpmVoxelContainerLayoutVersion);
   metadata.Branch("cpm_voxel_container_storage", &cpmVoxelContainerStorage);
@@ -384,6 +629,8 @@ TrackStateRecord PHCPMTpcCalibration::makeRecord(
     const SvtxTrackState* state,
     const TrkrCluster* cluster,
     const TVector3& clusterPosition,
+    const TVector3& statePosition,
+    const TVector3& stateMomentum,
     const VoxelId& voxel) const
 {
   TrackStateRecord record;
@@ -411,8 +658,8 @@ TrackStateRecord PHCPMTpcCalibration::makeRecord(
   record.state.pathlength = state->get_pathlength();
   record.state.local_x = state->get_localX();
   record.state.local_y = state->get_localY();
-  record.state.position = {state->get_x(), state->get_y(), state->get_z()};
-  record.state.momentum = {state->get_px(), state->get_py(), state->get_pz()};
+  record.state.position = statePosition;
+  record.state.momentum = stateMomentum;
   record.state.covariance = copyCovariance(state);
 
   record.selection.has_crossing = track->get_crossing() == 0;

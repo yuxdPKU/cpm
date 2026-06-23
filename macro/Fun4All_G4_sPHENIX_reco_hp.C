@@ -112,7 +112,8 @@ int Fun4All_G4_sPHENIX_reco_hp(
     const int segment = 0,
     const bool writeMiniDst = false,
     const bool writePrunedSeedsToMiniDst = false,
-    const std::string fitMode = "auto")
+    const std::string fitMode = "auto",
+    const bool useTruthInformation = false)
 {
   bool validFitMode = false;
   const bool useActsFit = CPMRecoFitMode::resolve_use_acts(
@@ -135,6 +136,8 @@ int Fun4All_G4_sPHENIX_reco_hp(
   std::cout << "Fun4All_G4_sPHENIX_reco_hp - output prefix: " << resolvedOutfilename << std::endl;
   std::cout << "Fun4All_G4_sPHENIX_reco_hp - fit mode: "
             << (useActsFit ? "actsfit" : "genfit") << std::endl;
+  std::cout << "Fun4All_G4_sPHENIX_reco_hp - CPM use truth information: "
+            << useTruthInformation << std::endl;
 
   // options
   Enable::PIPE = true;
@@ -371,6 +374,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     cpmreco->requireTPOT(true);
     // CPM does not apply the legacy PHTpcResiduals central-membrane requirement.
     cpmreco->disableAverageCorr();
+    cpmreco->setUseTruthInformation(useTruthInformation);
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
 
@@ -424,6 +428,7 @@ int Fun4All_G4_sPHENIX_reco_hp(
     cpmreco->requireTPOT(true);
     // CPM does not apply the legacy PHTpcResiduals central-membrane requirement.
     cpmreco->disableAverageCorr();
+    cpmreco->setUseTruthInformation(useTruthInformation);
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
 

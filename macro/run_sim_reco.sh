@@ -35,6 +35,7 @@ Index=$5
 StepSize=$6
 Segment=$7
 FitMode=${8:-auto}
+UseTruthInformation=${9:-false}
 
 #getinputfiles.pl $InDst $InSeedDst
 getinputfiles.pl --filelist $InDstList
@@ -42,5 +43,5 @@ getinputfiles.pl --filelist $InDstList
 # print the environment - needed for debugging
 printenv
 
-root.exe -q -b Fun4All_G4_sPHENIX_reco_hp.C\($nEvents,\"${InDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize,$Segment,true,false,\"${FitMode}\"\)
+root.exe -q -b Fun4All_G4_sPHENIX_reco_hp.C\($nEvents,\"${InDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize,$Segment,true,false,\"${FitMode}\",${UseTruthInformation}\)
 echo Script done

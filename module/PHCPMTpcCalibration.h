@@ -9,17 +9,22 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 
 class ActsGeometry;
 class EventHeader;
+class PHG4Hit;
+class PHG4HitContainer;
 class PHCompositeNode;
 class SvtxTrack;
 class SvtxTrackMap;
 class SvtxTrackState;
 class SyncObject;
 class TrkrCluster;
+class TrkrClusterHitAssoc;
 class TrkrClusterContainer;
+class TrkrHitTruthAssoc;
 
 class PHCPMTpcCalibration : public SubsysReco
 {
@@ -53,6 +58,8 @@ class PHCPMTpcCalibration : public SubsysReco
   void requireTPOT(const bool value = true) { m_requireTPOT = value; }
   void setWriteRecords(const bool value = true) { m_writeRecords = value; }
   void setWriteQARecords(const bool value = true) { m_writeQARecords = value; }
+  void setUseTruthInformation(const bool value = true) { m_useTruthInformation = value; }
+  [[nodiscard]] bool useTruthInformation() const { return m_useTruthInformation; }
 
   void setGridDimensions(int phiBins, int rBins, int zBins);
 
@@ -86,12 +93,23 @@ class PHCPMTpcCalibration : public SubsysReco
   bool checkState(const SvtxTrackState* state) const;
   bool getVoxelId(const TVector3& position, VoxelId& voxel) const;
 
+  struct TruthState
+  {
+    TVector3 position;
+    TVector3 momentum;
+  };
+
+  bool getTruthState(TrkrDefs::cluskey cluskey, double radius, TruthState& truthState) const;
+  std::set<PHG4Hit*> findG4Hits(TrkrDefs::cluskey cluskey) const;
+
   TrackStateRecord makeRecord(
       unsigned int trackKey,
       const SvtxTrack* track,
       const SvtxTrackState* state,
       const TrkrCluster* cluster,
       const TVector3& clusterPosition,
+      const TVector3& statePosition,
+      const TVector3& stateMomentum,
       const VoxelId& voxel) const;
 
   EventReference makeEventReference() const;
@@ -115,6 +133,9 @@ class PHCPMTpcCalibration : public SubsysReco
   SvtxTrackMap* m_trackMap = nullptr;
   ActsGeometry* m_tGeometry = nullptr;
   TrkrClusterContainer* m_clusterContainer = nullptr;
+  TrkrClusterHitAssoc* m_clusterHitAssoc = nullptr;
+  TrkrHitTruthAssoc* m_hitTruthAssoc = nullptr;
+  PHG4HitContainer* m_g4hitsTpc = nullptr;
   SyncObject* m_syncObject = nullptr;
   EventHeader* m_eventHeader = nullptr;
 
@@ -138,6 +159,7 @@ class PHCPMTpcCalibration : public SubsysReco
   bool m_requireTPOT = true;
   bool m_writeRecords = true;
   bool m_writeQARecords = false;
+  bool m_useTruthInformation = false;
 
   std::uint64_t m_event = 0;
 
@@ -145,6 +167,9 @@ class PHCPMTpcCalibration : public SubsysReco
   std::uint64_t m_accepted_tracks = 0;
   std::uint64_t m_total_states = 0;
   std::uint64_t m_accepted_states = 0;
+  std::uint64_t m_truth_requested_states = 0;
+  std::uint64_t m_truth_accepted_states = 0;
+  std::uint64_t m_truth_missing_states = 0;
 };
 
 #endif
