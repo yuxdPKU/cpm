@@ -3,17 +3,18 @@ set -euo pipefail
 
 echo run sim genfit weighted
 ./run_cpm_b_chain.sh \
-  --input simlist_genfit.txt \
+  --input list_CPM_run29_sim_genfit.txt \
   --input-is-list \
-  --out-dir output/sim_weighted \
-  --prefix sim_genfit_weighted \
+  --out-dir output/sim_run29_genfit_weighted \
+  --prefix sim_run29_genfit_weighted_maxdca0p2 \
+  --max-pair-dca 0.2 \
   --weighted
 
-echo run sim genfit qa weighted
-./run_cpm_qa_chain.sh \
-  --input simlist_genfit.txt \
-  --input-is-list \
-  --out-dir output/sim_weighted_qa \
-  --prefix sim_genfit_weighted \
-  --weighted \
-  --write-pair-tree
+#echo run sim genfit qa weighted
+#./run_cpm_qa_chain.sh \
+#  --input simlist_genfit.txt \
+#  --input-is-list \
+#  --out-dir output/sim_genfit_weighted_qa \
+#  --prefix sim_genfit_weighted \
+#  --weighted \
+#  --write-pair-tree

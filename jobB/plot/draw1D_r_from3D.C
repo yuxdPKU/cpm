@@ -102,9 +102,13 @@ for (int i = 0; i < nrun; i++)
 {
   draw1Dmap(Form("/sphenix/u/xyu3/workarea/TPCdistortion/Si_TPOT_fit/run3pp_newSiFieldonAlignment_newTPOTzfAlignment/jobB/Rootfiles/Distortions_full_mm_%d.root",runs[i]), Form("%d_MI",runs[i]), selectZ, h_R_pos_MI[i], h_R_neg_MI[i], h_P_pos_MI[i], h_P_neg_MI[i], h_Z_pos_MI[i], h_Z_neg_MI[i], h_N_pos_MI[i], h_N_neg_MI[i], 2, 1);
 
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_unweighted/run%d_unweighted_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_unweighted",runs[i]), selectZ, h_R_pos_data_unweighted[i], h_R_neg_data_unweighted[i], h_P_pos_data_unweighted[i], h_P_neg_data_unweighted[i], h_Z_pos_data_unweighted[i], h_Z_neg_data_unweighted[i], h_N_pos_data_unweighted[i], h_N_neg_data_unweighted[i], 4, 1);
+  //draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_unweighted/run%d_unweighted_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_unweighted",runs[i]), selectZ, h_R_pos_data_unweighted[i], h_R_neg_data_unweighted[i], h_P_pos_data_unweighted[i], h_P_neg_data_unweighted[i], h_Z_pos_data_unweighted[i], h_Z_neg_data_unweighted[i], h_N_pos_data_unweighted[i], h_N_neg_data_unweighted[i], 4, 1);
+  //draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_unweighted/run%d_unweighted_maxdca0p02_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_unweighted",runs[i]), selectZ, h_R_pos_data_unweighted[i], h_R_neg_data_unweighted[i], h_P_pos_data_unweighted[i], h_P_neg_data_unweighted[i], h_Z_pos_data_unweighted[i], h_Z_neg_data_unweighted[i], h_N_pos_data_unweighted[i], h_N_neg_data_unweighted[i], 4, 1);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_unweighted/run%d_unweighted_maxdca0p2_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_unweighted",runs[i]), selectZ, h_R_pos_data_unweighted[i], h_R_neg_data_unweighted[i], h_P_pos_data_unweighted[i], h_P_neg_data_unweighted[i], h_Z_pos_data_unweighted[i], h_Z_neg_data_unweighted[i], h_N_pos_data_unweighted[i], h_N_neg_data_unweighted[i], 4, 1);
 
-  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_weighted/run%d_weighted_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_weighted",runs[i]), selectZ, h_R_pos_data_weighted[i], h_R_neg_data_weighted[i], h_P_pos_data_weighted[i], h_P_neg_data_weighted[i], h_Z_pos_data_weighted[i], h_Z_neg_data_weighted[i], h_N_pos_data_weighted[i], h_N_neg_data_weighted[i], 4, 2);
+  //draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_weighted/run%d_weighted_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_weighted",runs[i]), selectZ, h_R_pos_data_weighted[i], h_R_neg_data_weighted[i], h_P_pos_data_weighted[i], h_P_neg_data_weighted[i], h_Z_pos_data_weighted[i], h_Z_neg_data_weighted[i], h_N_pos_data_weighted[i], h_N_neg_data_weighted[i], 4, 2);
+  //draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_weighted/run%d_weighted_maxdca0p02_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_weighted",runs[i]), selectZ, h_R_pos_data_weighted[i], h_R_neg_data_weighted[i], h_P_pos_data_weighted[i], h_P_neg_data_weighted[i], h_Z_pos_data_weighted[i], h_Z_neg_data_weighted[i], h_N_pos_data_weighted[i], h_N_neg_data_weighted[i], 4, 2);
+  draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/run%d_weighted/run%d_weighted_maxdca0p2_B3_average_correction_histograms.root",runs[i],runs[i]), Form("%d_cpm_weighted",runs[i]), selectZ, h_R_pos_data_weighted[i], h_R_neg_data_weighted[i], h_P_pos_data_weighted[i], h_P_neg_data_weighted[i], h_Z_pos_data_weighted[i], h_Z_neg_data_weighted[i], h_N_pos_data_weighted[i], h_N_neg_data_weighted[i], 4, 2);
 }
 
 TH1 *h_N_pos_sim_acts_unweighted, *h_R_pos_sim_acts_unweighted, *h_P_pos_sim_acts_unweighted, *h_Z_pos_sim_acts_unweighted;
@@ -119,13 +123,21 @@ TH1 *h_N_neg_sim_genfit_unweighted, *h_R_neg_sim_genfit_unweighted, *h_P_neg_sim
 TH1 *h_N_pos_sim_genfit_weighted, *h_R_pos_sim_genfit_weighted, *h_P_pos_sim_genfit_weighted, *h_Z_pos_sim_genfit_weighted;
 TH1 *h_N_neg_sim_genfit_weighted, *h_R_neg_sim_genfit_weighted, *h_P_neg_sim_genfit_weighted, *h_Z_neg_sim_genfit_weighted;
 
-draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_unweighted/sim_acts_unweighted_B3_average_correction_histograms.root"), Form("sim_cpm_acts_unweighted"), selectZ, h_R_pos_sim_acts_unweighted, h_R_neg_sim_acts_unweighted, h_P_pos_sim_acts_unweighted, h_P_neg_sim_acts_unweighted, h_Z_pos_sim_acts_unweighted, h_Z_neg_sim_acts_unweighted, h_N_pos_sim_acts_unweighted, h_N_neg_sim_acts_unweighted, 1, 1);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_unweighted/sim_acts_unweighted_B3_average_correction_histograms.root"), Form("sim_cpm_acts_unweighted"), selectZ, h_R_pos_sim_acts_unweighted, h_R_neg_sim_acts_unweighted, h_P_pos_sim_acts_unweighted, h_P_neg_sim_acts_unweighted, h_Z_pos_sim_acts_unweighted, h_Z_neg_sim_acts_unweighted, h_N_pos_sim_acts_unweighted, h_N_neg_sim_acts_unweighted, 1, 1);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_unweighted/sim_acts_unweighted_maxdca0p02_B3_average_correction_histograms.root"), Form("sim_cpm_acts_unweighted"), selectZ, h_R_pos_sim_acts_unweighted, h_R_neg_sim_acts_unweighted, h_P_pos_sim_acts_unweighted, h_P_neg_sim_acts_unweighted, h_Z_pos_sim_acts_unweighted, h_Z_neg_sim_acts_unweighted, h_N_pos_sim_acts_unweighted, h_N_neg_sim_acts_unweighted, 1, 1);
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_unweighted/sim_acts_unweighted_maxdca0p2_B3_average_correction_histograms.root"), Form("sim_cpm_acts_unweighted"), selectZ, h_R_pos_sim_acts_unweighted, h_R_neg_sim_acts_unweighted, h_P_pos_sim_acts_unweighted, h_P_neg_sim_acts_unweighted, h_Z_pos_sim_acts_unweighted, h_Z_neg_sim_acts_unweighted, h_N_pos_sim_acts_unweighted, h_N_neg_sim_acts_unweighted, 1, 1);
 
-draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_weighted/sim_acts_weighted_B3_average_correction_histograms.root"), Form("sim_cpm_acts_weighted"), selectZ, h_R_pos_sim_acts_weighted, h_R_neg_sim_acts_weighted, h_P_pos_sim_acts_weighted, h_P_neg_sim_acts_weighted, h_Z_pos_sim_acts_weighted, h_Z_neg_sim_acts_weighted, h_N_pos_sim_acts_weighted, h_N_neg_sim_acts_weighted, 1, 2);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_weighted/sim_acts_weighted_B3_average_correction_histograms.root"), Form("sim_cpm_acts_weighted"), selectZ, h_R_pos_sim_acts_weighted, h_R_neg_sim_acts_weighted, h_P_pos_sim_acts_weighted, h_P_neg_sim_acts_weighted, h_Z_pos_sim_acts_weighted, h_Z_neg_sim_acts_weighted, h_N_pos_sim_acts_weighted, h_N_neg_sim_acts_weighted, 1, 2);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_weighted/sim_acts_weighted_maxdca0p02_B3_average_correction_histograms.root"), Form("sim_cpm_acts_weighted"), selectZ, h_R_pos_sim_acts_weighted, h_R_neg_sim_acts_weighted, h_P_pos_sim_acts_weighted, h_P_neg_sim_acts_weighted, h_Z_pos_sim_acts_weighted, h_Z_neg_sim_acts_weighted, h_N_pos_sim_acts_weighted, h_N_neg_sim_acts_weighted, 1, 2);
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_acts_weighted/sim_acts_weighted_maxdca0p2_B3_average_correction_histograms.root"), Form("sim_cpm_acts_weighted"), selectZ, h_R_pos_sim_acts_weighted, h_R_neg_sim_acts_weighted, h_P_pos_sim_acts_weighted, h_P_neg_sim_acts_weighted, h_Z_pos_sim_acts_weighted, h_Z_neg_sim_acts_weighted, h_N_pos_sim_acts_weighted, h_N_neg_sim_acts_weighted, 1, 2);
 
-draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_unweighted/sim_genfit_unweighted_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_unweighted"), selectZ, h_R_pos_sim_genfit_unweighted, h_R_neg_sim_genfit_unweighted, h_P_pos_sim_genfit_unweighted, h_P_neg_sim_genfit_unweighted, h_Z_pos_sim_genfit_unweighted, h_Z_neg_sim_genfit_unweighted, h_N_pos_sim_genfit_unweighted, h_N_neg_sim_genfit_unweighted, 1, 1);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_unweighted/sim_genfit_unweighted_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_unweighted"), selectZ, h_R_pos_sim_genfit_unweighted, h_R_neg_sim_genfit_unweighted, h_P_pos_sim_genfit_unweighted, h_P_neg_sim_genfit_unweighted, h_Z_pos_sim_genfit_unweighted, h_Z_neg_sim_genfit_unweighted, h_N_pos_sim_genfit_unweighted, h_N_neg_sim_genfit_unweighted, 1, 1);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_unweighted/sim_genfit_unweighted_maxdca0p02_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_unweighted"), selectZ, h_R_pos_sim_genfit_unweighted, h_R_neg_sim_genfit_unweighted, h_P_pos_sim_genfit_unweighted, h_P_neg_sim_genfit_unweighted, h_Z_pos_sim_genfit_unweighted, h_Z_neg_sim_genfit_unweighted, h_N_pos_sim_genfit_unweighted, h_N_neg_sim_genfit_unweighted, 1, 1);
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_unweighted/sim_genfit_unweighted_maxdca0p2_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_unweighted"), selectZ, h_R_pos_sim_genfit_unweighted, h_R_neg_sim_genfit_unweighted, h_P_pos_sim_genfit_unweighted, h_P_neg_sim_genfit_unweighted, h_Z_pos_sim_genfit_unweighted, h_Z_neg_sim_genfit_unweighted, h_N_pos_sim_genfit_unweighted, h_N_neg_sim_genfit_unweighted, 1, 1);
 
-draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_weighted/sim_genfit_weighted_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_weighted"), selectZ, h_R_pos_sim_genfit_weighted, h_R_neg_sim_genfit_weighted, h_P_pos_sim_genfit_weighted, h_P_neg_sim_genfit_weighted, h_Z_pos_sim_genfit_weighted, h_Z_neg_sim_genfit_weighted, h_N_pos_sim_genfit_weighted, h_N_neg_sim_genfit_weighted, 1, 2);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_weighted/sim_genfit_weighted_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_weighted"), selectZ, h_R_pos_sim_genfit_weighted, h_R_neg_sim_genfit_weighted, h_P_pos_sim_genfit_weighted, h_P_neg_sim_genfit_weighted, h_Z_pos_sim_genfit_weighted, h_Z_neg_sim_genfit_weighted, h_N_pos_sim_genfit_weighted, h_N_neg_sim_genfit_weighted, 1, 2);
+//draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_weighted/sim_genfit_weighted_maxdca0p02_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_weighted"), selectZ, h_R_pos_sim_genfit_weighted, h_R_neg_sim_genfit_weighted, h_P_pos_sim_genfit_weighted, h_P_neg_sim_genfit_weighted, h_Z_pos_sim_genfit_weighted, h_Z_neg_sim_genfit_weighted, h_N_pos_sim_genfit_weighted, h_N_neg_sim_genfit_weighted, 1, 2);
+draw1Dmap(Form("/sphenix/u/xyu3/workarea/cpm/jobB/output/sim_genfit_weighted/sim_genfit_weighted_maxdca0p2_B3_average_correction_histograms.root"), Form("sim_cpm_genfit_weighted"), selectZ, h_R_pos_sim_genfit_weighted, h_R_neg_sim_genfit_weighted, h_P_pos_sim_genfit_weighted, h_P_neg_sim_genfit_weighted, h_Z_pos_sim_genfit_weighted, h_Z_neg_sim_genfit_weighted, h_N_pos_sim_genfit_weighted, h_N_neg_sim_genfit_weighted, 1, 2);
 
 std::vector<TH1*> hists_P; hists_P.clear();
 std::vector<TH1*> hists_R; hists_R.clear();
@@ -213,37 +225,37 @@ TCanvas* can_MI_CPM_LAM = new TCanvas("can_MI_CPM_LAM","",2400,1200);
 can_MI_CPM_LAM->Divide(3,2);
 can_MI_CPM_LAM->cd(1);
 gPad->SetLogy(0);
-h_P_pos_MI[i]->Draw("hist,e,same");
+h_P_pos_MI[i]->Draw("hist,same");
 h_P_pos_data_unweighted[i]->Draw("hist,same");
 h_P_pos_data_weighted[i]->Draw("hist,same");
 hcdb_lamination_P_pos[i]->Draw("hist,same");
 can_MI_CPM_LAM->cd(2);
 gPad->SetLogy(0);
-h_R_pos_MI[i]->Draw("hist,e,same");
+h_R_pos_MI[i]->Draw("hist,same");
 h_R_pos_data_unweighted[i]->Draw("hist,same");
 h_R_pos_data_weighted[i]->Draw("hist,same");
 hcdb_lamination_R_pos[i]->Draw("hist,same");
 can_MI_CPM_LAM->cd(3);
 gPad->SetLogy(0);
-h_Z_pos_MI[i]->Draw("hist,e,same");
+h_Z_pos_MI[i]->Draw("hist,same");
 h_Z_pos_data_unweighted[i]->Draw("hist,same");
 h_Z_pos_data_weighted[i]->Draw("hist,same");
 hcdb_lamination_Z_pos[i]->Draw("hist,same");
 can_MI_CPM_LAM->cd(4);
 gPad->SetLogy(0);
-h_P_neg_MI[i]->Draw("hist,e,same");
+h_P_neg_MI[i]->Draw("hist,same");
 h_P_neg_data_unweighted[i]->Draw("hist,same");
 h_P_neg_data_weighted[i]->Draw("hist,same");
 hcdb_lamination_P_neg[i]->Draw("hist,same");
 can_MI_CPM_LAM->cd(5);
 gPad->SetLogy(0);
-h_R_neg_MI[i]->Draw("hist,e,same");
+h_R_neg_MI[i]->Draw("hist,same");
 h_R_neg_data_unweighted[i]->Draw("hist,same");
 h_R_neg_data_weighted[i]->Draw("hist,same");
 hcdb_lamination_R_neg[i]->Draw("hist,same");
 can_MI_CPM_LAM->cd(6);
 gPad->SetLogy(0);
-h_Z_neg_MI[i]->Draw("hist,e,same");
+h_Z_neg_MI[i]->Draw("hist,same");
 h_Z_neg_data_unweighted[i]->Draw("hist,same");
 h_Z_neg_data_weighted[i]->Draw("hist,same");
 hcdb_lamination_Z_neg[i]->Draw("hist,same");
@@ -322,8 +334,8 @@ can_sim_acts->SaveAs(Form("figure/resid_vsR_from3D_atZ%d_sim_acts.pdf",(int)sele
 
 TLegend *legend_sim_acts = new TLegend(0.1, 0.1, 0.9, 0.9);
 legend_sim_acts->SetHeader(Form("Simulation acts"));
-legend_sim_acts->AddEntry(h_P_pos_sim_acts_unweighted[i], Form("CPM Unweighted"), "l");
-legend_sim_acts->AddEntry(h_P_pos_sim_acts_weighted[i], Form("CPM weighted"), "l");
+legend_sim_acts->AddEntry(h_P_pos_sim_acts_unweighted, Form("CPM Unweighted"), "l");
+legend_sim_acts->AddEntry(h_P_pos_sim_acts_weighted, Form("CPM weighted"), "l");
 legend_sim_acts->Draw();
 TCanvas* can_sim_acts_leg = new TCanvas("can_sim_acts_leg","",2500,1000);
 legend_sim_acts->Draw();
@@ -386,8 +398,8 @@ can_sim_genfit->SaveAs(Form("figure/resid_vsR_from3D_atZ%d_sim_genfit.pdf",(int)
 
 TLegend *legend_sim_genfit = new TLegend(0.1, 0.1, 0.9, 0.9);
 legend_sim_genfit->SetHeader(Form("Simulation genfit"));
-legend_sim_genfit->AddEntry(h_P_pos_sim_genfit_unweighted[i], Form("CPM Unweighted"), "l");
-legend_sim_genfit->AddEntry(h_P_pos_sim_genfit_weighted[i], Form("CPM weighted"), "l");
+legend_sim_genfit->AddEntry(h_P_pos_sim_genfit_unweighted, Form("CPM Unweighted"), "l");
+legend_sim_genfit->AddEntry(h_P_pos_sim_genfit_weighted, Form("CPM weighted"), "l");
 legend_sim_genfit->Draw();
 TCanvas* can_sim_genfit_leg = new TCanvas("can_sim_genfit_leg","",2500,1000);
 legend_sim_genfit->Draw();

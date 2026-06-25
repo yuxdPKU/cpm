@@ -33,6 +33,7 @@ OutDir=$3
 OutPrefix=$4
 Index=$5
 StepSize=$6
+UseTruthInformation=${7:-false}
 
 #getinputfiles.pl $InClusterDst $InSeedDst
 getinputfiles.pl --filelist $InDstList
@@ -40,5 +41,5 @@ getinputfiles.pl --filelist $InDstList
 # print the environment - needed for debugging
 printenv
 
-root.exe -q -b Fun4All_CPMTrackAnalysis.C\($nEvents,\"${InClusterDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize,false,true,false\)
+root.exe -q -b Fun4All_CPMTrackAnalysis.C\($nEvents,\"${InClusterDst}\",\"${OutDir}\",\"${OutPrefix}\",$Index,$StepSize,false,true,false,${UseTruthInformation}\)
 echo Script done

@@ -72,12 +72,14 @@ void Fun4All_CPMTrackAnalysis(
     const int stepsize = 10,
     const bool convertSeeds = false,
     const bool writeMiniDst = false,
-    const bool writePrunedSeedsToMiniDst = false)
+    const bool writePrunedSeedsToMiniDst = false,
+    const bool useTruthInformation = false)
 {
   std::string inputclusterFile = clusterfilename;
 
   G4TRACKING::convert_seeds_to_svtxtracks = convertSeeds;
   std::cout << "Converting to seeds : " << G4TRACKING::convert_seeds_to_svtxtracks << std::endl;
+  std::cout << "CPM use truth information : " << useTruthInformation << std::endl;
 
   std::pair<int, int> runseg = Fun4AllUtils::GetRunSegment(clusterfilename);
   int runnumber = runseg.first;
@@ -408,6 +410,7 @@ void Fun4All_CPMTrackAnalysis(
     cpmreco->requireCrossing(false);
     cpmreco->requireTPOT(true);
     cpmreco->disableAverageCorr();
+    cpmreco->setUseTruthInformation(useTruthInformation);
     cpmreco->setGridDimensions(36, 16, 80);
     se->registerSubsystem(cpmreco);
 
