@@ -116,6 +116,7 @@ int Fun4All_G4_sPHENIX_reco(
     const bool doTruthSeeding = true,
     const bool doTruthFitting = false,
     const std::string fitMode = "acts",
+    const bool enableStaticDistortion = false,
     const bool writeMiniDst = false,
     const bool writePrunedSeedsToMiniDst = false,
     const int index = 0,
@@ -132,6 +133,7 @@ int Fun4All_G4_sPHENIX_reco(
               << " (expected auto, acts, actsfit, genfit, or gen)" << std::endl;
     return 1;
   }
+
   const std::string resolvedOutfilename = !outfilename.empty() ?
       outfilename :
       (useActsFit ? "dst_sim_acts" : "dst_sim_genfit");
@@ -146,6 +148,8 @@ int Fun4All_G4_sPHENIX_reco(
             << doTruthSeeding << std::endl;
   std::cout << "Fun4All_G4_sPHENIX_reco - do track fitting use truth information: "
             << doTruthFitting << std::endl;
+  std::cout << "Fun4All_G4_sPHENIX_reco - enable static distortion: "
+            << enableStaticDistortion << std::endl;
 
   // options
   Enable::PIPE = true;
@@ -176,9 +180,7 @@ int Fun4All_G4_sPHENIX_reco(
   Enable::MAGNET_ABSORBER = false;
   Enable::HCALOUT_ABSORBER = false;
 
-  G4TPC::ENABLE_STATIC_DISTORTIONS = false;
-
-  //G4TPC::ENABLE_STATIC_DISTORTIONS = true;
+  G4TPC::ENABLE_STATIC_DISTORTIONS = enableStaticDistortion;
   G4TPC::DISTORTIONS_USE_PHI_AS_RADIANS = false;
   G4TPC::ENABLE_REACHES_READOUT = false;
   G4TPC::static_distortion_filename = "/phenix/u/hpereira/sphenix/work/g4simulations/distortion_maps/average_minus_static_distortion_converted.root";
@@ -225,6 +227,8 @@ int Fun4All_G4_sPHENIX_reco(
   // make sure to printout random seeds for reproducibility
   PHRandomSeed::Verbosity(1);
 
+  const int randomSeed = 100000 + segment;
+  rc->set_IntFlag("RANDOMSEED", randomSeed);
   // rc->set_IntFlag("RANDOMSEED",1);
 
   // condition database
@@ -350,9 +354,10 @@ int Fun4All_G4_sPHENIX_reco(
       actsFit->Verbosity(0);
       actsFit->commissioning(G4TRACKING::use_alignment);
 
-      // fit with Micromegas and Silicon ONLY
-      actsFit->fitSiliconMMs(G4TRACKING::SC_CALIBMODE);
-      actsFit->setUseMicromegas(G4TRACKING::SC_USE_MICROMEGAS);
+      // The first pass must use the full detector so that the track pruner
+      // can apply its TPC and Micromegas cluster/state requirements.
+      actsFit->fitSiliconMMs(false);
+      actsFit->setUseMicromegas(true);
 
       actsFit->set_use_clustermover(true);
       actsFit->useActsEvaluator(false);
@@ -389,7 +394,7 @@ int Fun4All_G4_sPHENIX_reco(
       actsFit_SiTpotFit->fitSiliconMMs(G4TRACKING::SC_CALIBMODE);
       actsFit_SiTpotFit->setUseMicromegas(G4TRACKING::SC_USE_MICROMEGAS);
       actsFit_SiTpotFit->set_svtx_seed_map_name("PrunedSvtxTrackSeedContainer");
-      actsFit_SiTpotFit->set_pp_mode(TRACKING::pp_mode);
+      actsFit_SiTpotFit->set_pp_mode(TRACKING::streaming_mode);
       actsFit_SiTpotFit->set_use_clustermover(true);  // default is true for now
       actsFit_SiTpotFit->useActsEvaluator(false);
       actsFit_SiTpotFit->useOutlierFinder(false);
@@ -401,11 +406,41 @@ int Fun4All_G4_sPHENIX_reco(
     {
 
       std::cout<<"Using Genfit"<<std::endl;
-      // perform final track fit with GENFIT
+      // Perform the full-detector fit first. This writes SvtxTrackMap, which
+      // is consumed by PHTrackCleaner and PHTrackPruner below.
       auto genfitFit = new PHGenFitTrkFitter;
-      genfitFit->set_fit_silicon_mms(G4TRACKING::SC_CALIBMODE);
-      genfitFit->set_svtx_track_map_name("SvtxSiliconMMTrackMap");
+      genfitFit->set_fit_silicon_mms(false);
+      genfitFit->set_use_micromegas(true);
       se->registerSubsystem(genfitFit);
+
+      auto cleaner = new PHTrackCleaner();
+      cleaner->Verbosity(0);
+      se->registerSubsystem(cleaner);
+
+      // Prune the full tracks and create the seed map for the Si-TPOT refit.
+      auto trackpruner = new PHTrackPruner;
+      trackpruner->Verbosity(0);
+      trackpruner->set_svtx_track_map_name("SvtxTrackMap");
+      trackpruner->set_pruned_svtx_seed_map_name("PrunedSvtxTrackSeedContainer");
+      trackpruner->set_track_pt_low_cut(0.5);
+      trackpruner->set_track_quality_high_cut(100);
+      trackpruner->set_nmvtx_clus_low_cut(3);
+      trackpruner->set_nintt_clus_low_cut(2);
+      trackpruner->set_ntpc_clus_low_cut(35);
+      trackpruner->set_ntpot_clus_low_cut(1);
+      trackpruner->set_nmvtx_states_low_cut(3);
+      trackpruner->set_nintt_states_low_cut(2);
+      trackpruner->set_ntpc_states_low_cut(35);
+      trackpruner->set_ntpot_states_low_cut(1);
+      se->registerSubsystem(trackpruner);
+
+      // Refit the pruned seeds using only silicon and Micromegas clusters.
+      auto genfitFit_SiTpotFit = new PHGenFitTrkFitter;
+      genfitFit_SiTpotFit->set_fit_silicon_mms(G4TRACKING::SC_CALIBMODE);
+      genfitFit_SiTpotFit->set_use_micromegas(G4TRACKING::SC_USE_MICROMEGAS);
+      genfitFit_SiTpotFit->set_svtx_track_map_name("SvtxSiliconMMTrackMap");
+      genfitFit_SiTpotFit->set_svtx_seed_map_name("PrunedSvtxTrackSeedContainer");
+      se->registerSubsystem(genfitFit_SiTpotFit);
 
     }
   }

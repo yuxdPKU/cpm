@@ -11,7 +11,7 @@ request_memory = 8GB
 request_cpus   = 1
 
 Priority       = 20
-GetEnv         = True
+#GetEnv         = True
 Requirements   = (CPU_Speed >= 1)
 Rank           = CPU_Speed
 

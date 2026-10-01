@@ -10,7 +10,7 @@ PeriodicHold   = (NumJobStarts>=1 && JobStatus == 1)
 # Jobs by default get 1.4Gb of RAM allocated, ask for more if needed
 # but if a job needs more than 2Gb it will not be able to run on the
 # older nodes
-request_memory = 8GB
+request_memory = 2000MB
 
 # If you need multiple cores you can ask for them, but the scheduling
 # may take longer the "larger" a job you ask for
@@ -23,7 +23,7 @@ Priority=20
 
 # Copy all of the user's current shell environment variables 
 # at the time of job submission.
-GetEnv=True
+#GetEnv=True
 
 # The requirement line specifies which machines we want to
 # run this job on.  Any arbitrary classad expression can
@@ -45,21 +45,26 @@ Executable     = $(Initialdir)/macro/run_sim_reco.sh
 
 RunNumber      = 29
 Nevent         = 1000
-NJob           = 1000
+NJob           = 2000
 
 Segment        = $(Process)
 DstFileName    = G4Hits_pythia8_Detroit-$INT(RunNumber,%010d)-$INT(Segment,%06d).root
 OutDir         = $(Initialdir)/root/
-OutPrefix      = CPM_sim_reco_truth
-DoTruthSeeding = true
+#DoTruthSeeding = true
+DoTruthSeeding = false
 DoTruthFitting = true
 FitMode        = auto
+#StaticDistortionInput = false
+StaticDistortionInput = true
+OutPrefix      = CPM_sim_reco_FITtruth_DISTORTIONINPUT$(StaticDistortionInput)_TRUTHSEEDING$(DoTruthSeeding)
+WriteMiniDst   = false
+WritePrunedSeedsToMiniDst = false
 Index          = 0
 StepSize       = 0
 
 # The argument to pass to the executable.
 #tracking firt then calo, only one tracking file
-Arguments      = "$(Nevent) $(DstFileName) $(OutDir) $(OutPrefix) $(DoTruthSeeding) $(DoTruthFitting) $(FitMode) $(Index) $(StepSize)"
+Arguments      = "$(Nevent) $(DstFileName) $(OutDir) $(OutPrefix) $(DoTruthSeeding) $(DoTruthFitting) $(FitMode) $(StaticDistortionInput) $(WriteMiniDst) $(WritePrunedSeedsToMiniDst) $(Index) $(StepSize)"
 
 # The job's stdout is sent to this file.
 Output         = $(Initialdir)/log/job-$(OutPrefix)-$(RunNumber).$(Segment).$(Index).$(Cluster).$(Process).out
@@ -68,7 +73,8 @@ Output         = $(Initialdir)/log/job-$(OutPrefix)-$(RunNumber).$(Segment).$(In
 Error          = $(Initialdir)/log/job-$(OutPrefix)-$(RunNumber).$(Segment).$(Index).$(Cluster).$(Process).err
 
 # The condor log file for this job, useful when debugging.
-Log            = $(Initialdir)/log/job-$(OutPrefix)-$(RunNumber).$(Segment).$(Index).$(Cluster).$(Process).log
+#Log            = $(Initialdir)/log/job-$(OutPrefix)-$(RunNumber).$(Segment).$(Index).$(Cluster).$(Process).log
+Log            = /tmp/job-$(OutPrefix)-$(RunNumber).$(Segment).$(Index).$(Cluster).$(Process).log
 
 #should_transfer_files   = YES
 #when_to_transfer_output = ON_EXIT_OR_EVICT
