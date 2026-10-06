@@ -270,3 +270,39 @@ cmake -S module -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+
+### Local crossing protection (2026-10-06)
+
+Both line and helix pair solvers enforce a finite local path window. Helix
+search starts at the translated track states (`s=t=0`), uses decreasing-distance
+backtracking, and requires convergence and a positive-definite local Hessian.
+Iteration exhaustion, stagnation, nonfinite input, and insufficient opening angle
+are rejected. Line fallback is disabled by default; when explicitly enabled,
+it has the same angle/path checks and final voxel-locality check.
+
+Production `run_cpm_b_chain.sh` accepts `--max-abs-path` and
+`--max-midpoint-distance` in cm (both default to 5), and `--allow-line-fallback`.
+The 5 cm defaults are provisional protection limits, not measured distortion
+bounds: validate efficiency, angle dependence, and truth closure before using a
+new map. A DCA cut alone does not constrain crossing location. The same options
+are trailing arguments in the production macro and B1 QA macro.
+
+Merged files preserve and check partial-file cuts, solver, averaging mode, and
+`solver_protection_version`. Legacy partials remain version 0; merging does not
+repair their already accumulated nonlocal crossings. Do not mix protection
+versions or configurations. Recompute pairing from saved voxel records.
+
+Production ROOT invocations use `scripts/run_guarded.py`; each owns a separate
+process group, enforces a finite timeout, and verifies cleanup. Set
+`CPM_ROOT_TIMEOUT_SECONDS` to change the default 3600 seconds per invocation.
+
+`module/test_local_line_poca.cc` covers local zero-residual crossings, distant
+zero-DCA branches, parallel degeneracy, iteration exhaustion, stagnation,
+invalid limits, angular checks including fallback, and ROOT metadata merge
+round trips/mismatches. Run it from a writable scratch directory after building.
+For corrected-input diagnosis, use Job A QA `state_x/y/z` and `cluster_x/y/z`
+to inspect state-minus-cluster before pairing; the two positions must use the
+same distortion/crossing conventions. Small residuals alone do not cause a
+large physical radial distortion. No before/after input comparison or full data
+reprocessing has yet established which input change activated the old failure.

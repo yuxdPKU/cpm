@@ -698,6 +698,90 @@ bool CPMAverageCorrectionReconstruction::read_summary_tree(TFile& input)
     return false;
   }
 
+  // A merger must preserve the producing configuration, not its own defaults.
+  unsigned int protection_version = 0;  // legacy files predate these protections
+  if (summary->GetBranch("solver_protection_version"))
+  {
+    summary->SetBranchAddress("solver_protection_version", &protection_version);
+    summary->GetEntry(0);
+    summary->ResetBranchAddresses();
+  }
+  if (m_merge_config_loaded && protection_version != m_solver_protection_version)
+  {
+    std::cout << "CPM merge - inconsistent solver protection versions" << std::endl;
+    return false;
+  }
+  struct DoubleConfig { const char* name; double* destination; };
+  const DoubleConfig configs[] = {
+      {"max_pair_dca", &m_pair_options.max_pair_dca},
+      {"min_sin_angle", &m_pair_options.min_sin_angle},
+      {"min_pair_pt", &m_pair_options.min_pt},
+      {"magnetic_field_z", &m_pair_options.magnetic_field_z},
+      {"max_abs_path", &m_pair_options.max_abs_path},
+      {"max_midpoint_distance", &m_pair_options.max_midpoint_distance}};
+  for (const auto& config : configs)
+  {
+    if (!summary->GetBranch(config.name))
+    {
+      if (protection_version > 0) { return false; }
+      continue;
+    }
+    double value = 0.0;
+    summary->SetBranchAddress(config.name, &value);
+    summary->GetEntry(0);
+    summary->ResetBranchAddresses();
+    if (!std::isfinite(value) ||
+        (m_merge_config_loaded && value != *config.destination))
+    {
+      std::cout << "CPM merge - inconsistent/invalid " << config.name << std::endl;
+      return false;
+    }
+    *config.destination = value;
+  }
+  struct UIntConfig { const char* name; unsigned int* destination; };
+  const UIntConfig uint_configs[] = {
+      {"max_records_per_voxel", &m_max_records_per_voxel},
+      {"min_records_per_charge", &m_min_records_per_charge},
+      {"max_pair_records_per_charge_batch", &m_max_pair_records_per_charge_batch}};
+  for (const auto& config : uint_configs)
+  {
+    if (!summary->GetBranch(config.name)) { return false; }
+    unsigned int value = 0;
+    summary->SetBranchAddress(config.name, &value);
+    summary->GetEntry(0);
+    summary->ResetBranchAddresses();
+    if (m_merge_config_loaded && value != *config.destination) { return false; }
+    *config.destination = value;
+  }
+  std::string* solver = nullptr;
+  bool pair_weights = false;
+  bool fallback = false;
+  if (!summary->GetBranch("crossing_solver") || !summary->GetBranch("use_pair_weights") ||
+      (protection_version > 0 && !summary->GetBranch("allow_line_fallback"))) { return false; }
+  summary->SetBranchAddress("crossing_solver", &solver);
+  summary->SetBranchAddress("use_pair_weights", &pair_weights);
+  if (summary->GetBranch("allow_line_fallback"))
+  {
+    summary->SetBranchAddress("allow_line_fallback", &fallback);
+  }
+  summary->GetEntry(0);
+  const std::string solver_name = solver ? *solver : "";
+  summary->ResetBranchAddresses();
+  delete solver;
+  if (pair_weights != m_use_pair_weights ||
+      (m_merge_config_loaded &&
+       (solver_name != CPMReconstructionHelper::solver_name(m_pair_options.solver) ||
+        fallback != m_pair_options.allow_line_fallback)) ||
+      !set_crossing_solver(solver_name))
+  {
+    std::cout << "CPM merge - inconsistent averaging/solver configuration" << std::endl;
+    return false;
+  }
+  m_pair_options.allow_line_fallback = fallback;
+  m_min_pair_pt = m_pair_options.min_pt;
+  m_solver_protection_version = protection_version;
+  m_merge_config_loaded = true;
+
   unsigned int input_files = 0;
   unsigned long long input_records = 0;
   unsigned int input_voxels = 0;
@@ -929,6 +1013,10 @@ void CPMAverageCorrectionReconstruction::write_summary_tree(TFile& output) const
   unsigned int skipped_low_entry_voxels = m_summary.skipped_low_entry_voxels;
   unsigned int skipped_invalid_voxels = m_summary.skipped_invalid_voxels;
   unsigned int min_entries_per_voxel = m_min_entries_per_voxel;
+  unsigned int solver_protection_version = m_solver_protection_version;
+  double max_abs_path = m_pair_options.max_abs_path;
+  double max_midpoint_distance = m_pair_options.max_midpoint_distance;
+  bool allow_line_fallback = m_pair_options.allow_line_fallback;
   double max_pair_dca = m_pair_options.max_pair_dca;
   double min_sin_angle = m_pair_options.min_sin_angle;
   unsigned int max_records_per_voxel = m_max_records_per_voxel;
@@ -970,6 +1058,13 @@ void CPMAverageCorrectionReconstruction::write_summary_tree(TFile& output) const
   summary_tree.Branch("skipped_low_entry_voxels", &skipped_low_entry_voxels);
   summary_tree.Branch("skipped_invalid_voxels", &skipped_invalid_voxels);
   summary_tree.Branch("min_entries_per_voxel", &min_entries_per_voxel);
+  summary_tree.Branch("solver_protection_version", &solver_protection_version);
+  if (solver_protection_version > 0)
+  {
+    summary_tree.Branch("max_abs_path", &max_abs_path);
+    summary_tree.Branch("max_midpoint_distance", &max_midpoint_distance);
+    summary_tree.Branch("allow_line_fallback", &allow_line_fallback);
+  }
   summary_tree.Branch("max_pair_dca", &max_pair_dca);
   summary_tree.Branch("min_sin_angle", &min_sin_angle);
   summary_tree.Branch("max_records_per_voxel", &max_records_per_voxel);

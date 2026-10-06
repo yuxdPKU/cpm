@@ -421,7 +421,10 @@ void CPM_QA_B1_ComputePoCA(
     const unsigned int max_pair_records_per_voxel = 10,
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
-    const bool write_pair_tree = true)
+    const bool write_pair_tree = true,
+    const double max_abs_path = 5.0,
+    const double max_midpoint_distance = 5.0,
+    const bool allow_line_fallback = false)
 {
   const bool use_helix_solver = crossing_solver == "helix";
   if (crossing_solver != "line" && crossing_solver != "helix")
@@ -785,6 +788,9 @@ void CPM_QA_B1_ComputePoCA(
   pair_options.max_pair_dca = max_pair_dca;
   pair_options.magnetic_field_z = magnetic_field_z;
   pair_options.min_sin_angle = min_sin_angle;
+  pair_options.max_abs_path = max_abs_path;
+  pair_options.max_midpoint_distance = max_midpoint_distance;
+  pair_options.allow_line_fallback = allow_line_fallback;
 
   unsigned long long candidate_pairs = 0;
   unsigned long long accepted_pairs = 0;
@@ -1250,6 +1256,9 @@ void CPM_QA_B1_ComputePoCA(
   summary.Branch("skipped_low_charge_voxels", &skipped_low_charge_voxels);
   summary.Branch("candidate_pairs", &candidate_pairs);
   summary.Branch("accepted_pairs", &accepted_pairs);
+  summary.Branch("max_abs_path", &pair_options.max_abs_path);
+  summary.Branch("max_midpoint_distance", &pair_options.max_midpoint_distance);
+  summary.Branch("allow_line_fallback", &pair_options.allow_line_fallback);
   summary.Branch("max_pair_dca", &summary_max_pair_dca);
   summary.Branch("min_sin_angle", &summary_min_sin_angle);
   summary.Branch("max_records_per_voxel", &summary_max_records_per_voxel);
@@ -1322,7 +1331,10 @@ void CPM_QA_B1_ComputePoCA(
     const unsigned int max_pair_records_per_voxel = 10,
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
-    const bool write_pair_tree = true)
+    const bool write_pair_tree = true,
+    const double max_abs_path = 5.0,
+    const double max_midpoint_distance = 5.0,
+    const bool allow_line_fallback = false)
 {
   CPM_QA_B1_ComputePoCA(
       std::vector<std::string>{input_file},
@@ -1336,7 +1348,10 @@ void CPM_QA_B1_ComputePoCA(
       max_pair_records_per_voxel,
       crossing_solver,
       magnetic_field_z,
-      write_pair_tree);
+      write_pair_tree,
+      max_abs_path,
+      max_midpoint_distance,
+      allow_line_fallback);
 }
 
 void CPM_QA_B1_ComputePoCA(
@@ -1352,7 +1367,10 @@ void CPM_QA_B1_ComputePoCA(
     const unsigned int max_pair_records_per_voxel = 10,
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
-    const bool write_pair_tree = true)
+    const bool write_pair_tree = true,
+    const double max_abs_path = 5.0,
+    const double max_midpoint_distance = 5.0,
+    const bool allow_line_fallback = false)
 {
   const auto input_files = input_is_list ?
       CPMB1::read_file_list(input_file_or_list) :
@@ -1370,5 +1388,8 @@ void CPM_QA_B1_ComputePoCA(
       max_pair_records_per_voxel,
       crossing_solver,
       magnetic_field_z,
-      write_pair_tree);
+      write_pair_tree,
+      max_abs_path,
+      max_midpoint_distance,
+      allow_line_fallback);
 }

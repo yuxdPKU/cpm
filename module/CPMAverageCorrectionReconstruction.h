@@ -75,6 +75,9 @@ class CPMAverageCorrectionReconstruction
   {
     m_max_pair_records_per_charge_batch = value;
   }
+  void set_max_abs_path(double value) { m_pair_options.max_abs_path = value; }
+  void set_max_midpoint_distance(double value) { m_pair_options.max_midpoint_distance = value; }
+  void set_allow_line_fallback(bool value) { m_pair_options.allow_line_fallback = value; }
   void set_magnetic_field_z(double value) { m_pair_options.magnetic_field_z = value; }
   void set_crossing_solver(CPMReconstructionHelper::PairSolver solver) { m_pair_options.solver = solver; }
   bool set_crossing_solver(const std::string& solver);
@@ -94,6 +97,8 @@ class CPMAverageCorrectionReconstruction
   std::map<VoxelId, CPMReconstructionHelper::CorrectionAccumulator> m_accumulators;
   std::set<VoxelId> m_input_voxels;
   Summary m_summary;
+  bool m_merge_config_loaded = false;
+  unsigned int m_solver_protection_version = 1;
 
   bool m_use_pair_weights = true;
   unsigned int m_min_entries_per_voxel = 1;

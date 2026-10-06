@@ -76,6 +76,7 @@ class CPMReconstructionHelper
   struct LocalLinePoCAOptions
   {
     double min_sin_angle = 1.0e-4;
+    double max_abs_path = 5.0;  // cm; finite local search window
   };
 
   struct LocalLinePoCAResult
@@ -104,10 +105,11 @@ class CPMReconstructionHelper
     double min_hessian_determinant = 1.0e-18;
     double gradient_tolerance = 1.0e-9;
     double step_tolerance = 1.0e-9;
-    double max_abs_path = 100.0;
-    double max_step = 10.0;
+    double max_abs_path = 5.0;
+    double max_step = 1.0;
+    double min_sin_angle = 1.0e-4;
     unsigned int max_iterations = 50;
-    bool allow_line_fallback = true;
+    bool allow_line_fallback = false;
   };
 
   struct HelixEvaluation
@@ -149,6 +151,9 @@ class CPMReconstructionHelper
     double max_pair_dca = 2.0;
     double magnetic_field_z = 1.4;
     double min_sin_angle = 1.0e-4;
+    double max_abs_path = 5.0;
+    double max_midpoint_distance = 5.0;  // cm, provisional: validate with closure
+    bool allow_line_fallback = false;
   };
 
   struct PairResult

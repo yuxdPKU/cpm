@@ -57,7 +57,12 @@ CPMReconstructionHelper::compute_local_line_poca(
   result.point_b = point_b + v * result.t;
   result.midpoint = (result.point_a + result.point_b) * 0.5;
   result.dca = (result.point_a - result.point_b).Mag();
-  result.valid = std::isfinite(result.dca);
+  result.valid = std::isfinite(result.dca) &&
+      std::isfinite(result.s) && std::isfinite(result.t) &&
+      std::isfinite(options.max_abs_path) && options.max_abs_path > 0.0 &&
+      std::isfinite(options.min_sin_angle) && options.min_sin_angle > 0.0 &&
+      std::fabs(result.s) <= options.max_abs_path &&
+      std::fabs(result.t) <= options.max_abs_path;
 
   return result;
 }
@@ -107,15 +112,6 @@ namespace
            options.magnetic_field_z / momentum_norm;
   }
 
-  double clamp_step(const double step, const double max_step)
-  {
-    if (!(max_step > 0.0) || std::fabs(step) <= max_step)
-    {
-      return step;
-    }
-    return std::copysign(max_step, step);
-  }
-
   bool within_path_window(
       const double s,
       const double t,
@@ -131,15 +127,19 @@ namespace
 
   CPMReconstructionHelper::HelixPoCAResult line_fallback(
       const CPMReconstructionHelper::HelixState& state_a,
-      const CPMReconstructionHelper::HelixState& state_b)
+      const CPMReconstructionHelper::HelixState& state_b,
+      const CPMReconstructionHelper::HelixPoCAOptions& options)
   {
     CPMReconstructionHelper::HelixPoCAResult result;
+    CPMReconstructionHelper::LocalLinePoCAOptions line_options;
+    line_options.min_sin_angle = options.min_sin_angle;
+    line_options.max_abs_path = options.max_abs_path;
     const auto line_result = CPMReconstructionHelper::compute_local_line_poca(
         state_a.position,
         state_a.momentum,
         state_b.position,
         state_b.momentum,
-        CPMReconstructionHelper::LocalLinePoCAOptions{});
+        line_options);
 
     if (!line_result.valid)
     {
@@ -228,39 +228,32 @@ CPMReconstructionHelper::compute_helix_poca(
 {
   HelixPoCAResult result;
 
-  const auto initial = compute_local_line_poca(
-      state_a.position,
-      state_a.momentum,
-      state_b.position,
-      state_b.momentum,
-      LocalLinePoCAOptions{});
-  double s = initial.valid ? initial.s : 0.0;
-  double t = initial.valid ? initial.t : 0.0;
-
-  if (!within_path_window(s, t, options))
+  // Start at the translated states, not an unrestricted distant line crossing.
+  if (!finite_vector(state_a.position) || !finite_vector(state_b.position) ||
+      !finite_vector(state_a.momentum) || !finite_vector(state_b.momentum) ||
+      !std::isfinite(options.max_abs_path) || options.max_abs_path <= 0.0 ||
+      !std::isfinite(options.max_step) || options.max_step <= 0.0 ||
+      !std::isfinite(options.min_sin_angle) || options.min_sin_angle <= 0.0 ||
+      !std::isfinite(options.gradient_tolerance) || options.gradient_tolerance <= 0.0 ||
+      !std::isfinite(options.step_tolerance) || options.step_tolerance <= 0.0 ||
+      !std::isfinite(options.min_hessian_determinant) || options.min_hessian_determinant <= 0.0)
   {
-    s = 0.0;
-    t = 0.0;
+    return result;
   }
-
+  double s = 0.0;
+  double t = 0.0;
   for (unsigned int iteration = 0; iteration < options.max_iterations; ++iteration)
   {
     const auto eval_a = evaluate_helix(state_a, s, options);
     const auto eval_b = evaluate_helix(state_b, t, options);
     if (!eval_a.valid || !eval_b.valid)
     {
-      if (options.allow_line_fallback)
-      {
-        return line_fallback(state_a, state_b);
-      }
-      return result;
+      return result;  // invalid helix input must not be disguised by fallback
     }
-
     const TVector3 delta = eval_a.position - eval_b.position;
-    const double gradient_s = delta.Dot(eval_a.tangent);
-    const double gradient_t = -delta.Dot(eval_b.tangent);
-    result.gradient_norm = std::hypot(gradient_s, gradient_t);
-
+    const double gs = delta.Dot(eval_a.tangent);
+    const double gt = -delta.Dot(eval_b.tangent);
+    result.gradient_norm = std::hypot(gs, gt);
     result.iterations = iteration + 1;
     result.s = s;
     result.t = t;
@@ -268,50 +261,63 @@ CPMReconstructionHelper::compute_helix_poca(
     result.point_b = eval_b.position;
     result.midpoint = (result.point_a + result.point_b) * 0.5;
     result.dca = delta.Mag();
-    result.valid = std::isfinite(result.dca);
 
-    if (result.gradient_norm <= options.gradient_tolerance)
-    {
-      result.converged = result.valid;
-      return result;
-    }
-
-    const double hss =
-        eval_a.tangent.Dot(eval_a.tangent) + delta.Dot(eval_a.curvature);
-    const double htt =
-        eval_b.tangent.Dot(eval_b.tangent) - delta.Dot(eval_b.curvature);
+    const double angle_sin2 = eval_a.tangent.Cross(eval_b.tangent).Mag2();
+    const double hss = eval_a.tangent.Mag2() + delta.Dot(eval_a.curvature);
+    const double htt = eval_b.tangent.Mag2() - delta.Dot(eval_b.curvature);
     const double hst = -eval_a.tangent.Dot(eval_b.tangent);
     const double determinant = hss * htt - hst * hst;
-
-    if (std::fabs(determinant) <= options.min_hessian_determinant)
+    // A stationary point is usable only if it is an isolated local minimum.
+    if (!std::isfinite(result.dca) || !std::isfinite(result.gradient_norm) ||
+        !std::isfinite(determinant) || !std::isfinite(hss) || !std::isfinite(htt) ||
+        angle_sin2 <= options.min_sin_angle * options.min_sin_angle ||
+        hss <= 0.0 || htt <= 0.0 || determinant <= options.min_hessian_determinant)
     {
-      if (options.allow_line_fallback)
+      return options.allow_line_fallback ? line_fallback(state_a, state_b, options) : result;
+    }
+    if (result.gradient_norm <= options.gradient_tolerance)
+    {
+      result.valid = result.converged = true;
+      return result;
+    }
+    double ds = (-gs * htt + hst * gt) / determinant;
+    double dt = (hst * gs - hss * gt) / determinant;
+    const double largest_step = std::max(std::fabs(ds), std::fabs(dt));
+    if (!std::isfinite(largest_step)) { return result; }
+    if (largest_step > options.max_step)
+    {
+      ds *= options.max_step / largest_step;
+      dt *= options.max_step / largest_step;
+    }
+    if (std::hypot(ds, dt) <= options.step_tolerance)
+    {
+      return result;  // stagnation is not convergence
+    }
+    bool improved = false;
+    for (unsigned int backtrack = 0; backtrack < 24; ++backtrack)
+    {
+      const double ns = s + ds;
+      const double nt = t + dt;
+      if (within_path_window(ns, nt, options))
       {
-        return line_fallback(state_a, state_b);
+        const auto next_a = evaluate_helix(state_a, ns, options);
+        const auto next_b = evaluate_helix(state_b, nt, options);
+        if (next_a.valid && next_b.valid &&
+            (next_a.position - next_b.position).Mag2() < delta.Mag2())
+        {
+          s = ns;
+          t = nt;
+          improved = true;
+          break;
+        }
       }
-      return result;
+      ds *= 0.5;
+      dt *= 0.5;
     }
-
-    double delta_s = (-gradient_s * htt + hst * gradient_t) / determinant;
-    double delta_t = (hst * gradient_s - hss * gradient_t) / determinant;
-    delta_s = clamp_step(delta_s, options.max_step);
-    delta_t = clamp_step(delta_t, options.max_step);
-
-    if (std::hypot(delta_s, delta_t) <= options.step_tolerance)
-    {
-      result.converged = result.valid;
-      return result;
-    }
-
-    s += delta_s;
-    t += delta_t;
-    if (!within_path_window(s, t, options))
-    {
-      return result;
-    }
+    if (!improved) { return result; }
   }
+  return result;  // iteration exhaustion always remains invalid
 
-  return result;
 }
 
 bool CPMReconstructionHelper::pair_has_good_pt(
@@ -389,11 +395,14 @@ CPMReconstructionHelper::compute_pair(
   {
     HelixPoCAOptions helix_options;
     helix_options.magnetic_field_z = options.magnetic_field_z;
+    helix_options.max_abs_path = options.max_abs_path;
+    helix_options.min_sin_angle = options.min_sin_angle;
+    helix_options.allow_line_fallback = options.allow_line_fallback;
     const auto poca = compute_helix_poca(
         {point_a, input_a.state_momentum, input_a.charge},
         {point_b, input_b.state_momentum, input_b.charge},
         helix_options);
-    poca_valid = poca.valid;
+    poca_valid = poca.valid && poca.converged;
     result.used_line_fallback = poca.used_line_fallback;
     result.s = poca.s;
     result.t = poca.t;
@@ -406,6 +415,7 @@ CPMReconstructionHelper::compute_pair(
   {
     LocalLinePoCAOptions line_options;
     line_options.min_sin_angle = options.min_sin_angle;
+    line_options.max_abs_path = options.max_abs_path;
     const auto poca = compute_local_line_poca(
         point_a,
         input_a.state_momentum,
@@ -421,13 +431,18 @@ CPMReconstructionHelper::compute_pair(
     result.midpoint = poca.midpoint;
   }
 
-  if (!poca_valid)
+  if (!poca_valid || !finite_vector(voxel_center) ||
+      !finite_vector(result.point_a) || !finite_vector(result.point_b) ||
+      !finite_vector(result.midpoint) ||
+      !std::isfinite(options.max_midpoint_distance) || options.max_midpoint_distance <= 0.0 ||
+      (result.midpoint - voxel_center).Mag() > options.max_midpoint_distance)
   {
     result.status = PairStatus::InvalidPoCA;
     return result;
   }
 
-  if (!(result.dca <= options.max_pair_dca))
+  if (!(std::isfinite(options.max_pair_dca) && options.max_pair_dca >= 0.0 &&
+        result.dca <= options.max_pair_dca))
   {
     result.status = PairStatus::DcaRejected;
     return result;

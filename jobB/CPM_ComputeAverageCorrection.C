@@ -31,7 +31,10 @@ bool CPM_ComputeAverageCorrection(
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
     const std::string& metadata_file = "",
-    const unsigned long long max_input_records_per_chunk = 500000)
+    const unsigned long long max_input_records_per_chunk = 500000,
+    const double max_abs_path = 5.0,
+    const double max_midpoint_distance = 5.0,
+    const bool allow_line_fallback = false)
 {
   CPMAverageCorrectionReconstruction reconstruction;
   reconstruction.set_use_pair_weights(use_pair_weights);
@@ -43,6 +46,9 @@ bool CPM_ComputeAverageCorrection(
   reconstruction.set_min_pair_pt(min_pair_pt);
   reconstruction.set_max_pair_records_per_charge_batch(max_pair_records_per_charge_batch);
   reconstruction.set_magnetic_field_z(magnetic_field_z);
+  reconstruction.set_max_abs_path(max_abs_path);
+  reconstruction.set_max_midpoint_distance(max_midpoint_distance);
+  reconstruction.set_allow_line_fallback(allow_line_fallback);
   if (!reconstruction.set_crossing_solver(crossing_solver))
   {
     return false;
@@ -163,7 +169,10 @@ bool CPM_ComputeAverageCorrection(
     const std::string& crossing_solver = "helix",
     const double magnetic_field_z = 1.4,
     const std::string& metadata_file = "",
-    const unsigned long long max_input_records_per_chunk = 500000)
+    const unsigned long long max_input_records_per_chunk = 500000,
+    const double max_abs_path = 5.0,
+    const double max_midpoint_distance = 5.0,
+    const bool allow_line_fallback = false)
 {
   const auto input_files = input_is_list ?
       CPMReconstructionHelper::read_file_list(input_file_or_list) :
@@ -183,5 +192,8 @@ bool CPM_ComputeAverageCorrection(
       crossing_solver,
       magnetic_field_z,
       metadata_file,
-      max_input_records_per_chunk);
+      max_input_records_per_chunk,
+      max_abs_path,
+      max_midpoint_distance,
+      allow_line_fallback);
 }

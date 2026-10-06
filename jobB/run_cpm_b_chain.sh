@@ -31,7 +31,7 @@ Options:
                                 --input for single-file mode, first list entry
                                 for --input-is-list mode.
   --max-pair-dca VALUE          Max pair DCA. Default: 2.0
-  --min-sin-angle VALUE         Minimum sin(opening angle) for line solver.
+  --min-sin-angle VALUE         Minimum sin(opening angle) for both solvers.
                                 Default: 1.0e-4
   --max-records VALUE           Max raw records per voxel before skipping.
                                 0 disables this safety skip. Default: 0
@@ -45,6 +45,9 @@ Options:
                                 unlimited full-voxel batch.
                                 Default: 10
   --crossing-solver VALUE        Crossing solver: helix or line. Default: helix
+  --max-abs-path VALUE          Local path limit in cm (default 5).
+  --max-midpoint-distance VALUE Voxel-to-midpoint limit in cm (default 5).
+  --allow-line-fallback         Enable bounded line fallback (default off).
   --magnetic-field-z VALUE       Helix-solver Bz field in tesla. Default: 1.4
   --min-entries VALUE           Minimum accepted pairs per voxel. Default: 1
   --max-input-records-per-chunk VALUE
@@ -104,7 +107,7 @@ run_root_bool_check() {
   macro_file_q=$(root_string "$macro_file")
   echo
   echo "[run_cpm_b_chain] root bool check ${function_call}"
-  root -l -b -q -e "gROOT->LoadMacro(${macro_file_q}); bool ok = ${function_call}; gSystem->Exit(ok ? 0 : 1);"
+  python3 "${REPO_DIR}/scripts/run_guarded.py" --timeout "${CPM_ROOT_TIMEOUT_SECONDS:-3600}" -- root -l -b -q -e "gROOT->LoadMacro(${macro_file_q}); bool ok = ${function_call}; gSystem->Exit(ok ? 0 : 1);"
 }
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -124,6 +127,9 @@ B1_MIN_PAIR_PT="0.5"
 B1_MAX_PAIR_RECORDS="10"
 B1_CROSSING_SOLVER="helix"
 B1_MAGNETIC_FIELD_Z="1.4"
+B_MAX_ABS_PATH="5.0"
+B_MAX_MIDPOINT_DISTANCE="5.0"
+B_ALLOW_LINE_FALLBACK=0
 B2_MIN_ENTRIES="1"
 B2_USE_PAIR_WEIGHTS=1
 B_MAX_INPUT_RECORDS_PER_CHUNK="500000"
@@ -182,6 +188,18 @@ while [[ $# -gt 0 ]]; do
     --magnetic-field-z|--b1-magnetic-field-z)
       B1_MAGNETIC_FIELD_Z=${2:-}
       shift 2
+      ;;
+    --max-abs-path)
+      B_MAX_ABS_PATH=${2:-}
+      shift 2
+      ;;
+    --max-midpoint-distance)
+      B_MAX_MIDPOINT_DISTANCE=${2:-}
+      shift 2
+      ;;
+    --allow-line-fallback)
+      B_ALLOW_LINE_FALLBACK=1
+      shift
       ;;
     --min-entries|--b2-min-entries)
       B2_MIN_ENTRIES=${2:-}
@@ -277,6 +295,9 @@ echo "[run_cpm_b_chain] min_pair_pt: $B1_MIN_PAIR_PT"
 echo "[run_cpm_b_chain] max_pair_records_per_charge_batch: $B1_MAX_PAIR_RECORDS"
 echo "[run_cpm_b_chain] crossing_solver: $B1_CROSSING_SOLVER"
 echo "[run_cpm_b_chain] magnetic_field_z: $B1_MAGNETIC_FIELD_Z"
+echo "[run_cpm_b_chain] max_abs_path: $B_MAX_ABS_PATH cm"
+echo "[run_cpm_b_chain] max_midpoint_distance: $B_MAX_MIDPOINT_DISTANCE cm"
+echo "[run_cpm_b_chain] allow_line_fallback: $B_ALLOW_LINE_FALLBACK"
 echo "[run_cpm_b_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 echo "[run_cpm_b_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 echo "[run_cpm_b_chain] max_input_records_per_chunk: $B_MAX_INPUT_RECORDS_PER_CHUNK"
@@ -340,13 +361,13 @@ if [[ "$INPUT_IS_LIST" -eq 1 && "$B_FILES_PER_PROCESS" != "0" ]]; then
     segment_output_q=$(root_string "$segment_output")
     echo
     echo "[run_cpm_b_chain] running partial segment $((segment_index + 1))/${#SEGMENT_LISTS[@]}: $segment_list"
-    run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${segment_list_q},${segment_output_q},1,${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK})"
+    run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${segment_list_q},${segment_output_q},1,${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK},${B_MAX_ABS_PATH},${B_MAX_MIDPOINT_DISTANCE},${B_ALLOW_LINE_FALLBACK})"
   done
 
   PARTIAL_OUTPUT_LIST_Q=$(root_string "$PARTIAL_OUTPUT_LIST")
   run_root_bool_check "${MACRO_DIR}/CPM_MergeAverageCorrectionSums.C" "CPM_MergeAverageCorrectionSumsFromList(${PARTIAL_OUTPUT_LIST_Q},${B3_Q},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES})"
 else
-  run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK})"
+  run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK},${B_MAX_ABS_PATH},${B_MAX_MIDPOINT_DISTANCE},${B_ALLOW_LINE_FALLBACK})"
 fi
 
 run_root_bool_check "${MACRO_DIR}/CPM_QA_B3_CheckAverageCorrectionHistograms.C" "CPM_QA_B3_CheckAverageCorrectionHistograms(${B3_Q})"

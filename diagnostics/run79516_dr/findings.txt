@@ -1,0 +1,35 @@
+Run 79516 CPM dR investigation (2026-10-03)
+
+Inputs (read-only copies inspected with uproot):
+/gpfs/mnt/gpfs02/sphenix/user/xyu3/cpm/jobB/output/data_reco_FITacts_USEMMSfalse/run79516_CPM_unweighted_maxdca0p2_B3_average_correction_histograms.root
+/gpfs/mnt/gpfs02/sphenix/user/xyu3/cpm/jobB/output/data_reco_FITacts_USEMMStrue/run79516_CPM_unweighted_maxdca0p2_B3_average_correction_histograms.root
+
+Confirmed data:
+USEMMSfalse: 33,608 populated voxels; 10,754,229 accepted pairs; pair-weighted mean dR 22.1112 cm; voxel median 25.9319 cm; voxel range -44.8431 to 73.7959 cm.
+USEMMStrue: 6,862 populated voxels; 729,029 accepted pairs; pair-weighted mean dR 18.4093 cm; voxel median 21.9516 cm; voxel range -14.8853 to 70.0937 cm.
+Here pair-weighted means equal weighting per accepted pair, NOT the optional inverse-pT weighting. Both files use plain averaging.
+For entries>=100: false has 20,971 voxels, mean dR 21.7544 cm; true has 2,235 voxels, mean dR 15.8342 cm.
+Raw histogram contents match sum_delta_r/entries to <4e-6 cm. The optional weighted-sum representation gives exactly the same means in these plain runs. Large values are already in accumulation, not a plotting or normalization artifact.
+
+Concrete accepted distant crossing:
+USEMMStrue voxel (iphi,ir,iz)=(30,15,5): R=76.1875 cm; entries=1; dR=70.0936648 cm; midpoint radius=6.0938352 cm; DCA=0.0901236 cm.
+A higher-statistics example is voxel (29,15,16): R=76.1875 cm; entries=25; mean dR=66.4412798 cm; mean midpoint radius=9.7462202 cm; mean DCA=0.1022896 cm.
+Thus proximity of the TWO tracks does not guarantee proximity to the VOXEL. This is a nonlocal crossing estimate, not evidence that the physical radial cluster residual is 70 cm.
+
+Verified code on server agrees with the local implementation:
+CPMReconstructionHelper::compute_pair translates each state by cluster-minus-voxel-center, solves PoCA, accepts based on poca.valid and DCA alone, and defines delta_r=voxel_radius-midpoint_radius.
+compute_helix_poca initializes from unrestricted infinite-line PoCA; accepts initial paths within +/-100 cm. No midpoint-to-voxel locality criterion exists.
+Finite dca sets valid=true before convergence. Exceeding the path window or exhausting iterations returns this valid result, and compute_pair ignores converged.
+line_fallback uses unrestricted infinite lines and bypasses the helix path bound. Helix mode does not propagate the configurable min_sin_angle to its initializer or fallback.
+These are confirmed acceptance/solver defects. The B3 files contain sums, not per-pair s/t, convergence, fallback flags, or opening angle; the separate contributions of each defect cannot be quantified from these files. A common inward crossing branch is consistent with the positive dR bias; an exact common-vertex explanation has not been proved per pair.
+
+Independent metadata defect:
+Final cpm_b3_summary says max_pair_dca=2.0 in BOTH files. Production log job-159413.1.out explicitly runs CPM_ComputeAverageCorrection with max_pair_dca=0.2, helix, Bz=1.4. Voxel mean DCAs are all below 0.2.
+CPMAverageCorrectionReconstruction::read_summary_tree reads counts/grid but not solver/configuration. The merger creates a default reconstruction object; write_summary_tree writes default options. This explains misleading final metadata, not large dR. Other solver configuration fields can also be lost by this mechanism.
+
+Recommended correction/validation:
+Require a converged, finite solution and handle timeout/window/iteration failure as invalid. Verify minimum rather than any stationary point (positive-definite local Hessian or equivalent descent validation).
+Restrict crossing search to a physically justified local neighborhood of the translated states/voxel, apply equivalent locality/path/angle requirements to line fallback, and reject/flag distant branches. Do not choose the limit by forcing a desired small dR; tune against truth closure, efficiency, and angle conditioning.
+Persist pair-level s,t, midpoint offset, opening angle, convergence, fallback, and rejection reason on a bounded QA sample. Compare local line and helix results with truth closure and track-cluster residuals.
+Preserve and validate matching partial-file configurations when merging.
+Changing B3 plotting or cutting already-averaged dR cannot repair these maps. Rerun pairing and accumulation from saved voxel records after correcting/validating the solver. Original remote files and source code were not changed in this investigation.
