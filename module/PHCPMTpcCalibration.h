@@ -48,6 +48,7 @@ class PHCPMTpcCalibration : public SubsysReco
   void setClusterSource(const std::string& value) { m_cluster_source = value; }
   void setTrackSource(const std::string& value) { m_track_source = value; }
   void setTrackMapName(const std::string& value) { m_trackmapname = value; }
+  void setClusterMapName(const std::string& value) { m_clustermapname = value; }
   void setRunSegment(const int run, const int segment)
   {
     m_run = run;
@@ -123,6 +124,7 @@ class PHCPMTpcCalibration : public SubsysReco
   static double offsetMagnitude2(const TrackStateRecord& record);
 
   std::string m_trackmapname = "SvtxSiliconMMTrackMap";
+  std::string m_clustermapname = "TRKR_CLUSTER";
   std::string m_outputfile = "CPMVoxelContainer.root";
   std::string m_outputContainerName = "CPMVoxelContainer";
   std::string m_cluster_source;

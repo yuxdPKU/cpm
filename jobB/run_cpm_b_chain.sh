@@ -59,6 +59,8 @@ Options:
                                 partial output, then merge accumulator sums.
                                 0 disables this process-level split.
                                 Default: 200
+  --invalid-input-policy VALUE  How to handle unreadable or invalid-grid input
+                                files: skip or fail. Default: skip
   --weighted                    Use pair weights in voxel averaging. Default.
   --unweighted                  Use a simple unweighted average.
   --help                        Show this message.
@@ -134,6 +136,7 @@ B2_MIN_ENTRIES="1"
 B2_USE_PAIR_WEIGHTS=1
 B_MAX_INPUT_RECORDS_PER_CHUNK="500000"
 B_FILES_PER_PROCESS="200"
+B_INVALID_INPUT_POLICY="skip"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -213,6 +216,10 @@ while [[ $# -gt 0 ]]; do
       B_FILES_PER_PROCESS=${2:-}
       shift 2
       ;;
+    --invalid-input-policy)
+      B_INVALID_INPUT_POLICY=${2:-}
+      shift 2
+      ;;
     --weighted|--b2-weighted)
       B2_USE_PAIR_WEIGHTS=1
       shift
@@ -259,6 +266,19 @@ if [[ ! "$B_FILES_PER_PROCESS" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+case "$B_INVALID_INPUT_POLICY" in
+  skip)
+    B_SKIP_INVALID_INPUTS=1
+    ;;
+  fail)
+    B_SKIP_INVALID_INPUTS=0
+    ;;
+  *)
+    echo "Invalid --invalid-input-policy: $B_INVALID_INPUT_POLICY (expected skip or fail)" >&2
+    exit 2
+    ;;
+esac
+
 mkdir -p "$OUT_DIR"
 
 if [[ -z "$METADATA" ]]; then
@@ -302,6 +322,7 @@ echo "[run_cpm_b_chain] use_pair_weights: $B2_USE_PAIR_WEIGHTS"
 echo "[run_cpm_b_chain] min_entries_per_voxel: $B2_MIN_ENTRIES"
 echo "[run_cpm_b_chain] max_input_records_per_chunk: $B_MAX_INPUT_RECORDS_PER_CHUNK"
 echo "[run_cpm_b_chain] files_per_process: $B_FILES_PER_PROCESS"
+echo "[run_cpm_b_chain] invalid_input_policy: $B_INVALID_INPUT_POLICY"
 
 SEGMENT_LISTS=()
 SEGMENT_OUTPUTS=()
@@ -361,13 +382,13 @@ if [[ "$INPUT_IS_LIST" -eq 1 && "$B_FILES_PER_PROCESS" != "0" ]]; then
     segment_output_q=$(root_string "$segment_output")
     echo
     echo "[run_cpm_b_chain] running partial segment $((segment_index + 1))/${#SEGMENT_LISTS[@]}: $segment_list"
-    run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${segment_list_q},${segment_output_q},1,${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK},${B_MAX_ABS_PATH},${B_MAX_MIDPOINT_DISTANCE},${B_ALLOW_LINE_FALLBACK})"
+    run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${segment_list_q},${segment_output_q},1,${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK},${B_SKIP_INVALID_INPUTS},${B_MAX_ABS_PATH},${B_MAX_MIDPOINT_DISTANCE},${B_ALLOW_LINE_FALLBACK})"
   done
 
   PARTIAL_OUTPUT_LIST_Q=$(root_string "$PARTIAL_OUTPUT_LIST")
   run_root_bool_check "${MACRO_DIR}/CPM_MergeAverageCorrectionSums.C" "CPM_MergeAverageCorrectionSumsFromList(${PARTIAL_OUTPUT_LIST_Q},${B3_Q},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES})"
 else
-  run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK},${B_MAX_ABS_PATH},${B_MAX_MIDPOINT_DISTANCE},${B_ALLOW_LINE_FALLBACK})"
+  run_root_bool_check "${MACRO_DIR}/CPM_ComputeAverageCorrection.C" "CPM_ComputeAverageCorrection(${INPUT_Q},${B3_Q},${INPUT_IS_LIST},${B2_USE_PAIR_WEIGHTS},${B2_MIN_ENTRIES},${B1_MAX_PAIR_DCA},${B1_MIN_SIN_ANGLE},${B1_MAX_RECORDS},${B1_MIN_RECORDS_PER_CHARGE},${B1_MIN_PAIR_PT},${B1_MAX_PAIR_RECORDS},${B1_CROSSING_SOLVER_Q},${B1_MAGNETIC_FIELD_Z},${METADATA_Q},${B_MAX_INPUT_RECORDS_PER_CHUNK},${B_SKIP_INVALID_INPUTS},${B_MAX_ABS_PATH},${B_MAX_MIDPOINT_DISTANCE},${B_ALLOW_LINE_FALLBACK})"
 fi
 
 run_root_bool_check "${MACRO_DIR}/CPM_QA_B3_CheckAverageCorrectionHistograms.C" "CPM_QA_B3_CheckAverageCorrectionHistograms(${B3_Q})"

@@ -214,10 +214,10 @@ void PHCPMTpcCalibration::setGridDimensions(const int phiBins, const int rBins, 
 
 int PHCPMTpcCalibration::getNodes(PHCompositeNode* topNode)
 {
-  m_clusterContainer = findNode::getClass<TrkrClusterContainer>(topNode, "TRKR_CLUSTER");
+  m_clusterContainer = findNode::getClass<TrkrClusterContainer>(topNode, m_clustermapname);
   if (!m_clusterContainer)
   {
-    std::cout << PHWHERE << "No TRKR_CLUSTER node on node tree. Exiting." << std::endl;
+    std::cout << PHWHERE << " " << m_clustermapname << " not on node tree. Exiting." << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 

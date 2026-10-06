@@ -8,9 +8,13 @@
 
 #include <CPMAverageCorrectionReconstruction.h>
 #include <CPMReconstructionHelper.h>
+#include <CPMVoxelContainer.h>
+
+#include <TFile.h>
 
 #include <cstddef>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,6 +36,7 @@ bool CPM_ComputeAverageCorrection(
     const double magnetic_field_z = 1.4,
     const std::string& metadata_file = "",
     const unsigned long long max_input_records_per_chunk = 500000,
+    const bool skip_invalid_inputs = false,
     const double max_abs_path = 5.0,
     const double max_midpoint_distance = 5.0,
     const bool allow_line_fallback = false)
@@ -58,6 +63,12 @@ bool CPM_ComputeAverageCorrection(
             << input_files.size() << std::endl;
   std::cout << "CPM_ComputeAverageCorrection - max input records per chunk: "
             << max_input_records_per_chunk << std::endl;
+  std::cout << "CPM_ComputeAverageCorrection - skip invalid inputs: "
+            << skip_invalid_inputs << std::endl;
+
+  std::vector<std::string> skipped_invalid_input_files;
+  std::vector<std::string> skipped_empty_input_files;
+  std::size_t loaded_input_files = 0;
 
   for (std::size_t ifile = 0; ifile < input_files.size(); ++ifile)
   {
@@ -74,13 +85,48 @@ bool CPM_ComputeAverageCorrection(
                 << ": " << input_file << std::endl;
     }
 
-    if (!reconstruction.add_from_file(input_file))
+    std::unique_ptr<TFile> input(TFile::Open(input_file.c_str(), "READ"));
+    auto* source = input && !input->IsZombie() ?
+        dynamic_cast<CPMVoxelContainer*>(input->Get("CPMVoxelContainer")) : nullptr;
+
+    if (!source)
     {
       std::cout << "CPM_ComputeAverageCorrection - failed while loading input "
                 << (ifile + 1) << "/" << input_files.size()
                 << ": " << input_file << std::endl;
-      return false;
+      if (!skip_invalid_inputs)
+      {
+        return false;
+      }
+      skipped_invalid_input_files.push_back(input_file);
+      std::cout << "CPM_ComputeAverageCorrection - skipping invalid input: "
+                << input_file << std::endl;
+      continue;
     }
+
+    if (source->empty())
+    {
+      skipped_empty_input_files.push_back(input_file);
+      std::cout << "CPM_ComputeAverageCorrection - skipping empty input: "
+                << input_file << std::endl;
+      continue;
+    }
+
+    if (!reconstruction.add(*source))
+    {
+      std::cout << "CPM_ComputeAverageCorrection - failed while adding input "
+                << (ifile + 1) << "/" << input_files.size()
+                << ": " << input_file << std::endl;
+      if (!skip_invalid_inputs)
+      {
+        return false;
+      }
+      skipped_invalid_input_files.push_back(input_file);
+      std::cout << "CPM_ComputeAverageCorrection - skipping invalid input: "
+                << input_file << std::endl;
+      continue;
+    }
+    ++loaded_input_files;
 
     if (print_progress)
     {
@@ -111,14 +157,46 @@ bool CPM_ComputeAverageCorrection(
     }
   }
 
+  if (!skipped_empty_input_files.empty())
+  {
+    std::cout << "CPM_ComputeAverageCorrection - skipped empty input files: "
+              << skipped_empty_input_files.size() << std::endl;
+    for (const auto& filename : skipped_empty_input_files)
+    {
+      std::cout << "  " << filename << std::endl;
+    }
+  }
+
+  if (!skipped_invalid_input_files.empty())
+  {
+    std::cout << "CPM_ComputeAverageCorrection - skipped invalid input files: "
+              << skipped_invalid_input_files.size() << std::endl;
+    for (const auto& filename : skipped_invalid_input_files)
+    {
+      std::cout << "  " << filename << std::endl;
+    }
+  }
+
+  if (loaded_input_files == 0)
+  {
+    std::cout << "CPM_ComputeAverageCorrection - no valid input files were loaded"
+              << std::endl;
+    return false;
+  }
+
   if (!metadata_file.empty())
   {
     CPMAverageCorrectionReconstruction metadata_check;
     if (!metadata_check.add_from_file(metadata_file))
     {
-      return false;
+      if (!skip_invalid_inputs)
+      {
+        return false;
+      }
+      std::cout << "CPM_ComputeAverageCorrection - ignoring invalid metadata file: "
+                << metadata_file << std::endl;
     }
-    if (!CPMReconstructionHelper::same_grid(reconstruction.grid(), metadata_check.grid()))
+    else if (!CPMReconstructionHelper::same_grid(reconstruction.grid(), metadata_check.grid()))
     {
       std::cout << "CPM_ComputeAverageCorrection - provided metadata file has inconsistent CPMVoxelContainer grid: "
                 << metadata_file << std::endl;
@@ -170,6 +248,7 @@ bool CPM_ComputeAverageCorrection(
     const double magnetic_field_z = 1.4,
     const std::string& metadata_file = "",
     const unsigned long long max_input_records_per_chunk = 500000,
+    const bool skip_invalid_inputs = false,
     const double max_abs_path = 5.0,
     const double max_midpoint_distance = 5.0,
     const bool allow_line_fallback = false)
@@ -193,6 +272,7 @@ bool CPM_ComputeAverageCorrection(
       magnetic_field_z,
       metadata_file,
       max_input_records_per_chunk,
+      skip_invalid_inputs,
       max_abs_path,
       max_midpoint_distance,
       allow_line_fallback);
