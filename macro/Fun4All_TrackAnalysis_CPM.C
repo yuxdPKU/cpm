@@ -298,6 +298,7 @@ void Fun4All_TrackAnalysis_CPM(
     se->registerSubsystem(trackpruner);
 
     auto genfitFit_SiTpotFit = new PHGenFitTrkFitter;
+    // need setter for TRKR_CLUSTER_SEED
     genfitFit_SiTpotFit->set_fit_silicon_mms(G4TRACKING::SC_CALIBMODE);
     genfitFit_SiTpotFit->set_use_micromegas(G4TRACKING::SC_USE_MICROMEGAS);
     genfitFit_SiTpotFit->set_svtx_track_map_name("SvtxSiliconMMTrackMap");

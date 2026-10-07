@@ -3,6 +3,7 @@
 #include "CPMReconstructionHelper.h"
 
 #include <TFile.h>
+#include <TList.h>
 #include <TH3.h>
 #include <TH3F.h>
 #include <TTree.h>
@@ -116,7 +117,7 @@ bool CPMAverageCorrectionReconstruction::add(const CPMVoxelContainer& source)
   }
 
   const auto source_records = source.record_count();
-  if (!m_records.add(source))
+  if (!m_records.append(source))
   {
     return false;
   }
@@ -143,7 +144,9 @@ bool CPMAverageCorrectionReconstruction::add_from_file(
     return false;
   }
 
-  auto* source = dynamic_cast<CPMVoxelContainer*>(input->Get(objectname.c_str()));
+  std::unique_ptr<CPMVoxelContainer> source(
+      dynamic_cast<CPMVoxelContainer*>(input->Get(objectname.c_str())));
+  if (source) { input->GetList()->Remove(source.get()); }
   if (!source)
   {
     std::cout << "CPMAverageCorrectionReconstruction::add_from_file - could not find object "
@@ -329,6 +332,9 @@ bool CPMAverageCorrectionReconstruction::process_loaded_records()
   {
     return true;
   }
+
+  // Preserve the old stable event ordering, but only sort once per chunk.
+  m_records.sort_records();
 
   std::vector<VoxelId> voxels;
   voxels.reserve(m_records.voxel_count());

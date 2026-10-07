@@ -74,6 +74,12 @@ std::pair<double,double> SetCommonYRange(const std::vector<TH1*>& histograms)
     if (yMin == TMath::Infinity()) yMin = 0;
     if (yMax == -TMath::Infinity()) yMax = 1;
 
+    if (yMin<0) yMin *= 1.1;
+    else if (yMin>0) yMin *= 0.9;
+
+    if (yMax<0) yMax *= 0.9;
+    else if (yMax>0) yMax *= 1.1;
+
     for (TH1* h : histograms) {
         if (h) {
             h->SetMinimum(yMin);
@@ -96,6 +102,12 @@ std::pair<double,double> SetCommonZRange(const std::vector<TH2*>& histograms)
 
     if (zMin == TMath::Infinity()) zMin = 0;
     if (zMax == -TMath::Infinity()) zMax = 1;
+
+    if (zMin<0) zMin *= 1.1;
+    else if (zMin>0) zMin *= 0.9;
+
+    if (zMax<0) zMax *= 0.9;
+    else if (zMax>0) zMax *= 1.1;
 
     for (TH2* h : histograms) {
         if (h) {
@@ -921,15 +933,19 @@ else
 
 void AddOneDHistVectorToVectors(
     const std::vector<oneDHist>& histVector,
+    std::vector<TH1*>& hists_N,
     std::vector<TH1*>& hists_P,
     std::vector<TH1*>& hists_R,
     std::vector<TH1*>& hists_Z
 ) {
+    hists_N.clear();
     hists_P.clear();
     hists_R.clear();
     hists_Z.clear();
     
     for (const auto& hist : histVector) {
+        if (hist.h_N_neg) hists_N.push_back(hist.h_N_neg);
+        if (hist.h_N_pos) hists_N.push_back(hist.h_N_pos);
         if (hist.h_P_neg) hists_P.push_back(hist.h_P_neg);
         if (hist.h_P_pos) hists_P.push_back(hist.h_P_pos);
         if (hist.h_R_neg) hists_R.push_back(hist.h_R_neg);
@@ -941,15 +957,19 @@ void AddOneDHistVectorToVectors(
 
 void AddTwoDHistVectorToVectors(
     const std::vector<twoDHist>& histVector,
+    std::vector<TH2*>& hists_N,
     std::vector<TH2*>& hists_P,
     std::vector<TH2*>& hists_R,
     std::vector<TH2*>& hists_Z
 ) {
+    hists_N.clear();
     hists_P.clear();
     hists_R.clear();
     hists_Z.clear();
     
     for (const auto& hist : histVector) {
+        if (hist.h_N_neg) hists_N.push_back(hist.h_N_neg);
+        if (hist.h_N_pos) hists_N.push_back(hist.h_N_pos);
         if (hist.h_P_neg) hists_P.push_back(hist.h_P_neg);
         if (hist.h_P_pos) hists_P.push_back(hist.h_P_pos);
         if (hist.h_R_neg) hists_R.push_back(hist.h_R_neg);

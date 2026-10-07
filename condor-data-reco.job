@@ -45,7 +45,7 @@ Executable     = $(Initialdir)/macro/run_data_reco.sh
 
 Nevent         = 1000
 RunNumber      = 79516
-NJob           = 5000
+NJob           = 2000
 
 ANACDBVER      = ana573_2026p003_v001
 Segment        = $(Process)

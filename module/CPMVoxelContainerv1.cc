@@ -48,6 +48,13 @@ void CPMVoxelContainerv1::add(TrackStateRecord record)
 
 bool CPMVoxelContainerv1::add(const CPMVoxelContainer& other)
 {
+  if (!append(other)) { return false; }
+  sort_records();
+  return true;
+}
+
+bool CPMVoxelContainerv1::append(const CPMVoxelContainer& other)
+{
   const auto& other_grid = other.grid();
   if (!m_grid.valid() && other_grid.valid())
   {
@@ -73,7 +80,6 @@ bool CPMVoxelContainerv1::add(const CPMVoxelContainer& other)
     auto& out = m_records[voxel];
     out.insert(out.end(), records.begin(), records.end());
   }
-  sort_records();
   return true;
 }
 

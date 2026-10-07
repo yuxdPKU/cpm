@@ -1,6 +1,6 @@
 #include "utilities.h"
 
-void draw1D_r_fitter(bool useWeighted = false)
+void draw1D_phi_fitter(bool useWeighted = false)
 {
   gStyle->SetOptStat(0);
   TGaxis::SetMaxDigits(3);
@@ -9,26 +9,23 @@ void draw1D_r_fitter(bool useWeighted = false)
   const TString figureDir = Form("figure/%s", weightType.Data());
   gSystem->mkdir(figureDir, true);
 
-  std::vector<TString> phiTypes = {"central", "west", "east"};
-  for (const auto& phiType : phiTypes)
+  std::vector<float> selectRs={75, 70, 65, 60, 55, 50, 45, 40, 35, 30};
+  for (const auto& selectR : selectRs)
   {
-  oneDHist hists_mmsfalse{};
-  oneDHist hists_mmstrue{};
 
-  std::vector<float> selectZs={5, 10, 15, 30, 60, 80};
+  std::vector<float> selectZs={5, 10, 15, 30, 60};
   for (const auto& selectZ : selectZs)
   {
-    get1Dhist(Form("%s/hist_1Dr_Z%d_%s.root", inputDir.Data(), (int)selectZ, phiType.Data()), "CPM_data_reco_FITacts_USEMMSfalse", hists_mmsfalse, kBlack);
-    get1Dhist(Form("%s/hist_1Dr_Z%d_%s.root", inputDir.Data(), (int)selectZ, phiType.Data()), "CPM_data_reco_FITacts_USEMMStrue", hists_mmstrue, kRed - 7);
+    oneDHist hists_mmsfalse{};
+    get1Dhist(Form("%s/hist_1Dp_R%d_Z%d.root", inputDir.Data(), (int) selectR, (int)selectZ), "CPM_data_reco_FITacts_USEMMSfalse", hists_mmsfalse, kBlack);
 
-    if (!hists_mmsfalse.h_R_pos || !hists_mmstrue.h_R_pos) {
-      std::cerr << "Error: some histograms are null for Z = " << selectZ << std::endl;
+    if (!hists_mmsfalse.h_R_pos) {
+      std::cerr << "Error: some histograms are null for R = " << selectR << ", Z = " << selectZ << std::endl;
       continue;
     }
 
     std::vector<oneDHist> allHists = {
-      hists_mmsfalse,
-      hists_mmstrue
+      hists_mmsfalse
     };
 
     std::vector<TH1*> hists_N; hists_N.clear();
@@ -48,47 +45,38 @@ void draw1D_r_fitter(bool useWeighted = false)
     can->cd(1);
     gPad->SetLogy(1);
     hists_mmsfalse.h_N_pos->Draw("hist,same");
-    hists_mmstrue.h_N_pos->Draw("hist,same");
     can->cd(2);
     hists_mmsfalse.h_P_pos->Draw("hist,same");
-    hists_mmstrue.h_P_pos->Draw("hist,same");
     can->cd(3);
     gPad->SetLogy(0);
     hists_mmsfalse.h_R_pos->Draw("hist,same");
-    hists_mmstrue.h_R_pos->Draw("hist,same");
     can->cd(4);
     gPad->SetLogy(0);
     hists_mmsfalse.h_Z_pos->Draw("hist,same");
-    hists_mmstrue.h_Z_pos->Draw("hist,same");
     can->cd(5);
     gPad->SetLogy(1);
     hists_mmsfalse.h_N_neg->Draw("hist,same");
-    hists_mmstrue.h_N_neg->Draw("hist,same");
     can->cd(6);
     hists_mmsfalse.h_P_neg->Draw("hist,same");
-    hists_mmstrue.h_P_neg->Draw("hist,same");
     can->cd(7);
     gPad->SetLogy(0);
     hists_mmsfalse.h_R_neg->Draw("hist,same");
-    hists_mmstrue.h_R_neg->Draw("hist,same");
     can->cd(8);
     gPad->SetLogy(0);
     hists_mmsfalse.h_Z_neg->Draw("hist,same");
-    hists_mmstrue.h_Z_neg->Draw("hist,same");
 
     gPad->RedrawAxis();
 
     can->Update();
-    can->SaveAs(Form("%s/resid_vsR_from3D_atZ%d_%s.pdf", figureDir.Data(), (int)selectZ,phiType.Data()));
+    can->SaveAs(Form("%s/resid_vsP_from3D_atR%d_Z%d.pdf",figureDir.Data(),(int)selectR,(int)selectZ));
 
     TLegend *legend = new TLegend(0.1, 0.1, 0.9, 0.9);
     legend->SetHeader("ana573_2026p003_v001, Run 79516, poly seed");
     legend->AddEntry(hists_mmsfalse.h_P_pos, Form("No TPOT"), "F");
-    legend->AddEntry(hists_mmstrue.h_P_pos, Form("With TPOT"), "F");
     legend->Draw();
     TCanvas* can_leg = new TCanvas("can_leg","",2000,1200);
     legend->Draw();
-    can_leg->SaveAs(Form("%s/resid_vsR_from3D_leg_%s.pdf", figureDir.Data(), phiType.Data()));
+    can_leg->SaveAs(Form("%s/resid_vsP_from3D_leg.pdf",figureDir.Data()));
 
     delete can;
     delete can_leg;

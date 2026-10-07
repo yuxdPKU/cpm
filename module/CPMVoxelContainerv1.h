@@ -32,6 +32,8 @@ class CPMVoxelContainerv1 : public CPMVoxelContainer
 
   void add(TrackStateRecord record) override;
   bool add(const CPMVoxelContainer& other) override;
+  // Append without repeated sorting; callers sort once before processing.
+  bool append(const CPMVoxelContainer& other);
 
   [[nodiscard]] const std::vector<TrackStateRecord>* find(const VoxelId& voxel) const override;
   [[nodiscard]] const std::vector<TrackStateRecord>* find_by_index(int iphi, int ir, int iz) const override;
